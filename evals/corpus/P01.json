@@ -1,0 +1,90 @@
+{
+  "id": "P01",
+  "family": "plate",
+  "description": "Analytic plate 80x40x8 with four 6 mm corner holes",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Analytic plate 80x40x8 with four 6 mm corner holes",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "width": 80,
+      "height": 40,
+      "thickness": 8,
+      "hole_diameter": 6,
+      "edge_offset": 10
+    },
+    "features": [
+      {
+        "id": "base_profile",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "width",
+        "height_ref": "height"
+      },
+      {
+        "id": "base_solid",
+        "op": "extrude",
+        "profile_ref": "base_profile",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "mount_holes",
+        "op": "corner_hole_pattern",
+        "body_ref": "base_solid",
+        "diameter_ref": "hole_diameter",
+        "edge_offset_ref": "edge_offset",
+        "mode": "through_all"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "width",
+        "height",
+        "thickness"
+      ],
+      "holes": [
+        {
+          "diameter_ref": "hole_diameter",
+          "count": 4
+        }
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      80.0,
+      40.0,
+      8.0
+    ],
+    "volume": 24695.221316,
+    "solid_count": 1,
+    "holes": {
+      "6.0": 4
+    },
+    "hole_centers": {
+      "diameter": 6.0,
+      "centers": [
+        [
+          -30.0,
+          -10.0
+        ],
+        [
+          -30.0,
+          10.0
+        ],
+        [
+          30.0,
+          -10.0
+        ],
+        [
+          30.0,
+          10.0
+        ]
+      ]
+    }
+  }
+}

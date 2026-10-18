@@ -1,0 +1,46 @@
+{
+  "id": "H01",
+  "family": "shaft",
+  "description": "Two-step shaft 20x30 / 12x20",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Two-step shaft 20x30 / 12x20",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "d1": 20,
+      "l1": 30,
+      "d2": 12,
+      "l2": 20
+    },
+    "features": [
+      {
+        "id": "shaft",
+        "op": "stepped_shaft",
+        "sections": [
+          {
+            "diameter_ref": "d1",
+            "length_ref": "l1"
+          },
+          {
+            "diameter_ref": "d2",
+            "length_ref": "l2"
+          }
+        ]
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true
+    }
+  },
+  "oracle": {
+    "bbox": [
+      20,
+      20,
+      50
+    ],
+    "volume": 11686.724671,
+    "solid_count": 1
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "id": "S03",
+  "family": "spacer",
+  "description": "Small spacer OD12 ID6.4 L8",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Small spacer OD12 ID6.4 L8",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "outer_diameter": 12,
+      "inner_diameter": 6.4,
+      "length": 8
+    },
+    "features": [
+      {
+        "id": "body",
+        "op": "stepped_shaft",
+        "sections": [
+          {
+            "diameter_ref": "outer_diameter",
+            "length_ref": "length"
+          }
+        ],
+        "bore_diameter_ref": "inner_diameter"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "outer_diameter",
+        "outer_diameter",
+        "length"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      12,
+      12,
+      8
+    ],
+    "volume": 647.419414,
+    "solid_count": 1,
+    "holes": {
+      "6.4": 1
+    }
+  }
+}

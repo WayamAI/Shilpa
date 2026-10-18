@@ -1,0 +1,77 @@
+{
+  "id": "S05",
+  "family": "spacer",
+  "description": "Spacer OD40 ID20 L10 with 1 mm outer chamfer",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Spacer OD40 ID20 L10 with 1 mm outer chamfer",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "outer_diameter": 40,
+      "inner_diameter": 20,
+      "length": 10,
+      "chamfer": 1
+    },
+    "features": [
+      {
+        "id": "outer",
+        "op": "circle",
+        "plane": "XY",
+        "diameter_ref": "outer_diameter"
+      },
+      {
+        "id": "blank",
+        "op": "extrude",
+        "profile_ref": "outer",
+        "distance_ref": "length",
+        "direction": "positive_z"
+      },
+      {
+        "id": "edge_break",
+        "op": "chamfer",
+        "body_ref": "blank",
+        "distance_ref": "chamfer",
+        "edges": {
+          "curve": "circle",
+          "location": "top",
+          "boundary": "outer",
+          "expected_count": 1
+        }
+      },
+      {
+        "id": "bore",
+        "op": "hole",
+        "body_ref": "edge_break",
+        "diameter_ref": "inner_diameter"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "outer_diameter",
+        "outer_diameter",
+        "length"
+      ],
+      "holes": [
+        {
+          "diameter_ref": "inner_diameter",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      40,
+      40,
+      10
+    ],
+    "volume": 9362.993305,
+    "solid_count": 1,
+    "holes": {
+      "20": 1
+    }
+  }
+}

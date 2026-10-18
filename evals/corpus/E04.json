@@ -1,0 +1,74 @@
+{
+  "id": "E04",
+  "family": "enclosure",
+  "description": "Box with 1.5 mm top outer chamfer",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Box with 1.5 mm top outer chamfer",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "width": 90,
+      "depth": 70,
+      "height": 30,
+      "wall": 3,
+      "floor": 4,
+      "top_chamfer": 1.5
+    },
+    "features": [
+      {
+        "id": "outline",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "width",
+        "height_ref": "depth"
+      },
+      {
+        "id": "box",
+        "op": "extrude",
+        "profile_ref": "outline",
+        "distance_ref": "height",
+        "direction": "positive_z"
+      },
+      {
+        "id": "top_break",
+        "op": "chamfer",
+        "body_ref": "box",
+        "distance_ref": "top_chamfer",
+        "edges": {
+          "direction": "perpendicular_z",
+          "location": "top",
+          "curve": "line",
+          "boundary": "outer",
+          "expected_count": 4
+        }
+      },
+      {
+        "id": "cavity",
+        "op": "pocket",
+        "body_ref": "top_break",
+        "width_ref": "width - 2 * wall",
+        "height_ref": "depth - 2 * wall",
+        "depth_ref": "height - floor"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "width",
+        "depth",
+        "height"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      90,
+      70,
+      30
+    ],
+    "volume": 48868.5,
+    "solid_count": 1
+  }
+}

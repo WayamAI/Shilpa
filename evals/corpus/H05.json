@@ -1,0 +1,59 @@
+{
+  "id": "H05",
+  "family": "shaft",
+  "description": "Stepped shaft with 1 mm end chamfer",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Stepped shaft with 1 mm end chamfer",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "d1": 22,
+      "l1": 20,
+      "d2": 16,
+      "l2": 35,
+      "end_chamfer": 1
+    },
+    "features": [
+      {
+        "id": "shaft",
+        "op": "stepped_shaft",
+        "sections": [
+          {
+            "diameter_ref": "d1",
+            "length_ref": "l1"
+          },
+          {
+            "diameter_ref": "d2",
+            "length_ref": "l2"
+          }
+        ]
+      },
+      {
+        "id": "end_break",
+        "op": "chamfer",
+        "body_ref": "shaft",
+        "distance_ref": "end_chamfer",
+        "edges": {
+          "curve": "circle",
+          "location": "top",
+          "boundary": "any",
+          "expected_count": 1
+        }
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true
+    }
+  },
+  "oracle": {
+    "bbox": [
+      22,
+      22,
+      55
+    ],
+    "volume": 14615.736222,
+    "solid_count": 1
+  }
+}

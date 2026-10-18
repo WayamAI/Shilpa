@@ -1,0 +1,109 @@
+{
+  "id": "P03",
+  "family": "plate",
+  "description": "Plate 120x80x6 with a 3x2 grid of 6.6 mm holes",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Grid plate",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "width": 120,
+      "height": 80,
+      "thickness": 6,
+      "hole_diameter": 6.6,
+      "pitch_x": 40,
+      "pitch_y": 40,
+      "count_x": {
+        "value": 3,
+        "kind": "count"
+      },
+      "count_y": {
+        "value": 2,
+        "kind": "count"
+      }
+    },
+    "features": [
+      {
+        "id": "base_profile",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "width",
+        "height_ref": "height"
+      },
+      {
+        "id": "base_solid",
+        "op": "extrude",
+        "profile_ref": "base_profile",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "grid",
+        "op": "linear_hole_pattern",
+        "body_ref": "base_solid",
+        "diameter_ref": "hole_diameter",
+        "count_x_ref": "count_x",
+        "count_y_ref": "count_y",
+        "pitch_x_ref": "pitch_x",
+        "pitch_y_ref": "pitch_y"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "width",
+        "height",
+        "thickness"
+      ],
+      "holes": [
+        {
+          "diameter_ref": "hole_diameter",
+          "count": 6
+        }
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      120,
+      80,
+      6
+    ],
+    "volume": 56368.370016,
+    "solid_count": 1,
+    "holes": {
+      "6.6": 6
+    },
+    "hole_centers": {
+      "diameter": 6.6,
+      "centers": [
+        [
+          -40,
+          -20
+        ],
+        [
+          -40,
+          20
+        ],
+        [
+          0,
+          -20
+        ],
+        [
+          0,
+          20
+        ],
+        [
+          40,
+          -20
+        ],
+        [
+          40,
+          20
+        ]
+      ]
+    }
+  }
+}

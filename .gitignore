@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+var/
+evals/out/
+apps/studio/node_modules/
+apps/studio/dist/
+.pytest_cache/

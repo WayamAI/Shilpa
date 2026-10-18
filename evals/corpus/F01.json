@@ -1,0 +1,104 @@
+{
+  "id": "F01",
+  "family": "flange",
+  "description": "Flange OD100 with 4x10 on PCD70",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Flange OD100 with 4x10 on PCD70",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "outer_diameter": 100,
+      "thickness": 12,
+      "bore_diameter": 40,
+      "bolt_diameter": 10,
+      "pitch_diameter": 70,
+      "bolt_count": {
+        "value": 4,
+        "kind": "count"
+      }
+    },
+    "features": [
+      {
+        "id": "disc_profile",
+        "op": "circle",
+        "plane": "XY",
+        "diameter_ref": "outer_diameter"
+      },
+      {
+        "id": "disc",
+        "op": "extrude",
+        "profile_ref": "disc_profile",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "bolts",
+        "op": "polar_hole_pattern",
+        "body_ref": "disc",
+        "diameter_ref": "bolt_diameter",
+        "count_ref": "bolt_count",
+        "pitch_diameter_ref": "pitch_diameter"
+      },
+      {
+        "id": "bore",
+        "op": "hole",
+        "body_ref": "bolts",
+        "diameter_ref": "bore_diameter"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "outer_diameter",
+        "outer_diameter",
+        "thickness"
+      ],
+      "holes": [
+        {
+          "diameter_ref": "bolt_diameter",
+          "count": 4
+        },
+        {
+          "diameter_ref": "bore_diameter",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      100,
+      100,
+      12
+    ],
+    "volume": 75398.223686,
+    "solid_count": 1,
+    "holes": {
+      "10": 4,
+      "40": 1
+    },
+    "hole_centers": {
+      "diameter": 10,
+      "centers": [
+        [
+          35.0,
+          0.0
+        ],
+        [
+          2.1431318985078682e-15,
+          35.0
+        ],
+        [
+          -35.0,
+          4.2862637970157365e-15
+        ],
+        [
+          -6.429395695523604e-15,
+          -35.0
+        ]
+      ]
+    }
+  }
+}

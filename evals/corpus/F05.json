@@ -1,0 +1,90 @@
+{
+  "id": "F05",
+  "family": "flange",
+  "description": "Square flange 100x100x12 with 50 bore and 4x10 corners",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Square flange",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "width": 100,
+      "thickness": 12,
+      "bore_diameter": 50,
+      "bolt_diameter": 10,
+      "edge_offset": 12
+    },
+    "features": [
+      {
+        "id": "plate_profile",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "width",
+        "height_ref": "width"
+      },
+      {
+        "id": "plate",
+        "op": "extrude",
+        "profile_ref": "plate_profile",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "bolts",
+        "op": "corner_hole_pattern",
+        "body_ref": "plate",
+        "diameter_ref": "bolt_diameter",
+        "edge_offset_ref": "edge_offset"
+      },
+      {
+        "id": "bore",
+        "op": "hole",
+        "body_ref": "bolts",
+        "diameter_ref": "bore_diameter"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "width",
+        "width",
+        "thickness"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      100,
+      100,
+      12
+    ],
+    "volume": 92668.143914,
+    "solid_count": 1,
+    "holes": {
+      "10": 4,
+      "50": 1
+    },
+    "hole_centers": {
+      "diameter": 10,
+      "centers": [
+        [
+          -38,
+          -38
+        ],
+        [
+          -38,
+          38
+        ],
+        [
+          38,
+          -38
+        ],
+        [
+          38,
+          38
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "id": "S04",
+  "family": "spacer",
+  "description": "Thin washer OD50 ID25 T3",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Thin washer OD50 ID25 T3",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "outer_diameter": 50,
+      "inner_diameter": 25,
+      "length": 3
+    },
+    "features": [
+      {
+        "id": "outer",
+        "op": "circle",
+        "plane": "XY",
+        "diameter_ref": "outer_diameter"
+      },
+      {
+        "id": "blank",
+        "op": "extrude",
+        "profile_ref": "outer",
+        "distance_ref": "length",
+        "direction": "positive_z"
+      },
+      {
+        "id": "bore",
+        "op": "hole",
+        "body_ref": "blank",
+        "diameter_ref": "inner_diameter"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "outer_diameter",
+        "outer_diameter",
+        "length"
+      ],
+      "holes": [
+        {
+          "diameter_ref": "inner_diameter",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      50,
+      50,
+      3
+    ],
+    "volume": 4417.864669,
+    "solid_count": 1,
+    "holes": {
+      "25": 1
+    }
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "id": "B04",
+  "family": "bracket",
+  "description": "Heavy L bracket with holes and R6 inner fillet",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Heavy L bracket with holes and R6 inner fillet",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "width": 100,
+      "depth": 70,
+      "thickness": 10,
+      "height": 80,
+      "hole_diameter": 10.5,
+      "hole_pitch": 60,
+      "hole_count": {
+        "value": 2,
+        "kind": "count"
+      },
+      "one": {
+        "value": 1,
+        "kind": "count"
+      },
+      "inner_radius": 6
+    },
+    "features": [
+      {
+        "id": "base_profile",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "width",
+        "height_ref": "depth"
+      },
+      {
+        "id": "base",
+        "op": "extrude",
+        "profile_ref": "base_profile",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "base_holes",
+        "op": "linear_hole_pattern",
+        "body_ref": "base",
+        "diameter_ref": "hole_diameter",
+        "count_x_ref": "hole_count",
+        "count_y_ref": "one",
+        "pitch_x_ref": "hole_pitch",
+        "pitch_y_ref": "hole_pitch",
+        "center_y_ref": "-thickness / 2"
+      },
+      {
+        "id": "leg_profile",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "width",
+        "height_ref": "thickness",
+        "center_y_ref": "depth / 2 - thickness / 2"
+      },
+      {
+        "id": "leg",
+        "op": "extrude",
+        "profile_ref": "leg_profile",
+        "distance_ref": "height - thickness",
+        "direction": "positive_z",
+        "offset_ref": "thickness"
+      },
+      {
+        "id": "bracket",
+        "op": "boolean",
+        "operation": "union",
+        "target_ref": "base_holes",
+        "tool_ref": "leg"
+      },
+      {
+        "id": "inner_round",
+        "op": "fillet",
+        "body_ref": "bracket",
+        "radius_ref": "inner_radius",
+        "edges": {
+          "direction": "perpendicular_z",
+          "location": "between",
+          "curve": "line",
+          "boundary": "inner",
+          "expected_count": 1
+        }
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "width",
+        "depth",
+        "height"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      100,
+      70,
+      80
+    ],
+    "volume": 139040.763661,
+    "solid_count": 1,
+    "holes": {
+      "10.5": 2
+    },
+    "hole_centers": {
+      "diameter": 10.5,
+      "centers": [
+        [
+          -30.0,
+          -5.0
+        ],
+        [
+          30.0,
+          -5.0
+        ]
+      ]
+    }
+  }
+}

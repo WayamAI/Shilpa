@@ -1,0 +1,126 @@
+{
+  "id": "F04",
+  "family": "flange",
+  "description": "Flange OD80 with 8x6 rotated pi/8 rad",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Flange OD80 with 8x6 rotated pi/8 rad",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "outer_diameter": 80,
+      "thickness": 10,
+      "bore_diameter": 30,
+      "bolt_diameter": 6,
+      "pitch_diameter": 60,
+      "bolt_count": {
+        "value": 8,
+        "kind": "count"
+      },
+      "start_angle": {
+        "value": 0.39269908169872414,
+        "kind": "angle",
+        "unit": "rad"
+      }
+    },
+    "features": [
+      {
+        "id": "disc_profile",
+        "op": "circle",
+        "plane": "XY",
+        "diameter_ref": "outer_diameter"
+      },
+      {
+        "id": "disc",
+        "op": "extrude",
+        "profile_ref": "disc_profile",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "bolts",
+        "op": "polar_hole_pattern",
+        "body_ref": "disc",
+        "diameter_ref": "bolt_diameter",
+        "count_ref": "bolt_count",
+        "pitch_diameter_ref": "pitch_diameter",
+        "start_angle_ref": "start_angle"
+      },
+      {
+        "id": "bore",
+        "op": "hole",
+        "body_ref": "bolts",
+        "diameter_ref": "bore_diameter"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "outer_diameter",
+        "outer_diameter",
+        "thickness"
+      ],
+      "holes": [
+        {
+          "diameter_ref": "bolt_diameter",
+          "count": 8
+        },
+        {
+          "diameter_ref": "bore_diameter",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      80,
+      80,
+      10
+    ],
+    "volume": 40934.952276,
+    "solid_count": 1,
+    "holes": {
+      "6": 8,
+      "30": 1
+    },
+    "hole_centers": {
+      "diameter": 6,
+      "centers": [
+        [
+          27.716385975338603,
+          11.480502970952694
+        ],
+        [
+          11.480502970952696,
+          27.716385975338603
+        ],
+        [
+          -11.480502970952692,
+          27.716385975338603
+        ],
+        [
+          -27.716385975338603,
+          11.480502970952697
+        ],
+        [
+          -27.716385975338607,
+          -11.48050297095269
+        ],
+        [
+          -11.48050297095271,
+          -27.716385975338596
+        ],
+        [
+          11.480502970952701,
+          -27.7163859753386
+        ],
+        [
+          27.716385975338596,
+          -11.480502970952712
+        ]
+      ]
+    }
+  }
+}

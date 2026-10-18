@@ -1,0 +1,63 @@
+{
+  "id": "H03",
+  "family": "shaft",
+  "description": "Four-step hollow shaft with 6 mm bore",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Four-step hollow shaft with 6 mm bore",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "d1": 30,
+      "l1": 15,
+      "d2": 24,
+      "l2": 30,
+      "d3": 20,
+      "l3": 40,
+      "d4": 16,
+      "l4": 20,
+      "bore": 6
+    },
+    "features": [
+      {
+        "id": "shaft",
+        "op": "stepped_shaft",
+        "sections": [
+          {
+            "diameter_ref": "d1",
+            "length_ref": "l1"
+          },
+          {
+            "diameter_ref": "d2",
+            "length_ref": "l2"
+          },
+          {
+            "diameter_ref": "d3",
+            "length_ref": "l3"
+          },
+          {
+            "diameter_ref": "d4",
+            "length_ref": "l4"
+          }
+        ],
+        "bore_diameter_ref": "bore"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true
+    }
+  },
+  "oracle": {
+    "bbox": [
+      30,
+      30,
+      105
+    ],
+    "volume": 37793.359623,
+    "solid_count": 1,
+    "holes": {
+      "6": 1
+    }
+  }
+}

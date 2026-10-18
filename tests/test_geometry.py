@@ -1,0 +1,117 @@
+"""Geometry acceptance tests from the workbook (T001, T002, T009-T012, T016-T018)."""
+
+import copy
+import json
+import math
+from pathlib import Path
+
+import pytest
+
+from shilpa.adapters import build123d_adapter as adapter
+from shilpa.contracts.errors import ErrorCode
+from shilpa.pipeline import execute
+from shilpa.validators.geometry import hole_groups
+
+from .test_contracts import BLUEPRINT_PLATE, with_params
+
+
+def checks(res) -> dict:
+    return {c["name"]: c for c in res.validation["checks"]}
+
+
+def test_analytic_plate(tmp_path):  # T001
+    res = execute(BLUEPRINT_PLATE, tmp_path, oracle={"bbox": [80, 40, 8], "volume": 24695.2213, "solid_count": 1,
+                                                      "hole_centers": {"diameter": 6, "centers": [[-30, -10], [-30, 10], [30, -10], [30, 10]]}})
+    assert res.ok, res.error
+    m = res.validation["measurement"]
+    assert m["bbox_size"] == [80, 40, 8]
+    assert m["volume"] == pytest.approx(80 * 40 * 8 - 4 * math.pi * 9 * 8, rel=1e-6)
+    assert checks(res)["oracle_hole_centers"]["passed"]
+
+
+def test_width_edit_moves_holes_and_keeps_offset(tmp_path):  # T002
+    res = execute(with_params(width=100), tmp_path, oracle={"bbox": [100, 40, 8],
+                  "hole_centers": {"diameter": 6, "centers": [[-40, -10], [-40, 10], [40, -10], [40, 10]]}})
+    assert res.ok, res.error
+    assert checks(res)["oracle_hole_centers"]["passed"]
+
+
+def test_overlapping_holes_rejected(tmp_path):  # T009
+    r = copy.deepcopy(BLUEPRINT_PLATE)
+    r["parameters"].update(d=6, pitch=4, n={"value": 2, "kind": "count"}, one={"value": 1, "kind": "count"})
+    r["features"][2] = {"id": "grid", "op": "linear_hole_pattern", "body_ref": "base_solid", "diameter_ref": "d",
+                        "count_x_ref": "n", "count_y_ref": "one", "pitch_x_ref": "pitch", "pitch_y_ref": "pitch"}
+    res = execute(r, tmp_path)
+    assert not res.ok and res.error.code == ErrorCode.PRECONDITION_FAILED
+    assert "overlap" in res.error.message
+
+
+def test_hole_edge_clearance_rejected(tmp_path):  # T010
+    res = execute(with_params(hole_diameter=20), tmp_path)
+    assert not res.ok and res.error.code == ErrorCode.PRECONDITION_FAILED
+    assert not (tmp_path / "model.step").exists()
+
+
+def test_hole_off_the_part_rejected(tmp_path):
+    r = copy.deepcopy(BLUEPRINT_PLATE)
+    r["parameters"].update(x=38)
+    r["features"][2] = {"id": "h", "op": "hole", "body_ref": "base_solid", "diameter_ref": "hole_diameter", "center_x_ref": "x"}
+    res = execute(r, tmp_path)
+    assert not res.ok and res.error.code == ErrorCode.PRECONDITION_FAILED
+
+
+def test_excessive_fillet_is_structured_kernel_failure(tmp_path):  # T011
+    r = copy.deepcopy(BLUEPRINT_PLATE)
+    r["parameters"]["r"] = 30
+    r["features"].insert(2, {"id": "round", "op": "fillet", "body_ref": "base_solid", "radius_ref": "r",
+                             "edges": {"direction": "parallel_z", "boundary": "outer", "expected_count": 4}})
+    r["features"][3]["body_ref"] = "round"
+    res = execute(r, tmp_path)
+    assert not res.ok
+    assert res.error.code in (ErrorCode.KERNEL_FAILURE, ErrorCode.PRECONDITION_FAILED)
+    assert res.error.feature_id == "round" and res.error.retryable
+
+
+def test_selector_cardinality_is_enforced(tmp_path):  # T012
+    r = copy.deepcopy(BLUEPRINT_PLATE)
+    r["parameters"]["r"] = 2
+    r["features"].append({"id": "round", "op": "fillet", "body_ref": "mount_holes", "radius_ref": "r",
+                          "edges": {"direction": "parallel_z", "boundary": "outer", "expected_count": 2}})
+    res = execute(r, tmp_path)
+    assert not res.ok and res.error.code == ErrorCode.SELECTOR_AMBIGUOUS
+    assert res.error.details == {"matched": 4, "expected": 2}
+
+
+def test_roundtrip_stl_and_glb_scale(tmp_path):  # T016 T017 T018
+    res = execute(BLUEPRINT_PLATE, tmp_path)
+    c = checks(res)
+    assert c["step_roundtrip_volume"]["passed"]
+    assert c["stl_watertight"]["passed"] and c["stl_extent_mm"]["passed"]
+    assert c["glb_extent_m"]["passed"]
+    assert sorted(c["glb_extent_m"]["actual"]) == pytest.approx(sorted([0.08, 0.04, 0.008]), abs=5e-5)
+    units = json.loads((tmp_path / "model.stl.units.json").read_text())
+    assert units["units"] == "mm"
+
+
+def test_cancel_between_operations(tmp_path):
+    from shilpa.contracts.errors import ShilpaError
+
+    calls = {"n": 0}
+
+    def cancel():
+        calls["n"] += 1
+        return calls["n"] > 1
+
+    with pytest.raises(ShilpaError) as ei:
+        adapter.build(BLUEPRINT_PLATE, cancel_check=cancel)
+    assert ei.value.code == ErrorCode.CANCELLED
+
+
+def test_hole_detection_counts_unique_axes(tmp_path):
+    res = execute(BLUEPRINT_PLATE, tmp_path)
+    from shilpa.validators.geometry import Measurement, Cylinder
+
+    m = res.validation["measurement"]
+    cyl = [Cylinder(c["diameter"], tuple(c["axis"]), tuple(c["center"]), c["kind"]) for c in m["cylinders"]]
+    meas = Measurement(**{**m, "cylinders": cyl})
+    assert hole_groups(meas) == {6.0: 4}

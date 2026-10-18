@@ -1,0 +1,60 @@
+{
+  "id": "E03",
+  "family": "enclosure",
+  "description": "Small open box 50x50x30",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Small open box 50x50x30",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "width": 50,
+      "depth": 50,
+      "height": 30,
+      "wall": 2,
+      "floor": 2
+    },
+    "features": [
+      {
+        "id": "outline",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "width",
+        "height_ref": "depth"
+      },
+      {
+        "id": "box",
+        "op": "extrude",
+        "profile_ref": "outline",
+        "distance_ref": "height",
+        "direction": "positive_z"
+      },
+      {
+        "id": "cavity",
+        "op": "pocket",
+        "body_ref": "box",
+        "width_ref": "width - 2 * wall",
+        "height_ref": "depth - 2 * wall",
+        "depth_ref": "height - floor"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "width",
+        "depth",
+        "height"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      50,
+      50,
+      30
+    ],
+    "volume": 15752,
+    "solid_count": 1
+  }
+}

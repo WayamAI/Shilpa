@@ -1,0 +1,74 @@
+{
+  "id": "B01",
+  "family": "bracket",
+  "description": "L bracket 60 wide, 50 deep, 50 high, 6 thick",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "L bracket 60 wide, 50 deep, 50 high, 6 thick",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "width": 60,
+      "depth": 50,
+      "thickness": 6,
+      "height": 50
+    },
+    "features": [
+      {
+        "id": "base_profile",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "width",
+        "height_ref": "depth"
+      },
+      {
+        "id": "base",
+        "op": "extrude",
+        "profile_ref": "base_profile",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "leg_profile",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "width",
+        "height_ref": "thickness",
+        "center_y_ref": "depth / 2 - thickness / 2"
+      },
+      {
+        "id": "leg",
+        "op": "extrude",
+        "profile_ref": "leg_profile",
+        "distance_ref": "height - thickness",
+        "direction": "positive_z",
+        "offset_ref": "thickness"
+      },
+      {
+        "id": "bracket",
+        "op": "boolean",
+        "operation": "union",
+        "target_ref": "base",
+        "tool_ref": "leg"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "width",
+        "depth",
+        "height"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      60,
+      50,
+      50
+    ],
+    "volume": 33840,
+    "solid_count": 1
+  }
+}

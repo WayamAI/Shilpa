@@ -1,0 +1,102 @@
+{
+  "id": "P04",
+  "family": "plate",
+  "description": "Plate with R5 outer corners and four 5.5 mm holes",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Plate with R5 outer corners and four 5.5 mm holes",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "width": 90,
+      "height": 70,
+      "thickness": 6,
+      "hole_diameter": 5.5,
+      "edge_offset": 10,
+      "corner_radius": 5
+    },
+    "features": [
+      {
+        "id": "base_profile",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "width",
+        "height_ref": "height"
+      },
+      {
+        "id": "base_solid",
+        "op": "extrude",
+        "profile_ref": "base_profile",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "corner_round",
+        "op": "fillet",
+        "body_ref": "base_solid",
+        "radius_ref": "corner_radius",
+        "edges": {
+          "direction": "parallel_z",
+          "boundary": "outer",
+          "expected_count": 4
+        }
+      },
+      {
+        "id": "mount_holes",
+        "op": "corner_hole_pattern",
+        "body_ref": "corner_round",
+        "diameter_ref": "hole_diameter",
+        "edge_offset_ref": "edge_offset",
+        "mode": "through_all"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "width",
+        "height",
+        "thickness"
+      ],
+      "holes": [
+        {
+          "diameter_ref": "hole_diameter",
+          "count": 4
+        }
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      90.0,
+      70.0,
+      6.0
+    ],
+    "volume": 37101.039831,
+    "solid_count": 1,
+    "holes": {
+      "5.5": 4
+    },
+    "hole_centers": {
+      "diameter": 5.5,
+      "centers": [
+        [
+          -35.0,
+          -25.0
+        ],
+        [
+          -35.0,
+          25.0
+        ],
+        [
+          35.0,
+          -25.0
+        ],
+        [
+          35.0,
+          25.0
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "id": "H02",
+  "family": "shaft",
+  "description": "Three-step shaft",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Three-step shaft",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "d1": 25,
+      "l1": 10,
+      "d2": 18,
+      "l2": 40,
+      "d3": 12,
+      "l3": 25
+    },
+    "features": [
+      {
+        "id": "shaft",
+        "op": "stepped_shaft",
+        "sections": [
+          {
+            "diameter_ref": "d1",
+            "length_ref": "l1"
+          },
+          {
+            "diameter_ref": "d2",
+            "length_ref": "l2"
+          },
+          {
+            "diameter_ref": "d3",
+            "length_ref": "l3"
+          }
+        ]
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true
+    }
+  },
+  "oracle": {
+    "bbox": [
+      25,
+      25,
+      75
+    ],
+    "volume": 17914.932107,
+    "solid_count": 1
+  }
+}

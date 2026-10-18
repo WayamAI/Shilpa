@@ -1,0 +1,26 @@
+[project]
+name = "shilpa"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "azure-identity>=1.26.0",
+    "build123d==0.13.0",
+    "fastapi>=0.143.3",
+    "httpx>=0.28.1",
+    "openai>=3.35.1",
+    "pydantic>=2.14.1",
+    "python-dotenv>=1.2.4",
+    "python-multipart>=0.0.32",
+    "sqlalchemy>=2.1.5",
+    "sse-starlette>=3.5.0",
+    "trimesh>=5.1.1",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

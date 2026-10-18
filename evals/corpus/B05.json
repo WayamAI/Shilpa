@@ -1,0 +1,86 @@
+{
+  "id": "B05",
+  "family": "bracket",
+  "description": "Flat strap bracket 120x25x5 with two holes",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Strap bracket",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "length": 120,
+      "width": 25,
+      "thickness": 5,
+      "hole_diameter": 6.5,
+      "hole_pitch": 90,
+      "hole_count": {
+        "value": 2,
+        "kind": "count"
+      },
+      "one": {
+        "value": 1,
+        "kind": "count"
+      }
+    },
+    "features": [
+      {
+        "id": "strap_profile",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "length",
+        "height_ref": "width"
+      },
+      {
+        "id": "strap",
+        "op": "extrude",
+        "profile_ref": "strap_profile",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "holes",
+        "op": "linear_hole_pattern",
+        "body_ref": "strap",
+        "diameter_ref": "hole_diameter",
+        "count_x_ref": "hole_count",
+        "count_y_ref": "one",
+        "pitch_x_ref": "hole_pitch",
+        "pitch_y_ref": "hole_pitch"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "length",
+        "width",
+        "thickness"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      120,
+      25,
+      5
+    ],
+    "volume": 14668.169276,
+    "solid_count": 1,
+    "holes": {
+      "6.5": 2
+    },
+    "hole_centers": {
+      "diameter": 6.5,
+      "centers": [
+        [
+          -45,
+          0
+        ],
+        [
+          45,
+          0
+        ]
+      ]
+    }
+  }
+}

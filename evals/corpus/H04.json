@@ -1,0 +1,40 @@
+{
+  "id": "H04",
+  "family": "shaft",
+  "description": "Dowel pin D10 L100",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Dowel pin D10 L100",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "d1": 10,
+      "l1": 100
+    },
+    "features": [
+      {
+        "id": "shaft",
+        "op": "stepped_shaft",
+        "sections": [
+          {
+            "diameter_ref": "d1",
+            "length_ref": "l1"
+          }
+        ]
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true
+    }
+  },
+  "oracle": {
+    "bbox": [
+      10,
+      10,
+      100
+    ],
+    "volume": 7853.981634,
+    "solid_count": 1
+  }
+}

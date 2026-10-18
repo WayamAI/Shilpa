@@ -1,0 +1,118 @@
+{
+  "id": "F02",
+  "family": "flange",
+  "description": "Flange OD150 with 6x14 on PCD115 rotated 30 deg",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Flange OD150 with 6x14 on PCD115 rotated 30 deg",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "outer_diameter": 150,
+      "thickness": 16,
+      "bore_diameter": 60,
+      "bolt_diameter": 14,
+      "pitch_diameter": 115,
+      "bolt_count": {
+        "value": 6,
+        "kind": "count"
+      },
+      "start_angle": {
+        "value": 30,
+        "kind": "angle",
+        "unit": "deg"
+      }
+    },
+    "features": [
+      {
+        "id": "disc_profile",
+        "op": "circle",
+        "plane": "XY",
+        "diameter_ref": "outer_diameter"
+      },
+      {
+        "id": "disc",
+        "op": "extrude",
+        "profile_ref": "disc_profile",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "bolts",
+        "op": "polar_hole_pattern",
+        "body_ref": "disc",
+        "diameter_ref": "bolt_diameter",
+        "count_ref": "bolt_count",
+        "pitch_diameter_ref": "pitch_diameter",
+        "start_angle_ref": "start_angle"
+      },
+      {
+        "id": "bore",
+        "op": "hole",
+        "body_ref": "bolts",
+        "diameter_ref": "bore_diameter"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "outer_diameter",
+        "outer_diameter",
+        "thickness"
+      ],
+      "holes": [
+        {
+          "diameter_ref": "bolt_diameter",
+          "count": 6
+        },
+        {
+          "diameter_ref": "bore_diameter",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      150,
+      150,
+      16
+    ],
+    "volume": 222726.352769,
+    "solid_count": 1,
+    "holes": {
+      "14": 6,
+      "60": 1
+    },
+    "hole_centers": {
+      "diameter": 14,
+      "centers": [
+        [
+          49.79646071760523,
+          28.749999999999996
+        ],
+        [
+          3.5208595475486406e-15,
+          57.5
+        ],
+        [
+          -49.796460717605214,
+          28.750000000000018
+        ],
+        [
+          -49.796460717605235,
+          -28.749999999999986
+        ],
+        [
+          -1.056257864264592e-14,
+          -57.5
+        ],
+        [
+          49.796460717605235,
+          -28.749999999999982
+        ]
+      ]
+    }
+  }
+}

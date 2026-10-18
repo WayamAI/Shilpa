@@ -1,0 +1,117 @@
+{
+  "id": "F03",
+  "family": "flange",
+  "description": "Hub flange OD120 with hub D60x25 and 35 bore",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Hub flange",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "outer_diameter": 120,
+      "thickness": 12,
+      "hub_diameter": 60,
+      "hub_length": 25,
+      "bore_diameter": 35,
+      "bolt_diameter": 12,
+      "pitch_diameter": 90,
+      "bolt_count": {
+        "value": 4,
+        "kind": "count"
+      }
+    },
+    "features": [
+      {
+        "id": "disc_profile",
+        "op": "circle",
+        "plane": "XY",
+        "diameter_ref": "outer_diameter"
+      },
+      {
+        "id": "disc",
+        "op": "extrude",
+        "profile_ref": "disc_profile",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "bolts",
+        "op": "polar_hole_pattern",
+        "body_ref": "disc",
+        "diameter_ref": "bolt_diameter",
+        "count_ref": "bolt_count",
+        "pitch_diameter_ref": "pitch_diameter"
+      },
+      {
+        "id": "hub_profile",
+        "op": "circle",
+        "plane": "XY",
+        "diameter_ref": "hub_diameter"
+      },
+      {
+        "id": "hub",
+        "op": "extrude",
+        "profile_ref": "hub_profile",
+        "distance_ref": "hub_length",
+        "direction": "positive_z",
+        "offset_ref": "thickness"
+      },
+      {
+        "id": "joined",
+        "op": "boolean",
+        "operation": "union",
+        "target_ref": "bolts",
+        "tool_ref": "hub"
+      },
+      {
+        "id": "bore",
+        "op": "hole",
+        "body_ref": "joined",
+        "diameter_ref": "bore_diameter"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "outer_diameter",
+        "outer_diameter",
+        "thickness + hub_length"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      120,
+      120,
+      37
+    ],
+    "volume": 165375.793479,
+    "solid_count": 1,
+    "holes": {
+      "12": 4,
+      "35": 1
+    },
+    "hole_centers": {
+      "diameter": 12,
+      "centers": [
+        [
+          45,
+          0
+        ],
+        [
+          0,
+          45
+        ],
+        [
+          -45,
+          0
+        ],
+        [
+          0,
+          -45
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "id": "S02",
+  "family": "spacer",
+  "description": "Extruded spacer OD30 ID12.5 L15",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "Extruded spacer OD30 ID12.5 L15",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "outer_diameter": 30,
+      "inner_diameter": 12.5,
+      "length": 15
+    },
+    "features": [
+      {
+        "id": "outer",
+        "op": "circle",
+        "plane": "XY",
+        "diameter_ref": "outer_diameter"
+      },
+      {
+        "id": "blank",
+        "op": "extrude",
+        "profile_ref": "outer",
+        "distance_ref": "length",
+        "direction": "positive_z"
+      },
+      {
+        "id": "bore",
+        "op": "hole",
+        "body_ref": "blank",
+        "diameter_ref": "inner_diameter"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "outer_diameter",
+        "outer_diameter",
+        "length"
+      ],
+      "holes": [
+        {
+          "diameter_ref": "inner_diameter",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      30,
+      30,
+      15
+    ],
+    "volume": 8762.09826,
+    "solid_count": 1,
+    "holes": {
+      "12.5": 1
+    }
+  }
+}

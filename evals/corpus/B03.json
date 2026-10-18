@@ -1,0 +1,88 @@
+{
+  "id": "B03",
+  "family": "bracket",
+  "description": "L bracket with R4 inner fillet",
+  "recipe": {
+    "schema_version": "1.0",
+    "name": "L bracket with R4 inner fillet",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "width": 50,
+      "depth": 40,
+      "thickness": 5,
+      "height": 45,
+      "inner_radius": 4
+    },
+    "features": [
+      {
+        "id": "base_profile",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "width",
+        "height_ref": "depth"
+      },
+      {
+        "id": "base",
+        "op": "extrude",
+        "profile_ref": "base_profile",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "leg_profile",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "width",
+        "height_ref": "thickness",
+        "center_y_ref": "depth / 2 - thickness / 2"
+      },
+      {
+        "id": "leg",
+        "op": "extrude",
+        "profile_ref": "leg_profile",
+        "distance_ref": "height - thickness",
+        "direction": "positive_z",
+        "offset_ref": "thickness"
+      },
+      {
+        "id": "bracket",
+        "op": "boolean",
+        "operation": "union",
+        "target_ref": "base",
+        "tool_ref": "leg"
+      },
+      {
+        "id": "inner_round",
+        "op": "fillet",
+        "body_ref": "bracket",
+        "radius_ref": "inner_radius",
+        "edges": {
+          "direction": "perpendicular_z",
+          "location": "between",
+          "curve": "line",
+          "boundary": "inner",
+          "expected_count": 1
+        }
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "width",
+        "depth",
+        "height"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      50,
+      40,
+      45
+    ],
+    "volume": 20171.681469,
+    "solid_count": 1
+  }
+}
