@@ -109,9 +109,9 @@ def execute(recipe, out_dir: Path, oracle: dict | None = None, cancel_check=None
     if report.measurement is not None:
         size = report.measurement.bbox_size
         if (out_dir / "model.stl").exists():
-            report.checks += geometry.validate_stl(out_dir / "model.stl", size)
+            report.checks += geometry.validate_stl(out_dir / "model.stl", size, STL_TOLERANCE, STL_ANGULAR)
         if (out_dir / "preview.glb").exists():
-            report.checks += geometry.validate_glb(out_dir / "preview.glb", size)
+            report.checks += geometry.validate_glb(out_dir / "preview.glb", size, GLB_LINEAR, GLB_ANGULAR)
         report.passed = all(c.passed for c in report.checks)
     timings["validate"] = (time.perf_counter() - t0) * 1000
 

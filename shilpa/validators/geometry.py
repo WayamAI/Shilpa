@@ -201,24 +201,39 @@ def oracle_checks(m: Measurement, oracle: dict) -> list[Check]:
     return out
 
 
-def validate_stl(path: Path, expect_size_mm: tuple[float, float, float]) -> list[Check]:
+FLOAT32_SLACK = 1e-5  # relative: STL and glTF store float32 coordinates
+
+
+def mesh_extent_tolerance(size_mm, linear: float, angular: float) -> float:
+    """Largest shortfall of a tessellated extent: chord sagitta of the biggest arc plus linear deflection.
+
+    A fixed tolerance only works for small parts; a 180 mm disc meshed at 0.1 rad is legitimately
+    about 0.1 mm short across a diameter.
+    """
+    r = max(size_mm) / 2
+    return round(max(0.05, r * (1 - math.cos(angular / 2)) + linear), 4)
+
+
+def validate_stl(path: Path, expect_size_mm: tuple[float, float, float], linear: float = 0.01, angular: float = 0.1) -> list[Check]:
     import trimesh
 
     mesh = trimesh.load(str(path), force="mesh")
     size = tuple(float(x) for x in mesh.extents)
-    # Tessellation of curved boundaries can sit slightly inside the exact extent.
-    ok = all(abs(a - b) <= 0.05 for a, b in zip(size, expect_size_mm))
+    tol = mesh_extent_tolerance(expect_size_mm, linear, angular)
+    # A mesh may sit inside the exact extent by up to tol; outside only by float32 rounding.
+    ok = all(-FLOAT32_SLACK * max(b, 1.0) <= b - a <= tol for a, b in zip(size, expect_size_mm))
     return [
         Check("stl_watertight", bool(mesh.is_watertight), True, bool(mesh.is_watertight)),
-        Check("stl_extent_mm", ok, list(expect_size_mm), [_r(s, 4) for s in size], 0.05),
+        Check("stl_extent_mm", ok, list(expect_size_mm), [_r(s, 4) for s in size], tol, "tolerance from tessellation settings"),
     ]
 
 
-def validate_glb(path: Path, expect_size_mm: tuple[float, float, float]) -> list[Check]:
+def validate_glb(path: Path, expect_size_mm: tuple[float, float, float], linear: float = 0.05, angular: float = 0.2) -> list[Check]:
     import trimesh
 
     scene = trimesh.load(str(path), force="scene")
     size = tuple(float(x) for x in scene.extents)  # glTF is in metres
     want = tuple(s / 1000 for s in expect_size_mm)
-    ok = all(abs(a - b) <= 0.05 / 1000 for a, b in sorted(zip(sorted(size), sorted(want))))
-    return [Check("glb_extent_m", ok, [_r(s, 6) for s in want], [_r(s, 6) for s in size], 0.00005, "glTF uses metres, Y up")]
+    tol = mesh_extent_tolerance(expect_size_mm, linear, angular) / 1000
+    ok = all(-FLOAT32_SLACK * max(b, 1e-3) <= b - a <= tol for a, b in zip(sorted(size), sorted(want)))
+    return [Check("glb_extent_m", ok, [_r(s, 6) for s in want], [_r(s, 6) for s in size], tol, "glTF uses metres, Y up")]

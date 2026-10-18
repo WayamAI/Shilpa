@@ -380,13 +380,14 @@ def draw_turned(fx: dict, variant: str) -> Sheet:
     if bore:
         v.line(-total / 2, bore / 2, total / 2, bore / 2, w=THIN, dashes="[3 1.5] 0")
         v.line(-total / 2, -bore / 2, total / 2, -bore / 2, w=THIN, dashes="[3 1.5] 0")
-        v.leader(total / 2, bore / 2, 14, -18 - dmax / 2 * k, f"Ø{fmt(bore)} THRU")
+        # Below the view, clear of the length dimensions and of any chamfer callout above.
+        v.leader(total / 2, -bore / 2, 14, (v.Y(-dmax / 2) + 30) - v.Y(-bore / 2), f"Ø{fmt(bore)} THRU")
     if chamfer:
         c = P(p, chamfer["distance_ref"])
         d_last = secs[-1][0]
         v.leader(total / 2 - c / 2, d_last / 2 - c / 2, 10, -12, f"{fmt(c)} X 45°")
         sh.note(25, 250, ["CHAMFER APPLIES TO RIGHT-HAND (TOP) END OUTER EDGE ONLY."])
-    v.s.text(v.cx, v.Y(-dmax / 2) + 30, "SIDE VIEW (AXIS HORIZONTAL; LEFT END = BOTTOM)", 3.0)
+    v.s.text(v.cx, v.Y(-dmax / 2) + 40, "SIDE VIEW (AXIS HORIZONTAL; LEFT END = BOTTOM)", 3.0)
     end = View(sh, 60 + total * k + 40 + dmax * k / 2, 110, k)
     for d, _ in secs:
         end.circle(0, 0, d / 2)

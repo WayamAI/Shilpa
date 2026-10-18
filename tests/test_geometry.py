@@ -148,3 +148,15 @@ def test_single_row_pattern_allows_zero_pitch(tmp_path):  # regression: G2 L025
     r["features"][2] = {"id": "row", "op": "linear_hole_pattern", "body_ref": "base_solid", "diameter_ref": "hole_diameter",
                         "count_x_ref": "n", "count_y_ref": "one", "pitch_x_ref": "pitch", "pitch_y_ref": "zero"}
     assert execute(r, tmp_path).ok
+
+
+def test_large_round_part_mesh_checks(tmp_path):  # regression: 180 mm flange failed fixed 0.05 mm mesh tolerance
+    import json as _json
+    from pathlib import Path as _P
+
+    fx = _json.loads((_P(__file__).resolve().parents[1] / "evals" / "corpus" / "F02.json").read_text())
+    r = copy.deepcopy(fx["recipe"])
+    r["parameters"].update(outer_diameter=180, thickness=18, bore_diameter=75, bolt_diameter=13.5, pitch_diameter=145)
+    r["assertions"].pop("holes", None)
+    res = execute(r, tmp_path)
+    assert res.ok, [c for c in res.validation["checks"] if not c["passed"]]

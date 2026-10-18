@@ -150,3 +150,10 @@ h3 { font-size: 13px; margin: 18px 0 6px; text-transform: uppercase; letter-spac
 .review-table input { width: 90px; }
 .review-table code { font-size: 12px; }
 @media (max-width: 1000px) { .review-grid { grid-template-columns: 1fr; } .review-side { border-left: none; border-top: 1px solid var(--line); } }
+
+/* Keep the three-column workspace inside the viewport: panels shrink and wrap instead of widening the page. */
+.app { overflow-x: hidden; }
+.workspace > * { min-width: 0; }
+.composer .row { flex-wrap: wrap; }
+.composer .row > * { min-width: 0; }
+.composer select { flex: 1 1 140px; max-width: 100%; }

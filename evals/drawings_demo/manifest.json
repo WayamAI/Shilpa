@@ -1,0 +1,107 @@
+[
+  {
+    "id": "D1_base_plate",
+    "base": "P02",
+    "variant": "vector",
+    "file": "D1_base_plate.pdf",
+    "family": "plate",
+    "expected": {
+      "bbox": [
+        150.0,
+        90.0,
+        12.0
+      ],
+      "volume": 157438.407467,
+      "holes": {
+        "11.0": 4
+      }
+    }
+  },
+  {
+    "id": "D2_pump_flange",
+    "base": "F02",
+    "variant": "vector",
+    "file": "D2_pump_flange.pdf",
+    "family": "flange",
+    "expected": {
+      "bbox": [
+        180.0,
+        180.0,
+        18.0
+      ],
+      "volume": 357910.655449,
+      "holes": {
+        "13.5": 8,
+        "75.0": 1
+      }
+    }
+  },
+  {
+    "id": "D3_drive_shaft",
+    "base": "H02",
+    "variant": "scan",
+    "file": "D3_drive_shaft.pdf",
+    "family": "shaft",
+    "expected": {
+      "bbox": [
+        32.0,
+        32.0,
+        113.0
+      ],
+      "volume": 54924.464363,
+      "holes": {}
+    }
+  },
+  {
+    "id": "D4_motor_bracket",
+    "base": "B04",
+    "variant": "vector",
+    "file": "D4_motor_bracket.pdf",
+    "family": "bracket",
+    "expected": {
+      "bbox": [
+        90.0,
+        65.0,
+        75.0
+      ],
+      "volume": 94504.978113,
+      "holes": {
+        "9.0": 2
+      }
+    }
+  },
+  {
+    "id": "D5_controller_box",
+    "base": "E02",
+    "variant": "vector",
+    "file": "D5_controller_box.pdf",
+    "family": "enclosure",
+    "expected": {
+      "bbox": [
+        160.0,
+        100.0,
+        50.0
+      ],
+      "volume": 132344.26494,
+      "holes": {}
+    }
+  },
+  {
+    "id": "D6_spacer_ring",
+    "base": "S05",
+    "variant": "scan",
+    "file": "D6_spacer_ring.pdf",
+    "family": "spacer",
+    "expected": {
+      "bbox": [
+        56.0,
+        56.0,
+        14.0
+      ],
+      "volume": 24391.718062,
+      "holes": {
+        "30.0": 1
+      }
+    }
+  }
+]
