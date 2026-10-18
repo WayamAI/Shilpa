@@ -7,3 +7,6 @@ evals/out/
 .pytest_cache/
 tools/
 evals/external/data/
+
+# agent worktrees
+.claude/worktrees/
