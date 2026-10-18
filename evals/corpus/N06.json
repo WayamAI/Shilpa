@@ -1,0 +1,83 @@
+{
+  "id": "N06",
+  "family": "plate",
+  "description": "Plate 100x60x8 with four M5 countersunk holes 10 from the edges",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "Countersunk plate",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "width": 100,
+      "depth": 60,
+      "thickness": 8,
+      "edge_offset": 10
+    },
+    "features": [
+      {
+        "id": "outline",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "width",
+        "height_ref": "depth"
+      },
+      {
+        "id": "plate",
+        "op": "extrude",
+        "profile_ref": "outline",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "csk_holes",
+        "op": "corner_hole_pattern",
+        "body_ref": "plate",
+        "edge_offset_ref": "edge_offset",
+        "hole_type": "countersink",
+        "standard_size": "M5"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "width",
+        "depth",
+        "thickness"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      100,
+      60,
+      8
+    ],
+    "volume": 46862.0743,
+    "solid_count": 1,
+    "holes": {
+      "5.5": 4
+    },
+    "hole_centers": {
+      "diameter": 5.5,
+      "centers": [
+        [
+          -40,
+          -20
+        ],
+        [
+          -40,
+          20
+        ],
+        [
+          40,
+          -20
+        ],
+        [
+          40,
+          20
+        ]
+      ]
+    }
+  }
+}

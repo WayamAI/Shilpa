@@ -1,0 +1,108 @@
+{
+  "id": "N14",
+  "family": "plate",
+  "description": "Plate 100x60x8 with two mirrored 30 x 8 slots and one 20 x 8 slot turned 90 degrees",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "Slotted plate",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "length": 100,
+      "width": 60,
+      "thickness": 8,
+      "slot_length": 30,
+      "slot_width": 8,
+      "slot_y": 15,
+      "cross_length": 20,
+      "cross_x": 35,
+      "quarter_turn": {
+        "value": 90,
+        "kind": "angle"
+      }
+    },
+    "features": [
+      {
+        "id": "outline",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "length",
+        "height_ref": "width"
+      },
+      {
+        "id": "plate",
+        "op": "extrude",
+        "profile_ref": "outline",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "slot_outline",
+        "op": "slot",
+        "length_ref": "slot_length",
+        "width_ref": "slot_width",
+        "center_y_ref": "slot_y"
+      },
+      {
+        "id": "slot_cutter",
+        "op": "extrude",
+        "profile_ref": "slot_outline",
+        "distance_ref": "3 * thickness",
+        "direction": "symmetric"
+      },
+      {
+        "id": "slot_pair",
+        "op": "mirror",
+        "body_ref": "slot_cutter",
+        "plane": "XZ"
+      },
+      {
+        "id": "slotted",
+        "op": "boolean",
+        "operation": "cut",
+        "target_ref": "plate",
+        "tool_ref": "slot_pair"
+      },
+      {
+        "id": "cross_outline",
+        "op": "slot",
+        "length_ref": "cross_length",
+        "width_ref": "slot_width",
+        "center_x_ref": "cross_x",
+        "rotation_angle_ref": "quarter_turn"
+      },
+      {
+        "id": "cross_cutter",
+        "op": "extrude",
+        "profile_ref": "cross_outline",
+        "distance_ref": "3 * thickness",
+        "direction": "symmetric"
+      },
+      {
+        "id": "slotted_plate",
+        "op": "boolean",
+        "operation": "cut",
+        "target_ref": "slotted",
+        "tool_ref": "cross_cutter"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "length",
+        "width",
+        "thickness"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      100,
+      60,
+      8
+    ],
+    "volume": 41673.628421,
+    "solid_count": 1
+  }
+}

@@ -4,25 +4,14 @@ from __future__ import annotations
 
 import copy
 
-from typing import Literal
+from typing import Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..contracts.ir import (
-    Assumption,
-    Boolean,
-    CenteredRectangle,
-    Chamfer,
-    Circle,
-    CornerHolePattern,
-    Extrude,
-    Fillet,
-    Hole,
-    LinearHolePattern,
-    Pocket,
-    PolarHolePattern,
-    SteppedShaft,
-)
+from ..contracts.ir import FEATURE_TYPES, SCHEMA_VERSION, Assumption
+
+# The plan schema offers every IR operation; strict mode turns the union into an anyOf keyed by "op".
+PlanFeature = Union[FEATURE_TYPES]
 
 
 class _S(BaseModel):
@@ -83,10 +72,7 @@ class PlanOutput(_S):
     name: str
     units: Literal["mm", "cm", "m", "in"]
     parameters: list[PlanParameter]
-    features: list[
-        CenteredRectangle | Circle | Extrude | SteppedShaft | Hole | CornerHolePattern | LinearHolePattern
-        | PolarHolePattern | Pocket | Boolean | Fillet | Chamfer
-    ]
+    features: list[PlanFeature]
     expected_bbox_refs: list[str] | None = Field(description="three refs for the X, Y, Z overall size, or null")
     assumptions: list[Assumption]
     change_summary: str | None = Field(description="for edits and repairs: what changed and why")
@@ -102,14 +88,11 @@ def to_recipe(plan: dict) -> dict:
             params[p["name"]] = entry
         else:
             params[p["name"]] = p["value"]
-    features = [{k: v for k, v in f.items() if v is not None} for f in plan.get("features", [])]
-    for f in features:
-        if isinstance(f.get("edges"), dict):
-            f["edges"] = {k: v for k, v in f["edges"].items() if v is not None}
-        if isinstance(f.get("sections"), list):
-            f["sections"] = [{k: v for k, v in s.items() if v is not None} for s in f["sections"]]
+    # Strict mode makes every optional field an explicit null; nested segments, face selectors,
+    # edge selectors and shaft sections carry them too.
+    features = [_drop_nulls(f) for f in plan.get("features", [])]
     recipe = {
-        "schema_version": "1.0",
+        "schema_version": SCHEMA_VERSION,
         "name": plan.get("name"),
         "intent": "engineering_cad",
         "units": plan.get("units") or "mm",
@@ -122,6 +105,14 @@ def to_recipe(plan: dict) -> dict:
     if bbox and len(bbox) == 3:
         recipe["assertions"]["bbox_ref"] = bbox
     return recipe
+
+
+def _drop_nulls(node):
+    if isinstance(node, dict):
+        return {k: _drop_nulls(v) for k, v in node.items() if v is not None}
+    if isinstance(node, list):
+        return [_drop_nulls(v) for v in node]
+    return node
 
 
 def from_recipe(recipe: dict) -> dict:

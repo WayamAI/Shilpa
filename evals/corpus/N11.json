@@ -1,0 +1,52 @@
+{
+  "id": "N11",
+  "family": "spring",
+  "description": "Helical spring, \u00d82 wire, \u00d820 mean diameter, 5 pitch, 4 turns",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "Helical spring",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "wire_diameter": 2,
+      "mean_diameter": 20,
+      "pitch": 5,
+      "free_length": 20
+    },
+    "features": [
+      {
+        "id": "wire",
+        "op": "circle",
+        "plane": "XZ",
+        "diameter_ref": "wire_diameter",
+        "center_x_ref": "mean_diameter / 2"
+      },
+      {
+        "id": "coil",
+        "op": "helix",
+        "diameter_ref": "mean_diameter",
+        "pitch_ref": "pitch",
+        "height_ref": "free_length"
+      },
+      {
+        "id": "spring",
+        "op": "sweep",
+        "profile_ref": "wire",
+        "path_ref": "coil"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true
+    }
+  },
+  "oracle": {
+    "bbox": [
+      22,
+      22,
+      22
+    ],
+    "volume": 789.568352,
+    "solid_count": 1
+  }
+}

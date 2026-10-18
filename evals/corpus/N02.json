@@ -1,0 +1,69 @@
+{
+  "id": "N02",
+  "family": "tube",
+  "description": "Swept tube OD20 ID16: 50 rise, R40 90-degree bend, 60 run",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "Tube bend",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "outer_diameter": 20,
+      "inner_diameter": 16,
+      "rise": 50,
+      "bend_radius": 40,
+      "run": 60
+    },
+    "features": [
+      {
+        "id": "section",
+        "op": "circle",
+        "diameter_ref": "outer_diameter",
+        "inner_diameter_ref": "inner_diameter"
+      },
+      {
+        "id": "centreline",
+        "op": "path",
+        "plane": "XZ",
+        "start_x_ref": "0 * rise",
+        "start_y_ref": "0 * rise",
+        "segments": [
+          {
+            "kind": "line",
+            "x_ref": "0 * rise",
+            "y_ref": "rise"
+          },
+          {
+            "kind": "tangent_arc",
+            "x_ref": "bend_radius",
+            "y_ref": "rise + bend_radius"
+          },
+          {
+            "kind": "line",
+            "x_ref": "bend_radius + run",
+            "y_ref": "rise + bend_radius"
+          }
+        ]
+      },
+      {
+        "id": "tube",
+        "op": "sweep",
+        "profile_ref": "section",
+        "path_ref": "centreline"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true
+    }
+  },
+  "oracle": {
+    "bbox": [
+      110,
+      20,
+      100
+    ],
+    "volume": 19546.822077,
+    "solid_count": 1
+  }
+}

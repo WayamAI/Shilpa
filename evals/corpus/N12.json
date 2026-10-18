@@ -1,0 +1,137 @@
+{
+  "id": "N12",
+  "family": "gear",
+  "description": "Involute spur gear m2 z20 20 deg pressure angle, 10 wide, \u00d810 bore (one profiled tooth, polar pattern)",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "Spur gear m2 z20",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "module": 2,
+      "face_width": 10,
+      "bore": 10,
+      "teeth": {
+        "value": 20,
+        "kind": "count",
+        "note": "tooth outline coordinates are computed for 20 teeth; edit module only"
+      }
+    },
+    "features": [
+      {
+        "id": "root_circle",
+        "op": "circle",
+        "diameter_ref": "17.5 * module"
+      },
+      {
+        "id": "root_disc",
+        "op": "extrude",
+        "profile_ref": "root_circle",
+        "distance_ref": "face_width",
+        "direction": "positive_z"
+      },
+      {
+        "id": "tooth_outline",
+        "op": "profile",
+        "start_x_ref": "8.2140074499 * module",
+        "start_y_ref": "-0.7697932269 * module",
+        "segments": [
+          {
+            "kind": "line",
+            "x_ref": "9.3559299246 * module",
+            "y_ref": "-0.8768109271 * module"
+          },
+          {
+            "kind": "arc",
+            "x_ref": "10.1729065485 * module",
+            "y_ref": "-0.7215414319 * module",
+            "mid_x_ref": "9.7620758962 * module",
+            "mid_y_ref": "-0.8346824345 * module"
+          },
+          {
+            "kind": "arc",
+            "x_ref": "10.9945134312 * module",
+            "y_ref": "-0.3473822251 * module",
+            "mid_x_ref": "10.5845823654 * module",
+            "mid_y_ref": "-0.5570687949 * module"
+          },
+          {
+            "kind": "arc",
+            "x_ref": "10.9945134312 * module",
+            "y_ref": "0.3473822251 * module",
+            "mid_x_ref": "11.0 * module",
+            "mid_y_ref": "0.0 * module"
+          },
+          {
+            "kind": "arc",
+            "x_ref": "10.1729065485 * module",
+            "y_ref": "0.7215414319 * module",
+            "mid_x_ref": "10.5845823654 * module",
+            "mid_y_ref": "0.5570687949 * module"
+          },
+          {
+            "kind": "arc",
+            "x_ref": "9.3559299246 * module",
+            "y_ref": "0.8768109271 * module",
+            "mid_x_ref": "9.7620758962 * module",
+            "mid_y_ref": "0.8346824345 * module"
+          },
+          {
+            "kind": "line",
+            "x_ref": "8.2140074499 * module",
+            "y_ref": "0.7697932269 * module"
+          },
+          {
+            "kind": "arc",
+            "x_ref": "8.2140074499 * module",
+            "y_ref": "-0.7697932269 * module",
+            "mid_x_ref": "8.25 * module",
+            "mid_y_ref": "0.0 * module"
+          }
+        ]
+      },
+      {
+        "id": "tooth",
+        "op": "extrude",
+        "profile_ref": "tooth_outline",
+        "distance_ref": "face_width",
+        "direction": "positive_z"
+      },
+      {
+        "id": "teeth_set",
+        "op": "polar_pattern",
+        "body_ref": "tooth",
+        "count_ref": "teeth"
+      },
+      {
+        "id": "gear_blank",
+        "op": "boolean",
+        "operation": "union",
+        "target_ref": "root_disc",
+        "tool_ref": "teeth_set"
+      },
+      {
+        "id": "gear",
+        "op": "hole",
+        "body_ref": "gear_blank",
+        "diameter_ref": "bore"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true
+    }
+  },
+  "oracle": {
+    "bbox": [
+      44,
+      44,
+      10
+    ],
+    "volume": 11475.037754,
+    "solid_count": 1,
+    "holes": {
+      "10": 1
+    }
+  }
+}

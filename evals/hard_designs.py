@@ -2,7 +2,7 @@
 
 Oracles are closed-form. Run through the real stack via run_language's task runner.
 
-Run:  uv run python evals/hard_designs.py
+Run:  uv run python evals/hard_designs.py [port]
 """
 
 from __future__ import annotations
@@ -88,21 +88,70 @@ build("X06", "redundant but consistent dimensions must not be flagged as a confl
       "Plate 100 x 50 x 10 mm with four Ø6 through holes 10 mm from each edge; hole spacing is 80 mm along the length and 30 mm across.",
       (100, 50, 10), 100 * 50 * 10 - 4 * c(6) * 10, {6: 4})
 
+def bicylinder(r, big, n=4000):
+    """Common volume of perpendicular cylinders with intersecting axes, the thinner passing fully through."""
+    f = lambda t: r * r * math.cos(t) ** 2 * math.sqrt(big * big - (r * math.sin(t)) ** 2)  # noqa: E731
+    h = (PI / 2) / n
+    return 8 * h / 3 * (f(0) + f(PI / 2) + sum((4 if i % 2 else 2) * f(i * h) for i in range(1, n)))
+
+
+# IR 1.1 made the cross hole buildable: a through hole entering the shaft's curved side.
+build("X09", "cross hole enters a curved face: hole from x_max through a round shaft",
+      "Shaft Ø20 x 80 mm with a Ø6 cross hole drilled straight through the diameter, 10 mm from the top end.",
+      (20, 20, 80), c(20) * 80 - bicylinder(3, 10), {6: 1})
+
+
+def pappus(pts):
+    a = cx = 0.0
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:] + pts[:1]):
+        k = x0 * y1 - x1 * y0
+        a += k / 2
+        cx += (x0 + x1) * k
+    return 2 * PI * (cx / (6 * a)) * abs(a)
+
+
+csk_d, csk_D = 6.6, 13.44  # M6: ISO 273 medium clearance, ISO 10642 head
+csk_h = (csk_D - csk_d) / 2
+build("X13", "revolved half-section with a V groove (profile + revolve)",
+      "V-belt pulley: 100 mm outside diameter, 24 mm wide, 15 mm bore. One V groove centred in the width, 16 mm wide at "
+      "the rim, 9 mm wide at the bottom and 11 mm deep.",
+      (100, 100, 24), pappus([(7.5, 0), (50, 0), (50, 4), (39, 7.5), (39, 16.5), (50, 20), (50, 24), (7.5, 24)]), {15: 1})
+build("X14", "ISO countersink lookup from a screw size",
+      "Mounting plate 120 x 80 x 10 mm with four M6 countersunk holes 12 mm from each edge and a 40 mm through bore in the centre.",
+      (120, 80, 10), 120 * 80 * 10 - c(40) * 10 - 4 * (c(csk_d) * (10 - csk_h) + PI * csk_h / 12 * (csk_D ** 2 + csk_D * csk_d + csk_d ** 2)),
+      {6.6: 4, 40: 1})
+build("X15", "swept ring section along a smooth path with a bend radius",
+      "Bent tube, 25 mm OD with a 2 mm wall: 80 mm straight up, then a 90 degree bend on a 50 mm centreline radius, then 120 mm straight.",
+      (182.5, 25, 142.5), (c(25) - c(21)) * (80 + PI * 50 / 2 + 120))
+build("X16", "shell with rounded corners (inner corner radius follows)",
+      "Electronics enclosure 150 x 100 x 50 mm with R10 rounded vertical corners, shelled to 2 mm walls, open at the top.",
+      (150, 100, 50), (150 * 100 - (4 - PI) * 100) * 50 - (146 * 96 - (4 - PI) * 64) * 48)
+build("X17", "helical sweep with free length as the overall length",
+      "Compression spring: 1.5 mm wire, 16 mm mean coil diameter, 6 mm pitch, 30 mm long.",
+      (17.5, 17.5, 30), c(1.5) * 2 * PI * 8 * (28.5 / 6))
+build("X18", "intersecting drillings from two faces (manifold)",
+      "Manifold block 80 x 50 x 50 mm. A 12 mm bore runs right through along the 80 mm length at mid-height and mid-width, "
+      "and a 10 mm hole is drilled through from the top at the centre so the two passages intersect.",
+      (80, 50, 50), 80 * 50 * 50 - c(12) * 80 - c(10) * 50 + bicylinder(5, 6))
+
 # ------------------------------------------------------------------ must refuse (no operation exists)
 refuse("X07", "keyway needs a side-cut slot", "Stepped shaft Ø25 x 40 then Ø20 x 60 with a 6 mm wide, 3.5 mm deep keyway along the Ø20 section.")
-refuse("X08", "gusset rib needs a triangular profile", "L bracket 80 wide, 60 deep, 60 tall, 6 mm thick, with a 45° triangular gusset rib 6 mm thick in the middle of the inside corner.")
-refuse("X09", "cross hole is not along Z", "Shaft Ø20 x 80 mm with a Ø6 cross hole drilled straight through the diameter, 10 mm from the top end.")
 refuse("X10", "two separate parts in one request", "Make an L bracket 60 x 50 x 50 x 6 mm and, as a separate loose part, a washer OD 20 ID 10 thickness 2.")
+refuse("X19", "gear teeth: the planner must not invent involute geometry (the IR can hold it; see corpus N12)",
+       "Spur gear, module 2, 20 teeth, 20 degree pressure angle, 10 mm face width, 10 mm bore.")
 
 # ------------------------------------------------------------------ judgement: standard reference with no dimensions given
 no_build("X11", "standard flange: dimensions come from a standard table, which must not be silently invented",
          "4 inch ASME B16.5 class 150 slip-on flange.")
 no_build("X12", "impossible: hub larger than the flange", "Hub flange Ø80 x 10 disc with a Ø100 hub 20 tall on top and a Ø30 bore.")
+no_build("X08", "a profile can make the gusset, but its leg size is not given and must be asked",
+         "L bracket 80 wide, 60 deep, 60 tall, 6 mm thick, with a 45° triangular gusset rib 6 mm thick in the middle of the inside corner.")
 
 
 def main() -> int:
-    procs, var = start_stack(8769, workers=5, coordinators=3)
-    base = "http://127.0.0.1:8769"
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8769  # pick a free port when other stacks are running
+    procs, var = start_stack(port, workers=5, coordinators=3)
+    base = f"http://127.0.0.1:{port}"
     try:
         project = httpx.post(f"{base}/v1/projects", json={"name": "Hard designs"}, headers=HEADERS).json()["id"]
         with ThreadPoolExecutor(5) as pool:

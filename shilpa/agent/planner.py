@@ -9,41 +9,84 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from functools import lru_cache
 from pathlib import Path
 
 from pydantic import ValidationError
 
 from ..adapters import CAPABILITIES
-from ..contracts.compile import ANGLE_TO_DEG, LENGTH_TO_MM, compile_recipe
+from ..contracts.compile import ANGLE_TO_DEG, FEATURE_REF_FIELDS, LENGTH_TO_MM, compile_recipe
 from ..contracts.errors import ErrorCode, ShilpaError
 from .llm import Budget, call_structured, strict_schema
 from .schemas import PlanOutput, Requirements, from_recipe, to_recipe
 
 log = logging.getLogger("shilpa.planner")
 CORPUS = Path(__file__).resolve().parents[2] / "evals" / "corpus"
-EXAMPLE_IDS = ("P01", "F03", "B03", "E02", "H03")
+EXAMPLE_IDS = ("P01", "F03", "B03", "E02", "H03", "N02", "N07", "N08")
 
 IR_GUIDE = """
-Shilpa IR 1.0 rules (engineering CAD, millimetres internally, Z up):
+Shilpa IR 1.1 rules (engineering CAD, millimetres internally, Z up):
 - Every dimension is a named parameter. Every numeric feature field is a *_ref string that is either a
   parameter name or a simple expression over parameters using + - * / and parentheses, e.g. "depth / 2 - thickness / 2".
-  Bare numbers alone are not allowed in length fields; "thickness / 2" is fine.
+  Bare numbers alone are not allowed in length fields; "thickness / 2" is fine, and a zero coordinate is "0 * width".
 - Parameter kinds: length (mm/cm/m/in), angle (deg/rad), count (integers, no unit).
 - Feature ids are snake_case, unique, and must not reuse a parameter name. Features may only reference earlier features.
-- Sketches: centered_rectangle (width_ref along X, height_ref along Y, optional center_x_ref/center_y_ref,
-  corner_radius_ref), circle (diameter_ref, optional centre). Planes XY (default), XZ, YZ.
-- extrude: profile_ref (a sketch id), distance_ref, direction positive_z | negative_z | symmetric,
-  optional offset_ref to start above Z=0.
+- Sketch planes and their local axes: XY (x=X, y=Y), XZ (x=X, y=Z), YZ (x=Y, y=Z). Every sketch takes an optional
+  offset_ref that moves it along the plane normal (+Z for XY, -Y for XZ, +X for YZ).
+- Sketches: centered_rectangle (width_ref along local x, height_ref along local y, optional center_x_ref/center_y_ref,
+  corner_radius_ref); circle (diameter_ref, optional centre, optional inner_diameter_ref for a ring/tube section);
+  slot (length_ref centre-to-centre, width_ref, optional centre and rotation_angle_ref);
+  profile: any closed outline from (start_x_ref, start_y_ref) through segments, each ending at (x_ref, y_ref):
+  kind line; arc through (mid_x_ref, mid_y_ref); tangent_arc (continues tangent to the previous segment);
+  radius_arc (radius_ref, the shorter arc, counter-clockwise unless clockwise=true). The outline closes itself with a
+  straight line back to the start and must not cross itself. Use profiles for L/T/U sections, gussets, cams, keyhole
+  shapes, half-sections to revolve, and anything that is not a rectangle, circle or slot.
+- extrude: profile_ref (a sketch id), distance_ref, direction positive_z | negative_z | positive_normal |
+  negative_normal | symmetric, optional offset_ref to start further along the normal.
 - stepped_shaft: coaxial cylinders along +Z from Z=0, sections [{diameter_ref, length_ref}], optional bore_diameter_ref.
-- hole, corner_hole_pattern (inset edge_offset_ref from each side of the body's XY extent),
+- revolve: profile_ref, axis X | Y | Z (a global axis through the origin that lies in the sketch plane, e.g. a profile on
+  XZ about Z), optional angle_ref (default 360, partial turns go counter-clockwise about +axis). Draw the half-section
+  on one side of the axis: pulleys, wheels, nozzles, knobs, grooved or flanged turned parts.
+- path: open spine on a plane (default XZ) from (start_x_ref, start_y_ref) through line / arc / tangent_arc / radius_arc
+  segments; it must be smooth, so join straight runs with a tangent_arc of the bend radius.
+  helix: about Z, diameter_ref, pitch_ref, height_ref, optional offset_ref (start Z), left_handed.
+  A spring's free length is its overall length: helix height_ref = free_length - wire_diameter and
+  offset_ref = wire_diameter / 2, so the coil spans exactly 0 to free_length.
+- sweep: profile_ref swept along path_ref. For a path the sketch must lie at the path start, normal to it (a path on XZ
+  starting at the origin and heading +Z takes an XY sketch at the origin). For a helix (springs, coils) the sketch is on
+  XZ with its centre at x = helix diameter / 2 and z = helix offset.
+- loft: profile_refs (2-10 sketches on the same plane type with strictly increasing offset_ref), ruled true for
+  straight-sided transitions (ducts, hoppers, nozzles, tapered bosses).
+- hole, corner_hole_pattern (inset edge_offset_ref from each side of the entry face's extent),
   linear_hole_pattern (count_x/count_y/pitch_x/pitch_y, centred on center_x/center_y),
   polar_hole_pattern (count_ref, pitch_diameter_ref, optional start_angle_ref):
-  holes are drilled straight down (-Z) from the TOP face (highest Z) of body_ref; mode through_all or blind with depth_ref.
-  The hole footprint must lie on that top face, so drill holes in a lower plate BEFORE uniting taller bodies onto it.
+  holes are drilled straight into body_ref from one side of its bounding box: face top (default, drills -Z),
+  bottom, x_min, x_max, y_min or y_max. Centres are in that face's coordinates: (X, Y) on top/bottom, (Y, Z) on the
+  x faces, (X, Z) on the y faces. mode through_all or blind with depth_ref (measured from the entry face).
+  The hole footprint must lie on that flat face, so drill holes in a lower plate BEFORE uniting taller bodies onto it.
+  Only plain through holes may enter a curved side (a cross hole through a round shaft: face x_max, centre (0, z)).
+  hole_type simple | counterbore | countersink | tapped. standard_size M3-M20 fills diameters from ISO tables
+  (clearance per fit fine | medium | coarse, counterbore for socket head cap screws, 90 deg countersink for
+  countersunk screws, tap drill for tapped holes); give cbore_diameter_ref / cbore_depth_ref / csk_diameter_ref /
+  csk_angle_ref only to override the table or when no standard size applies. Tapped holes need standard_size,
+  record the thread as metadata (no modelled thread) and take an optional thread_depth_ref.
+  Intersecting drillings (manifolds, cross ports) are separate holes from different faces, never extruded cylinders.
+- Every operation that modifies a body (holes, pocket, boolean, shell, fillet, chamfer, mirror, patterns) returns a
+  new body id: chain them, so each feature's body_ref is the id of the previous modification and the last one is the
+  output. Nothing may be left unused.
 - pocket: rectangular cavity cut down from the top face (width_ref, height_ref, depth_ref, optional corner_radius_ref);
   it must leave walls and a floor.
-- boolean: union | cut | intersect of target_ref and tool_ref bodies (union bodies must touch).
+- boolean: union | cut | intersect of target_ref and tool_ref bodies (union bodies must touch). A cut whose tool is an
+  extrude must stay inside the target's side walls (use holes for openings through walls); revolve, sweep and loft
+  tools may cut through side walls (grooves, channels).
+- shell: hollow body_ref to wall thickness_ref, removing open_faces [{side: top|bottom|x_min|x_max|y_min|y_max,
+  expected_count}], direction inward (default) or outward. Use it for enclosures, cups, ducts and hoppers.
+- mirror: body_ref mirrored across plane XY | XZ | YZ placed at offset_ref along that plane's own axis (z, y, x);
+  keep_original true unites the body with its image (the halves must touch, or be a tool for a later boolean).
+- linear_pattern: count_ref copies of body_ref spacing_ref apart along +direction X | Y | Z (copy 1 is the original).
+  polar_pattern: count_ref copies about axis X | Y | Z through the origin, 360 deg by default or angle_ref from first to
+  last copy. Pattern or mirror a standalone tool (a boss, rib, spoke, slot cutter) and then boolean it into the part.
 - fillet / chamfer: body_ref, radius_ref or distance_ref, and a semantic edge selector
   {direction: parallel_z|perpendicular_z|any, location: top|bottom|between|any, curve: line|circle|any,
    boundary: outer|inner|any, diameter_ref, expected_count}. "outer" means the edge lies on the body's bounding box.
@@ -81,9 +124,12 @@ def _schema(model_name: str) -> dict:
 INTAKE_SYSTEM = f"""You are the intake parser for Shilpa, an engineering CAD agent.
 Read the engineer's request and extract typed requirements. Do not design the part yet.
 
-Supported engineering families right now: mounting plates, simple brackets, spacers/washers, stepped shafts,
-flanges (with bolt circles and hubs), and prismatic open enclosures. Classify anything else as family "other";
-freeform or organic shapes, textured props and concept art are task_class "visual_asset" or "unsupported".
+Supported engineering families right now: mounting plates, brackets, spacers/washers, stepped shafts,
+flanges (with bolt circles and hubs), enclosures, and other single machined or moulded parts built from the
+operations listed below (turned/revolved parts such as pulleys, swept tubes and handles, lofted ducts, shelled
+housings, springs, manifold blocks with drilled channels). Classify anything that is not one of the named families
+as family "other"; freeform or organic shapes, textured props and concept art are task_class "visual_asset" or
+"unsupported".
 
 For each dimension, record the exact words that state it as evidence. If a value is not stated, set value null
 and add it to missing with a short question. A dimension is critical if the geometry is undefined without it
@@ -101,12 +147,16 @@ Apply these standard engineering conventions instead of asking, and list each on
 - An L bracket's vertical leg stands at the back edge of the base, full width; "height" is the overall height.
 - Stepped shafts are listed from the bottom up; a box is open at the top with the stated wall and floor thickness.
 - Chamfers are 45 degrees with the stated leg size; "rounded corners" on a plate mean its vertical edges.
+- Metric screw sizes (M3-M20) name a standard: a clearance, counterbored or countersunk hole for that screw, or a
+  tapped hole, takes its diameters from ISO tables. Record the size in features (e.g. "four M5 countersunk holes"),
+  not as a dimension, and do not ask for its clearance, counterbore or countersink diameters.
 Shilpa makes one connected part per request. If the request asks for two or more separate parts, set task_class
 "unsupported" and say they should be requested one at a time.
 
 If any requested feature cannot be built with the operations listed below (for example engraved text or logos,
-threads, gear teeth, springs, spheres, freeform or organic surfaces), set task_class "unsupported", name the feature
-in unsupported_reason, and do not ask questions about it.
+modelled thread geometry, gear teeth, knurling, freeform or organic surfaces), set task_class "unsupported", name the
+feature in unsupported_reason, and do not ask questions about it. Tapped holes are supported (the thread is recorded,
+not modelled); springs and coils are supported as a helical sweep.
 
 Only ask about a value that no convention supplies and without which the geometry is undefined
 (for example a missing thickness, hole diameter, overall size, or a bolt circle diameter).
@@ -241,15 +291,23 @@ def _plan_call(user: str, budget: Budget, purpose: str, feedback: str | None = N
 
 
 def _normalize_plan(data: dict) -> dict:
-    """Deterministic clean-up of constraints strict mode cannot express (empty optional refs become null)."""
+    """Deterministic clean-up of constraints strict mode cannot express.
+
+    Empty optional refs become null, and nulls inside features are dropped: strict mode makes every
+    optional field nullable, but a null boolean or enum (clockwise, left_handed, direction) means
+    "use the default", not an invalid value.
+    """
     def walk(node):
         if isinstance(node, dict):
-            return {k: (None if k.endswith("_ref") and isinstance(v, str) and not v.strip() else walk(v)) for k, v in node.items()}
+            out = {k: (None if k.endswith("_ref") and isinstance(v, str) and not v.strip() else walk(v)) for k, v in node.items()}
+            return {k: v for k, v in out.items() if v is not None}
         if isinstance(node, list):
             return [walk(v) for v in node]
         return node
 
-    return walk(data)
+    if isinstance(data.get("features"), list):
+        data = {**data, "features": walk(data["features"])}
+    return data
 
 
 def _explain_plan_error(exc: ValidationError, data: dict) -> str:
@@ -331,13 +389,20 @@ def check_requirements(recipe: dict, requirements: dict) -> None:
     """
     compiled = compile_recipe({k: v for k, v in recipe.items() if not k.startswith("_")}, CAPABILITIES)
     used: set[str] = set()
+
+    def collect(node) -> None:  # refs anywhere in a feature: shaft sections, profile segments, selectors
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if k.endswith("_ref") and isinstance(v, str) and not k.endswith(FEATURE_REF_FIELDS):
+                    used.update(_names_in(v))
+                else:
+                    collect(v)
+        elif isinstance(node, list):
+            for v in node:
+                collect(v)
+
     for cf in compiled.features:
-        for k, v in cf.spec:
-            if k.endswith("_ref") and isinstance(v, str):
-                used |= _names_in(v)
-            elif k == "sections":
-                for sec in v:
-                    used |= _names_in(sec.diameter_ref) | _names_in(sec.length_ref)
+        collect(cf.spec.model_dump())
     # Derived parameters carry the names they depend on.
     raw = compiled.recipe.parameters
     frontier = set(used)
@@ -359,6 +424,12 @@ def check_requirements(recipe: dict, requirements: dict) -> None:
             values.append((kind, v))
             if kind == "length" and ("diameter" in k):
                 values.append((kind, v / 2))  # a stated radius
+        size = getattr(cf.spec, "standard_size", None)
+        if size:
+            values.append(("length", float(size[1:])))  # "M6" stated as 6 mm is met by the M6 hole series
+        for seg in cf.segments or []:
+            if seg.kind == "arc":  # a stated bend or arc angle is met by an arc that sweeps it
+                values.append(("angle", round(math.degrees(seg.sweep), 9)))
     for v in compiled.assertion_values.get("bbox", []):
         values.append(("length", v))
     default_unit = requirements.get("units") or "mm"

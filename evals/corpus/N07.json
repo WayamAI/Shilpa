@@ -1,0 +1,105 @@
+{
+  "id": "N07",
+  "family": "block",
+  "description": "Block 80x50x20 with two M8 counterbored holes and an M10 tapped side port",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "Counterbored block",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "length": 80,
+      "width": 50,
+      "height": 20,
+      "pitch": 50,
+      "port_y": 15,
+      "port_z": 10,
+      "tap_depth": 15,
+      "thread_length": 12,
+      "count": {
+        "value": 2,
+        "kind": "count"
+      },
+      "one": {
+        "value": 1,
+        "kind": "count"
+      }
+    },
+    "features": [
+      {
+        "id": "outline",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "length",
+        "height_ref": "width"
+      },
+      {
+        "id": "block",
+        "op": "extrude",
+        "profile_ref": "outline",
+        "distance_ref": "height",
+        "direction": "positive_z"
+      },
+      {
+        "id": "cbores",
+        "op": "linear_hole_pattern",
+        "body_ref": "block",
+        "count_x_ref": "count",
+        "count_y_ref": "one",
+        "pitch_x_ref": "pitch",
+        "pitch_y_ref": "pitch",
+        "hole_type": "counterbore",
+        "standard_size": "M8"
+      },
+      {
+        "id": "side_tap",
+        "op": "hole",
+        "body_ref": "cbores",
+        "face": "x_max",
+        "center_x_ref": "port_y",
+        "center_y_ref": "port_z",
+        "mode": "blind",
+        "depth_ref": "tap_depth",
+        "hole_type": "tapped",
+        "standard_size": "M10",
+        "thread_depth_ref": "thread_length"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "length",
+        "width",
+        "height"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      80,
+      50,
+      20
+    ],
+    "volume": 74658.86052,
+    "solid_count": 1,
+    "holes": {
+      "9": 2,
+      "15": 2,
+      "8.5": 1
+    },
+    "hole_centers": {
+      "diameter": 9,
+      "centers": [
+        [
+          -25,
+          0
+        ],
+        [
+          25,
+          0
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "id": "N13",
+  "family": "manifold",
+  "description": "Manifold block 60x40x40: \u00d810 gallery along X, intersecting \u00d810 cross drilling and \u00d88 top port",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "Manifold block",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "length": 60,
+      "width": 40,
+      "height": 40,
+      "gallery": 10,
+      "gallery_z": 20,
+      "cross_x": 10,
+      "cross_depth": 28,
+      "port": 8,
+      "port_y": -12,
+      "port_depth": 28
+    },
+    "features": [
+      {
+        "id": "outline",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "length",
+        "height_ref": "width"
+      },
+      {
+        "id": "block",
+        "op": "extrude",
+        "profile_ref": "outline",
+        "distance_ref": "height",
+        "direction": "positive_z"
+      },
+      {
+        "id": "gallery_bore",
+        "op": "hole",
+        "body_ref": "block",
+        "face": "x_min",
+        "diameter_ref": "gallery",
+        "center_x_ref": "0 * width",
+        "center_y_ref": "gallery_z"
+      },
+      {
+        "id": "cross_bore",
+        "op": "hole",
+        "body_ref": "gallery_bore",
+        "face": "y_min",
+        "diameter_ref": "gallery",
+        "center_x_ref": "cross_x",
+        "center_y_ref": "gallery_z",
+        "mode": "blind",
+        "depth_ref": "cross_depth"
+      },
+      {
+        "id": "manifold",
+        "op": "hole",
+        "body_ref": "cross_bore",
+        "diameter_ref": "port",
+        "center_x_ref": "cross_x",
+        "center_y_ref": "port_y",
+        "mode": "blind",
+        "depth_ref": "port_depth"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "length",
+        "width",
+        "height"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      60,
+      40,
+      40
+    ],
+    "volume": 88806.030956,
+    "solid_count": 1
+  }
+}

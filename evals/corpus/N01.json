@@ -1,0 +1,92 @@
+{
+  "id": "N01",
+  "family": "pulley",
+  "description": "V-belt pulley OD80 x 20 with a 14/7 x 10 groove and 12 bore (revolved profile)",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "V-belt pulley",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "bore_diameter": 12,
+      "outer_diameter": 80,
+      "width": 20,
+      "groove_top": 14,
+      "groove_bottom": 7,
+      "groove_depth": 10
+    },
+    "features": [
+      {
+        "id": "half_section",
+        "op": "profile",
+        "plane": "XZ",
+        "start_x_ref": "bore_diameter / 2",
+        "start_y_ref": "0 * width",
+        "segments": [
+          {
+            "kind": "line",
+            "x_ref": "outer_diameter / 2",
+            "y_ref": "0 * width"
+          },
+          {
+            "kind": "line",
+            "x_ref": "outer_diameter / 2",
+            "y_ref": "(width - groove_top) / 2"
+          },
+          {
+            "kind": "line",
+            "x_ref": "outer_diameter / 2 - groove_depth",
+            "y_ref": "(width - groove_bottom) / 2"
+          },
+          {
+            "kind": "line",
+            "x_ref": "outer_diameter / 2 - groove_depth",
+            "y_ref": "(width + groove_bottom) / 2"
+          },
+          {
+            "kind": "line",
+            "x_ref": "outer_diameter / 2",
+            "y_ref": "(width + groove_top) / 2"
+          },
+          {
+            "kind": "line",
+            "x_ref": "outer_diameter / 2",
+            "y_ref": "width"
+          },
+          {
+            "kind": "line",
+            "x_ref": "bore_diameter / 2",
+            "y_ref": "width"
+          }
+        ]
+      },
+      {
+        "id": "pulley",
+        "op": "revolve",
+        "profile_ref": "half_section",
+        "axis": "Z"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "outer_diameter",
+        "outer_diameter",
+        "width"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      80,
+      80,
+      20
+    ],
+    "volume": 74811.793057,
+    "solid_count": 1,
+    "holes": {
+      "12": 1
+    }
+  }
+}

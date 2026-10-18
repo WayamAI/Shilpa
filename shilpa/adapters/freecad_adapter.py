@@ -1,10 +1,13 @@
 """FreeCAD adapter: native, parametric PartDesign documents (blueprint section 7, backlog B030/B031).
 
 Shilpa's IR is a dataflow graph; a PartDesign Body is a linear feature history. ``lower``
-turns a compiled recipe into a linear plan (Pad, Pocket, Revolution, Fillet, Chamfer)
-whose every dimension is an expression over a ``Params`` spreadsheet, so editing a
-parameter in FreeCAD regenerates the part with the same design intent. Recipes that do
-not fit a linear history return a typed unsupported error before FreeCAD runs.
+turns a compiled recipe into a linear plan (Pad, Pocket, Revolution, Groove, Additive /
+Subtractive Pipe, Helix and Loft, Thickness, Mirrored, Linear / Polar Pattern, Fillet,
+Chamfer) whose every dimension is an expression over a ``Params`` spreadsheet, so editing
+a parameter in FreeCAD regenerates the part with the same design intent. Standalone tool
+bodies wait until a boolean merges them; a cut turns the additive feature into its
+subtractive twin. Recipes that do not fit a linear history return a typed unsupported
+error before FreeCAD runs.
 
 FreeCAD runs as a separate FreeCADCmd process (its own Python) on fc_build.py.
 """
@@ -12,6 +15,7 @@ FreeCAD runs as a separate FreeCADCmd process (its own Python) on fc_build.py.
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import shutil
@@ -21,8 +25,9 @@ import time
 from pathlib import Path
 
 from ..contracts import expr
-from ..contracts.compile import CompiledRecipe
+from ..contracts.compile import PLANE_AXES, CompiledFeature, CompiledRecipe
 from ..contracts.errors import ErrorCode, ShilpaError
+from ..contracts.ir import HOLE_OPS, SKETCH_OPS
 from ..settings import ROOT
 
 SCRIPT = Path(__file__).parent / "freecad_script" / "fc_build.py"
@@ -31,10 +36,32 @@ SAFE_ENV_KEYS = ("SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "PATH", "TEMP", "TMP", "
                  "NUMBER_OF_PROCESSORS", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "LOCALAPPDATA", "APPDATA", "LANG")
 
 # Linear-history capability matrix (a subset of the IR; intersect has no PartDesign equivalent here).
-CAPABILITIES = {"centered_rectangle", "circle", "extrude", "stepped_shaft", "hole", "corner_hole_pattern",
-                "linear_hole_pattern", "polar_hole_pattern", "pocket", "boolean", "fillet", "chamfer"}
+CAPABILITIES = {"centered_rectangle", "circle", "slot", "profile", "path", "helix", "extrude", "stepped_shaft",
+                "revolve", "sweep", "loft", "hole", "corner_hole_pattern", "linear_hole_pattern", "polar_hole_pattern",
+                "pocket", "boolean", "shell", "mirror", "linear_pattern", "polar_pattern", "fillet", "chamfer"}
 
 _NAME = re.compile(r"\b[a-z][a-z0-9_]*\b")
+# A cut turns an additive tool feature into its subtractive twin.
+SUBTRACTIVE = {"Pad": "Pocket", "Revolution": "Groove", "AdditivePipe": "SubtractivePipe",
+               "AdditiveLoft": "SubtractiveLoft", "AdditiveHelix": "SubtractiveHelix"}
+# Sketch plane normals as (global axis index, sign): XZ faces -Y in both kernels.
+NORMAL = {"XY": (2, 1), "XZ": (1, -1), "YZ": (0, 1)}
+# Hole entry sides: (axis index, outward sign, in-face (u, v) axis indices) and the sketch plane holding (u, v).
+SIDES = {"top": (2, 1, (0, 1)), "bottom": (2, -1, (0, 1)), "x_max": (0, 1, (1, 2)), "x_min": (0, -1, (1, 2)),
+         "y_max": (1, 1, (0, 2)), "y_min": (1, -1, (0, 2))}
+SIDE_PLANE = {"top": "XY", "bottom": "XY", "x_max": "YZ", "x_min": "YZ", "y_max": "XZ", "y_min": "XZ"}
+
+
+def ex(q: dict, unit: str = "mm") -> str:
+    """FreeCAD expression text for a value dict; constants become quantities."""
+    return q.get("e") or f"{q['v']!r} {unit}".strip()
+
+
+def _q_add(a: dict, b: dict) -> dict:
+    out = {"v": a["v"] + b["v"]}
+    if a.get("e") or b.get("e"):
+        out["e"] = f"({ex(a)}) + ({ex(b)})"
+    return out
 
 
 def freecad_cmd() -> Path | None:
@@ -59,7 +86,8 @@ class _Lowerer:
         self.params = compiled.params
         self.bbox = {f["id"]: f.get("detail", {}).get("bbox") for f in feature_results}
         self.sketches: dict[str, dict] = {}
-        self.pending: dict[str, dict] = {}  # standalone bodies waiting to be merged by a boolean
+        self.helices: dict[str, CompiledFeature] = {}
+        self.pending: dict[str, list[dict]] = {}  # standalone bodies (their ops) waiting to be merged by a boolean
         self.ops: list[dict] = []
         self.tip: str | None = None
         self.alias: dict[str, str] = {}  # IR body id -> FreeCAD object name now holding that state
@@ -72,6 +100,11 @@ class _Lowerer:
         e = _NAME.sub(lambda m: f"Params.{m.group(0)}" if m.group(0) in self.params else m.group(0), ref)
         return {"v": v, "e": e}
 
+    def qv(self, cf: CompiledFeature, name: str) -> dict:
+        """Like q, but falls back to the compiled value (ISO table lookups are constants)."""
+        ref = getattr(cf.spec, name, None)
+        return self.q(ref) if ref is not None else {"v": cf.values[name]}
+
     def unsupported(self, msg: str, fid: str):
         raise ShilpaError(ErrorCode.UNSUPPORTED_OPERATION, f"FreeCAD adapter: {msg}", feature_id=fid)
 
@@ -80,63 +113,62 @@ class _Lowerer:
             self.unsupported(f"{fid} modifies {body_ref!r}, which is not the current end of the feature history", fid)
         return self.alias[self.tip]
 
-    def advance(self, fid: str) -> None:
+    def advance(self, fid: str, obj: str | None = None) -> None:
         self.tip = fid
-        self.alias[fid] = fid
+        self.alias[fid] = obj or fid
 
     def lower(self) -> dict:
         for cf in self.c.features:
             f, fid = cf.spec, cf.id
             if cf.op not in CAPABILITIES:
                 self.unsupported(f"operation {cf.op} is not supported", fid)
-            if cf.op == "centered_rectangle":
-                self.sketches[fid] = {"plane": f.plane, "shape": {"type": "rect", "cx": self.q(f.center_x_ref), "cy": self.q(f.center_y_ref),
-                                      "w": self.q(f.width_ref), "h": self.q(f.height_ref),
-                                      "r": self.q(f.corner_radius_ref) if f.corner_radius_ref else None}}
-            elif cf.op == "circle":
-                self.sketches[fid] = {"plane": f.plane, "shape": {"type": "circle", "cx": self.q(f.center_x_ref), "cy": self.q(f.center_y_ref),
-                                      "d": self.q(f.diameter_ref)}}
+            if cf.op in SKETCH_OPS or cf.op == "path":
+                self.sketches[fid] = self._sketch(cf)
+            elif cf.op == "helix":
+                self.helices[fid] = cf
             elif cf.op == "extrude":
-                sk = self.sketches[f.profile_ref]
-                op = {"id": fid, "pd": "Pad", "length": self.q(f.distance_ref),
-                      "sketch": {"plane": sk["plane"], "shapes": [sk["shape"]], "offset": self.q(f.offset_ref) if f.offset_ref else None},
+                sk = self._placed(f.profile_ref, f.offset_ref)
+                op = {"id": fid, "pd": "Pad", "length": self.q(f.distance_ref), "sketch": sk,
                       "midplane": f.direction == "symmetric", "reversed": f.direction in ("negative_z", "negative_normal")}
-                self._new_body(fid, op)
+                self._new_body(fid, [op])
             elif cf.op == "stepped_shaft":
-                self._new_body(fid, self._shaft(f, fid))
-            elif cf.op in ("hole", "corner_hole_pattern", "linear_hole_pattern", "polar_hole_pattern"):
-                tip = self.require_tip(fid, f.body_ref)
-                circles = [{"type": "circle", "cx": x, "cy": y, "d": self.q(f.diameter_ref)} for x, y in self._centers(cf, tip)]
-                op = {"id": fid, "pd": "Pocket", "sketch": {"plane": "XY", "shapes": circles, "offset": None}}
-                if f.mode == "through_all":
-                    op["through_all"] = True
+                self._new_body(fid, [self._shaft(f, fid)])
+            elif cf.op == "revolve":
+                sk = self.sketches[f.profile_ref]
+                axis = "H_Axis" if f.axis == PLANE_AXES[sk["plane"]][0] else "V_Axis"
+                # Both kernels revolve counter-clockwise about the positive global axis (checked against FreeCAD 1.1).
+                self._new_body(fid, [{"id": fid, "pd": "Revolution", "sketch": sk, "axis": axis,
+                                      "angle": self.q(f.angle_ref) if f.angle_ref else {"v": 360.0}}])
+            elif cf.op == "sweep":
+                sk = self.sketches[f.profile_ref]
+                if f.path_ref in self.helices:
+                    h = self.helices[f.path_ref]
+                    op = {"id": fid, "pd": "AdditiveHelix", "sketch": sk, "pitch": self.q(h.spec.pitch_ref),
+                          "height": self.q(h.spec.height_ref), "left_handed": h.spec.left_handed}
                 else:
-                    op["sketch"]["offset"] = self._top(tip)
-                    op["length"] = self.q(f.depth_ref)
-                self.ops.append(op)
-                self.advance(fid)
+                    op = {"id": fid, "pd": "AdditivePipe", "sketch": sk, "spine": self.sketches[f.path_ref]}
+                self._new_body(fid, [op])
+            elif cf.op == "loft":
+                self._new_body(fid, [{"id": fid, "pd": "AdditiveLoft", "sections": [self.sketches[p] for p in f.profile_refs],
+                                      "ruled": f.ruled}])
+            elif cf.op in HOLE_OPS:
+                self._holes(cf)
             elif cf.op == "pocket":
                 tip = self.require_tip(fid, f.body_ref)
                 rect = {"type": "rect", "cx": self.q(f.center_x_ref), "cy": self.q(f.center_y_ref), "w": self.q(f.width_ref),
                         "h": self.q(f.height_ref), "r": self.q(f.corner_radius_ref) if f.corner_radius_ref else None}
                 self.ops.append({"id": fid, "pd": "Pocket", "length": self.q(f.depth_ref),
-                                 "sketch": {"plane": "XY", "shapes": [rect], "offset": self._top(tip)}})
+                                 "sketch": {"plane": "XY", "shapes": [rect], "offset": self._entry(tip, "top")[0]}})
                 self.advance(fid)
             elif cf.op == "boolean":
-                self.require_tip(fid, f.target_ref)
-                if f.tool_ref not in self.pending:
-                    self.unsupported(f"boolean tool {f.tool_ref!r} must be a standalone extrude or shaft", fid)
-                if f.operation == "intersect":
-                    self.unsupported("intersect has no linear PartDesign equivalent", fid)
-                op = self.pending.pop(f.tool_ref)
-                if f.operation == "cut":
-                    if op["pd"] != "Pad":
-                        self.unsupported("only extruded tools can be cut", fid)
-                    # A pad region removed as a pocket: pockets cut against the sketch normal by default.
-                    op = {**op, "pd": "Pocket", "reversed": not op["reversed"] if not op["midplane"] else False}
-                self.ops.append(op)
-                self.alias[fid] = op["id"]
-                self.tip = fid
+                self._boolean(cf)
+            elif cf.op == "shell":
+                self.require_tip(fid, f.body_ref)
+                self.ops.append({"id": fid, "pd": "Thickness", "size": self.q(f.thickness_ref), "inward": f.direction == "inward",
+                                 "faces": [s.model_dump() for s in f.open_faces]})
+                self.advance(fid)
+            elif cf.op in ("mirror", "linear_pattern", "polar_pattern"):
+                self._transform(cf)
             elif cf.op in ("fillet", "chamfer"):
                 self.require_tip(fid, f.body_ref)
                 size = self.q(f.radius_ref if cf.op == "fillet" else f.distance_ref)
@@ -151,16 +183,137 @@ class _Lowerer:
         params = {k: {"value": q.value, "kind": q.kind} for k, q in self.params.items()}
         return {"params": params, "ops": self.ops}
 
-    def _new_body(self, fid: str, op: dict) -> None:
+    def _new_body(self, fid: str, ops: list[dict]) -> None:
         if self.tip is None:
-            self.ops.append(op)
-            self.advance(fid)
+            self.ops.extend(ops)
+            self.advance(fid, ops[-1]["id"])
         else:
-            self.pending[fid] = op
+            self.pending[fid] = ops
 
-    def _top(self, tip: str) -> dict:
+    # -------------------------------------------------------------- sketches
+
+    def _sketch(self, cf: CompiledFeature) -> dict:
+        f = cf.spec
+        off = self.q(f.offset_ref) if getattr(f, "offset_ref", None) else None
+        if cf.op == "centered_rectangle":
+            shapes = [{"type": "rect", "cx": self.q(f.center_x_ref), "cy": self.q(f.center_y_ref), "w": self.q(f.width_ref),
+                       "h": self.q(f.height_ref), "r": self.q(f.corner_radius_ref) if f.corner_radius_ref else None}]
+        elif cf.op == "circle":
+            shapes = [{"type": "circle", "cx": self.q(f.center_x_ref), "cy": self.q(f.center_y_ref), "d": self.q(f.diameter_ref)}]
+            if f.inner_diameter_ref:
+                shapes.append({**shapes[0], "d": self.q(f.inner_diameter_ref)})
+        elif cf.op == "slot":
+            shapes = [self._slot(cf)]
+        else:  # profile or path
+            shapes = [self._chain(cf)]
+        return {"plane": f.plane, "shapes": shapes, "offset": off}
+
+    def _placed(self, sketch_id: str, extra_ref: str | None) -> dict:
+        """A sketch spec with an extra offset along its normal (an extrude's start offset)."""
+        sk = dict(self.sketches[sketch_id])
+        if extra_ref:
+            sk["offset"] = _q_add(sk["offset"], self.q(extra_ref)) if sk["offset"] else self.q(extra_ref)
+        return sk
+
+    def _chain(self, cf: CompiledFeature) -> dict:
+        """Profile or path segments: exact geometry from the compiler, endpoints bound to the IR refs."""
+        f = cf.spec
+        start = (self.q(f.start_x_ref), self.q(f.start_y_ref))
+        ends = [(self.q(s.x_ref), self.q(s.y_ref)) for s in f.segments]
+        segs = []
+        for s in cf.segments:
+            i = s.source
+            p0 = start if i == 0 else ends[i - 1] if i is not None else ends[-1]
+            p1 = ends[i] if i is not None else start
+            out = {"kind": "line", "p0": p0, "p1": p1}
+            if s.kind == "arc":
+                ir = f.segments[i]
+                out.update(center=list(s.center), radius=s.radius, ccw=s.ccw)
+                if ir.kind == "arc":
+                    out.update(kind="arc3", mid=(self.q(ir.mid_x_ref), self.q(ir.mid_y_ref)))
+                elif ir.kind == "tangent_arc":
+                    out.update(kind="tangent")
+                else:
+                    out.update(kind="radius", r=self.q(ir.radius_ref))
+            segs.append(out)
+        if f.op == "profile" and cf.segments[-1].source is not None:
+            segs[-1]["p1"] = start  # the last segment closes onto the start point
+        return {"type": "chain", "closed": f.op == "profile", "segs": segs}
+
+    def _slot(self, cf: CompiledFeature) -> dict:
+        f, v = cf.spec, cf.values
+        cx, cy, L, W = self.q(f.center_x_ref), self.q(f.center_y_ref), self.q(f.length_ref), self.q(f.width_ref)
+        a = self.q(f.rotation_angle_ref) if f.rotation_angle_ref else None
+        av = math.radians(a["v"]) if a else 0.0
+        parametric = any(q.get("e") for q in (cx, cy, L, W) + ((a,) if a else ()))
+
+        def pt(su: int, sn: int) -> tuple[dict, dict]:
+            x = cx["v"] + su * L["v"] / 2 * math.cos(av) - sn * W["v"] / 2 * math.sin(av)
+            y = cy["v"] + su * L["v"] / 2 * math.sin(av) + sn * W["v"] / 2 * math.cos(av)
+            if not parametric:
+                return {"v": x}, {"v": y}
+            if a is None:
+                return ({"v": x, "e": f"({ex(cx)}) + {su} * ({ex(L)}) / 2"}, {"v": y, "e": f"({ex(cy)}) + {sn} * ({ex(W)}) / 2"})
+            c, s = f"cos({ex(a, 'deg')})", f"sin({ex(a, 'deg')})"
+            return ({"v": x, "e": f"({ex(cx)}) + {su} * ({ex(L)}) / 2 * {c} - {sn} * ({ex(W)}) / 2 * {s}"},
+                    {"v": y, "e": f"({ex(cy)}) + {su} * ({ex(L)}) / 2 * {s} + {sn} * ({ex(W)}) / 2 * {c}"})
+
+        corners = [pt(-1, -1), pt(1, -1), pt(1, 1), pt(-1, 1)]
+        centers = [[cx["v"] + su * L["v"] / 2 * math.cos(av), cy["v"] + su * L["v"] / 2 * math.sin(av)] for su in (1, -1)]
+        # The end arcs are tangent to the sides: a radius on a semicircle with pinned ends is degenerate for the solver.
+        segs = [{"kind": "line", "p0": corners[0], "p1": corners[1]},
+                {"kind": "tangent", "p0": corners[1], "p1": corners[2], "center": centers[0], "radius": W["v"] / 2, "ccw": True},
+                {"kind": "line", "p0": corners[2], "p1": corners[3]},
+                {"kind": "tangent", "p0": corners[3], "p1": corners[0], "center": centers[1], "radius": W["v"] / 2, "ccw": True}]
+        return {"type": "chain", "closed": True, "segs": segs}
+
+    # -------------------------------------------------------------- holes
+
+    def _entry(self, tip: str, side: str) -> tuple[dict, bool]:
+        """Sketch offset (along the side's sketch-plane normal) of a hole entry face, and whether the cut runs along that normal."""
+        axis, sign, _ = SIDES[side]
+        n_axis, n_sign = NORMAL[SIDE_PLANE[side]]
+        assert n_axis == axis
         bb = self.bbox.get(self.tip)  # bboxes are recorded per IR feature; self.tip is the IR id of the current state
-        return {"v": bb["max"][2] if bb else 0.0, "e": f"({tip}.Shape.BoundBox.ZMax * 1 mm)"}
+        key = "max" if sign > 0 else "min"
+        coord = {"v": bb[key][axis] if bb else 0.0, "e": f"({tip}.Shape.BoundBox.{'XYZ'[axis]}{key.capitalize()} * 1 mm)"}
+        off = coord if n_sign > 0 else {"v": -coord["v"], "e": f"-{coord['e']}"}
+        return off, -sign == n_sign
+
+    def _holes(self, cf: CompiledFeature) -> None:
+        f, fid = cf.spec, cf.id
+        tip = self.require_tip(fid, f.body_ref)
+        plane = SIDE_PLANE[f.face]
+        centers = self._centers(cf, tip)
+        d = self.qv(cf, "diameter_ref")
+        entry, along_normal = self._entry(tip, f.face)
+
+        def circles(dia: dict) -> list[dict]:
+            return [{"type": "circle", "cx": x, "cy": y, "d": dia} for x, y in centers]
+
+        if f.hole_type == "counterbore":
+            self.ops.append({"id": f"{fid}_cbore", "pd": "Pocket", "length": self.qv(cf, "cbore_depth_ref"), "reversed": along_normal,
+                             "sketch": {"plane": plane, "shapes": circles(self.qv(cf, "cbore_diameter_ref")), "offset": entry}})
+        elif f.hole_type == "countersink":
+            D, A = self.qv(cf, "csk_diameter_ref"), self.qv(cf, "csk_angle_ref")
+            depth = {"v": cf.values["csk_depth"]}
+            if any(q.get("e") for q in (D, A, d)):
+                depth["e"] = f"(({ex(D)}) - ({ex(d)})) / 2 / tan(({ex(A, 'deg')}) / 2)"
+            # A negative taper narrows the pocket as it goes in: the cone wall sits at half the included angle.
+            taper = {"v": -A["v"] / 2, **({"e": f"-({A['e']}) / 2"} if A.get("e") else {})}
+            self.ops.append({"id": f"{fid}_csk", "pd": "Pocket", "length": depth, "taper": taper, "reversed": along_normal,
+                             "sketch": {"plane": plane, "shapes": circles(D), "offset": entry}})
+        op = {"id": fid, "pd": "Pocket", "sketch": {"plane": plane, "shapes": circles(d), "offset": None}}
+        if f.mode == "through_all":
+            op["through_all"] = True
+        else:
+            op["sketch"]["offset"] = entry
+            op["length"] = self.q(f.depth_ref)
+            op["reversed"] = along_normal
+        if cf.meta.get("thread"):
+            op["meta"] = {"ShilpaThread": cf.meta["thread"] + (f" depth {cf.meta['thread_depth']:g} mm" if "thread_depth" in cf.meta else "")}
+        self.ops.append(op)
+        self.advance(fid)
 
     def _centers(self, cf, tip: str) -> list[tuple[dict, dict]]:
         f = cf.spec
@@ -169,10 +322,14 @@ class _Lowerer:
         if cf.op == "corner_hole_pattern":
             bb = self.bbox[self.tip]
             e = self.q(f.edge_offset_ref)
-            xs = [({"v": bb["min"][0] + e["v"], "e": f"({tip}.Shape.BoundBox.XMin * 1 mm) + ({e['e']})"}),
-                  ({"v": bb["max"][0] - e["v"], "e": f"({tip}.Shape.BoundBox.XMax * 1 mm) - ({e['e']})"})]
-            ys = [({"v": bb["min"][1] + e["v"], "e": f"({tip}.Shape.BoundBox.YMin * 1 mm) + ({e['e']})"}),
-                  ({"v": bb["max"][1] - e["v"], "e": f"({tip}.Shape.BoundBox.YMax * 1 mm) - ({e['e']})"})]
+            _, _, (iu, iv) = SIDES[f.face]
+
+            def lim(i: int, key: str, sign: int) -> dict:
+                name = f"{'XYZ'[i]}{key.capitalize()}"
+                return {"v": bb[key][i] + sign * e["v"], "e": f"({tip}.Shape.BoundBox.{name} * 1 mm) {'+' if sign > 0 else '-'} ({e['e']})"}
+
+            xs = [lim(iu, "min", 1), lim(iu, "max", -1)]
+            ys = [lim(iv, "min", 1), lim(iv, "max", -1)]
             return [(x, y) for x in xs for y in ys]
         cx, cy = self.q(f.center_x_ref), self.q(f.center_y_ref)
         cxe, cye = cx.get("e") or "0 mm", cy.get("e") or "0 mm"
@@ -187,8 +344,6 @@ class _Lowerer:
                                 {"v": cy["v"] + oy * py["v"], "e": f"({cye}) + {oy!r} * ({py['e']})"}))
             return out
         # polar
-        import math
-
         n = int(cf.values["count_ref"])
         pcd = self.q(f.pitch_diameter_ref)
         a0 = self.q(f.start_angle_ref) if f.start_angle_ref else {"v": 0.0}
@@ -200,6 +355,55 @@ class _Lowerer:
             out.append(({"v": cx["v"] + pcd["v"] / 2 * math.cos(rad), "e": f"({cxe}) + ({pcd['e']}) / 2 * cos({ang})"},
                         {"v": cy["v"] + pcd["v"] / 2 * math.sin(rad), "e": f"({cye}) + ({pcd['e']}) / 2 * sin({ang})"}))
         return out
+
+    # -------------------------------------------------------------- bodies
+
+    def _boolean(self, cf: CompiledFeature) -> None:
+        f, fid = cf.spec, cf.id
+        self.require_tip(fid, f.target_ref)
+        if f.tool_ref not in self.pending:
+            self.unsupported(f"boolean tool {f.tool_ref!r} must be a standalone body (extrude, shaft, revolve, sweep, "
+                             "loft, or a mirror / pattern of one)", fid)
+        if f.operation == "intersect":
+            self.unsupported("intersect has no linear PartDesign equivalent", fid)
+        ops = self.pending.pop(f.tool_ref)
+        if f.operation == "cut":
+            first = ops[0]
+            if first["pd"] not in SUBTRACTIVE:
+                self.unsupported(f"{first['pd']} tools cannot be cut", fid)
+            if first["pd"] == "Pad":
+                # A pad region removed as a pocket: pockets cut against the sketch normal by default.
+                first = {**first, "pd": "Pocket", "reversed": not first["reversed"] if not first["midplane"] else False}
+            else:
+                first = {**first, "pd": SUBTRACTIVE[first["pd"]]}
+            ops = [first] + ops[1:]
+        self.ops.extend(ops)
+        self.advance(fid, ops[-1]["id"])
+
+    def _transform(self, cf: CompiledFeature) -> None:
+        """Mirror / pattern: of a waiting tool body (feature mode, merged later) or of the whole current part."""
+        f, fid = cf.spec, cf.id
+        pd = {"mirror": "Mirrored", "linear_pattern": "LinearPattern", "polar_pattern": "PolarPattern"}[cf.op]
+        op: dict = {"id": fid, "pd": pd}
+        if cf.op == "mirror":
+            if not f.keep_original:
+                self.unsupported("a mirror without the original has no PartDesign equivalent", fid)
+            op.update(plane=f.plane, offset=self.q(f.offset_ref) if f.offset_ref else None)
+        elif cf.op == "linear_pattern":
+            op.update(direction=f.direction, count=self.q(f.count_ref), spacing=self.q(f.spacing_ref))
+        else:
+            op.update(axis=f.axis, count=self.q(f.count_ref), angle=self.q(f.angle_ref) if f.angle_ref else {"v": 360.0})
+        if f.body_ref in self.pending:
+            ops = self.pending.pop(f.body_ref)
+            if len(ops) != 1:
+                self.unsupported(f"{fid} transforms {f.body_ref!r}, which is already a mirror or pattern", fid)
+            op["originals"] = [ops[0]["id"]]
+            self.pending[fid] = ops + [op]
+        else:
+            self.require_tip(fid, f.body_ref)
+            op["originals"] = None  # whole shape
+            self.ops.append(op)
+            self.advance(fid)
 
     def _shaft(self, f, fid: str) -> dict:
         n = len(f.sections)
