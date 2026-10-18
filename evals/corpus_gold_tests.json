@@ -1,0 +1,3591 @@
+{
+ "B01": {
+  "description": "L bracket 60 wide, 50 deep, 50 high, 6 thick",
+  "oracle_tests": [
+   {
+    "id": "B01-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "B01-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "B01-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      60,
+      50,
+      50
+     ]
+    }
+   },
+   {
+    "id": "B01-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 33840
+    },
+    "rel_tol": 1e-05
+   }
+  ],
+  "tests": [
+   {
+    "id": "B01-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "B01-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "B01-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      60,
+      50,
+      50
+     ]
+    }
+   },
+   {
+    "id": "B01-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 33840
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "B01-05",
+    "kind": "face_count",
+    "requirement": "L bracket profile",
+    "args": {
+     "count": 8
+    }
+   }
+  ]
+ },
+ "B02": {
+  "description": "L bracket with two 8.5 mm base holes",
+  "oracle_tests": [
+   {
+    "id": "B02-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "B02-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "B02-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      80,
+      60,
+      60
+     ]
+    }
+   },
+   {
+    "id": "B02-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 70772.079723
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "B02-05",
+    "kind": "hole_count",
+    "requirement": "2 x 8.5 holes",
+    "args": {
+     "count": 2,
+     "diameter": 8.5
+    }
+   },
+   {
+    "id": "B02-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 8.5,
+     "points": [
+      [
+       -25.0,
+       -4.0
+      ],
+      [
+       25.0,
+       -4.0
+      ]
+     ]
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "B02-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "B02-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "B02-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      80,
+      60,
+      60
+     ]
+    }
+   },
+   {
+    "id": "B02-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 70772.079723
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "B02-05",
+    "kind": "hole_count",
+    "requirement": "2 x 8.5 holes",
+    "args": {
+     "count": 2,
+     "diameter": 8.5
+    }
+   },
+   {
+    "id": "B02-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 8.5,
+     "points": [
+      [
+       -25.0,
+       -4.0
+      ],
+      [
+       25.0,
+       -4.0
+      ]
+     ]
+    }
+   }
+  ]
+ },
+ "B03": {
+  "description": "L bracket with R4 inner fillet",
+  "oracle_tests": [
+   {
+    "id": "B03-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "B03-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "B03-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      50,
+      40,
+      45
+     ]
+    }
+   },
+   {
+    "id": "B03-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 20171.681469
+    },
+    "rel_tol": 1e-05
+   }
+  ],
+  "tests": [
+   {
+    "id": "B03-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "B03-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "B03-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      50,
+      40,
+      45
+     ]
+    }
+   },
+   {
+    "id": "B03-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 20171.681469
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "B03-05",
+    "kind": "face_count",
+    "requirement": "L bracket profile with one inner fillet",
+    "args": {
+     "count": 9
+    }
+   }
+  ]
+ },
+ "B04": {
+  "description": "Heavy L bracket with holes and R6 inner fillet",
+  "oracle_tests": [
+   {
+    "id": "B04-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "B04-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "B04-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      100,
+      70,
+      80
+     ]
+    }
+   },
+   {
+    "id": "B04-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 139040.763661
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "B04-05",
+    "kind": "hole_count",
+    "requirement": "2 x 10.5 holes",
+    "args": {
+     "count": 2,
+     "diameter": 10.5
+    }
+   },
+   {
+    "id": "B04-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 10.5,
+     "points": [
+      [
+       -30.0,
+       -5.0
+      ],
+      [
+       30.0,
+       -5.0
+      ]
+     ]
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "B04-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "B04-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "B04-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      100,
+      70,
+      80
+     ]
+    }
+   },
+   {
+    "id": "B04-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 139040.763661
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "B04-05",
+    "kind": "hole_count",
+    "requirement": "2 x 10.5 holes",
+    "args": {
+     "count": 2,
+     "diameter": 10.5
+    }
+   },
+   {
+    "id": "B04-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 10.5,
+     "points": [
+      [
+       -30.0,
+       -5.0
+      ],
+      [
+       30.0,
+       -5.0
+      ]
+     ]
+    }
+   }
+  ]
+ },
+ "B05": {
+  "description": "Flat strap bracket 120x25x5 with two holes",
+  "oracle_tests": [
+   {
+    "id": "B05-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "B05-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "B05-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      120,
+      25,
+      5
+     ]
+    }
+   },
+   {
+    "id": "B05-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 14668.169276
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "B05-05",
+    "kind": "hole_count",
+    "requirement": "2 x 6.5 holes",
+    "args": {
+     "count": 2,
+     "diameter": 6.5
+    }
+   },
+   {
+    "id": "B05-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 6.5,
+     "points": [
+      [
+       -45,
+       0
+      ],
+      [
+       45,
+       0
+      ]
+     ]
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "B05-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "B05-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "B05-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      120,
+      25,
+      5
+     ]
+    }
+   },
+   {
+    "id": "B05-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 14668.169276
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "B05-05",
+    "kind": "hole_count",
+    "requirement": "2 x 6.5 holes",
+    "args": {
+     "count": 2,
+     "diameter": 6.5
+    }
+   },
+   {
+    "id": "B05-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 6.5,
+     "points": [
+      [
+       -45,
+       0
+      ],
+      [
+       45,
+       0
+      ]
+     ]
+    }
+   }
+  ]
+ },
+ "E01": {
+  "description": "Open box 100x60x40, 3 mm walls",
+  "oracle_tests": [
+   {
+    "id": "E01-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "E01-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "E01-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      100,
+      60,
+      40
+     ]
+    }
+   },
+   {
+    "id": "E01-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 52188
+    },
+    "rel_tol": 1e-05
+   }
+  ],
+  "tests": [
+   {
+    "id": "E01-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "E01-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "E01-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      100,
+      60,
+      40
+     ]
+    }
+   },
+   {
+    "id": "E01-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 52188
+    },
+    "rel_tol": 1e-05
+   }
+  ]
+ },
+ "E02": {
+  "description": "Rounded box R6 with R3.5 inner corners",
+  "oracle_tests": [
+   {
+    "id": "E02-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "E02-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "E02-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      120,
+      80,
+      35
+     ]
+    }
+   },
+   {
+    "id": "E02-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 59254.902423
+    },
+    "rel_tol": 1e-05
+   }
+  ],
+  "tests": [
+   {
+    "id": "E02-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "E02-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "E02-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      120,
+      80,
+      35
+     ]
+    }
+   },
+   {
+    "id": "E02-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 59254.902423
+    },
+    "rel_tol": 1e-05
+   }
+  ]
+ },
+ "E03": {
+  "description": "Small open box 50x50x30",
+  "oracle_tests": [
+   {
+    "id": "E03-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "E03-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "E03-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      50,
+      50,
+      30
+     ]
+    }
+   },
+   {
+    "id": "E03-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 15752
+    },
+    "rel_tol": 1e-05
+   }
+  ],
+  "tests": [
+   {
+    "id": "E03-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "E03-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "E03-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      50,
+      50,
+      30
+     ]
+    }
+   },
+   {
+    "id": "E03-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 15752
+    },
+    "rel_tol": 1e-05
+   }
+  ]
+ },
+ "E04": {
+  "description": "Box with 1.5 mm top outer chamfer",
+  "oracle_tests": [
+   {
+    "id": "E04-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "E04-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "E04-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      90,
+      70,
+      30
+     ]
+    }
+   },
+   {
+    "id": "E04-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 48868.5
+    },
+    "rel_tol": 1e-05
+   }
+  ],
+  "tests": [
+   {
+    "id": "E04-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "E04-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "E04-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      90,
+      70,
+      30
+     ]
+    }
+   },
+   {
+    "id": "E04-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 48868.5
+    },
+    "rel_tol": 1e-05
+   }
+  ]
+ },
+ "E05": {
+  "description": "Box with R5 filleted vertical corners",
+  "oracle_tests": [
+   {
+    "id": "E05-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "E05-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "E05-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      110,
+      75,
+      45
+     ]
+    }
+   },
+   {
+    "id": "E05-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 68892.291735
+    },
+    "rel_tol": 1e-05
+   }
+  ],
+  "tests": [
+   {
+    "id": "E05-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "E05-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "E05-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      110,
+      75,
+      45
+     ]
+    }
+   },
+   {
+    "id": "E05-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 68892.291735
+    },
+    "rel_tol": 1e-05
+   }
+  ]
+ },
+ "F01": {
+  "description": "Flange OD100 with 4x10 on PCD70",
+  "oracle_tests": [
+   {
+    "id": "F01-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "F01-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "F01-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      100,
+      100,
+      12
+     ]
+    }
+   },
+   {
+    "id": "F01-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 75398.223686
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "F01-05",
+    "kind": "hole_count",
+    "requirement": "4 x 10 holes",
+    "args": {
+     "count": 4,
+     "diameter": 10.0
+    }
+   },
+   {
+    "id": "F01-06",
+    "kind": "hole_count",
+    "requirement": "1 x 40 holes",
+    "args": {
+     "count": 1,
+     "diameter": 40.0
+    }
+   },
+   {
+    "id": "F01-07",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 10,
+     "points": [
+      [
+       35.0,
+       0.0
+      ],
+      [
+       2.1431318985078682e-15,
+       35.0
+      ],
+      [
+       -35.0,
+       4.2862637970157365e-15
+      ],
+      [
+       -6.429395695523604e-15,
+       -35.0
+      ]
+     ]
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "F01-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "F01-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "F01-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      100,
+      100,
+      12
+     ]
+    }
+   },
+   {
+    "id": "F01-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 75398.223686
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "F01-05",
+    "kind": "hole_count",
+    "requirement": "4 x 10 holes",
+    "args": {
+     "count": 4,
+     "diameter": 10.0
+    }
+   },
+   {
+    "id": "F01-06",
+    "kind": "hole_count",
+    "requirement": "1 x 40 holes",
+    "args": {
+     "count": 1,
+     "diameter": 40.0
+    }
+   },
+   {
+    "id": "F01-07",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 10,
+     "points": [
+      [
+       35.0,
+       0.0
+      ],
+      [
+       2.1431318985078682e-15,
+       35.0
+      ],
+      [
+       -35.0,
+       4.2862637970157365e-15
+      ],
+      [
+       -6.429395695523604e-15,
+       -35.0
+      ]
+     ]
+    }
+   },
+   {
+    "id": "F01-08",
+    "kind": "concentric",
+    "requirement": "bore concentric with the flange",
+    "args": {
+     "a": {
+      "type": "hole",
+      "diameter": 40,
+      "which": "all"
+     },
+     "b": {
+      "type": "boss",
+      "diameter": 100
+     }
+    }
+   }
+  ]
+ },
+ "F02": {
+  "description": "Flange OD150 with 6x14 on PCD115 rotated 30 deg",
+  "oracle_tests": [
+   {
+    "id": "F02-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "F02-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "F02-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      150,
+      150,
+      16
+     ]
+    }
+   },
+   {
+    "id": "F02-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 222726.352769
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "F02-05",
+    "kind": "hole_count",
+    "requirement": "6 x 14 holes",
+    "args": {
+     "count": 6,
+     "diameter": 14.0
+    }
+   },
+   {
+    "id": "F02-06",
+    "kind": "hole_count",
+    "requirement": "1 x 60 holes",
+    "args": {
+     "count": 1,
+     "diameter": 60.0
+    }
+   },
+   {
+    "id": "F02-07",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 14,
+     "points": [
+      [
+       49.79646071760523,
+       28.749999999999996
+      ],
+      [
+       3.5208595475486406e-15,
+       57.5
+      ],
+      [
+       -49.796460717605214,
+       28.750000000000018
+      ],
+      [
+       -49.796460717605235,
+       -28.749999999999986
+      ],
+      [
+       -1.056257864264592e-14,
+       -57.5
+      ],
+      [
+       49.796460717605235,
+       -28.749999999999982
+      ]
+     ]
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "F02-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "F02-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "F02-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      150,
+      150,
+      16
+     ]
+    }
+   },
+   {
+    "id": "F02-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 222726.352769
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "F02-05",
+    "kind": "hole_count",
+    "requirement": "6 x 14 holes",
+    "args": {
+     "count": 6,
+     "diameter": 14.0
+    }
+   },
+   {
+    "id": "F02-06",
+    "kind": "hole_count",
+    "requirement": "1 x 60 holes",
+    "args": {
+     "count": 1,
+     "diameter": 60.0
+    }
+   },
+   {
+    "id": "F02-07",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 14,
+     "points": [
+      [
+       49.79646071760523,
+       28.749999999999996
+      ],
+      [
+       3.5208595475486406e-15,
+       57.5
+      ],
+      [
+       -49.796460717605214,
+       28.750000000000018
+      ],
+      [
+       -49.796460717605235,
+       -28.749999999999986
+      ],
+      [
+       -1.056257864264592e-14,
+       -57.5
+      ],
+      [
+       49.796460717605235,
+       -28.749999999999982
+      ]
+     ]
+    }
+   },
+   {
+    "id": "F02-08",
+    "kind": "concentric",
+    "requirement": "bore concentric with the flange",
+    "args": {
+     "a": {
+      "type": "hole",
+      "diameter": 60,
+      "which": "all"
+     },
+     "b": {
+      "type": "boss",
+      "diameter": 150
+     }
+    }
+   }
+  ]
+ },
+ "F03": {
+  "description": "Hub flange OD120 with hub D60x25 and 35 bore",
+  "oracle_tests": [
+   {
+    "id": "F03-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "F03-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "F03-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      120,
+      120,
+      37
+     ]
+    }
+   },
+   {
+    "id": "F03-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 165375.793479
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "F03-05",
+    "kind": "hole_count",
+    "requirement": "4 x 12 holes",
+    "args": {
+     "count": 4,
+     "diameter": 12.0
+    }
+   },
+   {
+    "id": "F03-06",
+    "kind": "hole_count",
+    "requirement": "1 x 35 holes",
+    "args": {
+     "count": 1,
+     "diameter": 35.0
+    }
+   },
+   {
+    "id": "F03-07",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 12,
+     "points": [
+      [
+       45,
+       0
+      ],
+      [
+       0,
+       45
+      ],
+      [
+       -45,
+       0
+      ],
+      [
+       0,
+       -45
+      ]
+     ]
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "F03-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "F03-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "F03-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      120,
+      120,
+      37
+     ]
+    }
+   },
+   {
+    "id": "F03-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 165375.793479
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "F03-05",
+    "kind": "hole_count",
+    "requirement": "4 x 12 holes",
+    "args": {
+     "count": 4,
+     "diameter": 12.0
+    }
+   },
+   {
+    "id": "F03-06",
+    "kind": "hole_count",
+    "requirement": "1 x 35 holes",
+    "args": {
+     "count": 1,
+     "diameter": 35.0
+    }
+   },
+   {
+    "id": "F03-07",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 12,
+     "points": [
+      [
+       45,
+       0
+      ],
+      [
+       0,
+       45
+      ],
+      [
+       -45,
+       0
+      ],
+      [
+       0,
+       -45
+      ]
+     ]
+    }
+   },
+   {
+    "id": "F03-08",
+    "kind": "concentric",
+    "requirement": "bore concentric with the hub",
+    "args": {
+     "a": {
+      "type": "hole",
+      "diameter": 35,
+      "which": "all"
+     },
+     "b": {
+      "type": "boss",
+      "diameter": 60
+     }
+    }
+   },
+   {
+    "id": "F03-09",
+    "kind": "concentric",
+    "requirement": "hub concentric with the disc",
+    "args": {
+     "a": {
+      "type": "boss",
+      "diameter": 60
+     },
+     "b": {
+      "type": "boss",
+      "diameter": 120
+     }
+    }
+   }
+  ]
+ },
+ "F04": {
+  "description": "Flange OD80 with 8x6 rotated pi/8 rad",
+  "oracle_tests": [
+   {
+    "id": "F04-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "F04-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "F04-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      80,
+      80,
+      10
+     ]
+    }
+   },
+   {
+    "id": "F04-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 40934.952276
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "F04-05",
+    "kind": "hole_count",
+    "requirement": "8 x 6 holes",
+    "args": {
+     "count": 8,
+     "diameter": 6.0
+    }
+   },
+   {
+    "id": "F04-06",
+    "kind": "hole_count",
+    "requirement": "1 x 30 holes",
+    "args": {
+     "count": 1,
+     "diameter": 30.0
+    }
+   },
+   {
+    "id": "F04-07",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 6,
+     "points": [
+      [
+       27.716385975338603,
+       11.480502970952694
+      ],
+      [
+       11.480502970952696,
+       27.716385975338603
+      ],
+      [
+       -11.480502970952692,
+       27.716385975338603
+      ],
+      [
+       -27.716385975338603,
+       11.480502970952697
+      ],
+      [
+       -27.716385975338607,
+       -11.48050297095269
+      ],
+      [
+       -11.48050297095271,
+       -27.716385975338596
+      ],
+      [
+       11.480502970952701,
+       -27.7163859753386
+      ],
+      [
+       27.716385975338596,
+       -11.480502970952712
+      ]
+     ]
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "F04-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "F04-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "F04-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      80,
+      80,
+      10
+     ]
+    }
+   },
+   {
+    "id": "F04-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 40934.952276
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "F04-05",
+    "kind": "hole_count",
+    "requirement": "8 x 6 holes",
+    "args": {
+     "count": 8,
+     "diameter": 6.0
+    }
+   },
+   {
+    "id": "F04-06",
+    "kind": "hole_count",
+    "requirement": "1 x 30 holes",
+    "args": {
+     "count": 1,
+     "diameter": 30.0
+    }
+   },
+   {
+    "id": "F04-07",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 6,
+     "points": [
+      [
+       27.716385975338603,
+       11.480502970952694
+      ],
+      [
+       11.480502970952696,
+       27.716385975338603
+      ],
+      [
+       -11.480502970952692,
+       27.716385975338603
+      ],
+      [
+       -27.716385975338603,
+       11.480502970952697
+      ],
+      [
+       -27.716385975338607,
+       -11.48050297095269
+      ],
+      [
+       -11.48050297095271,
+       -27.716385975338596
+      ],
+      [
+       11.480502970952701,
+       -27.7163859753386
+      ],
+      [
+       27.716385975338596,
+       -11.480502970952712
+      ]
+     ]
+    }
+   },
+   {
+    "id": "F04-08",
+    "kind": "concentric",
+    "requirement": "bore concentric with the flange",
+    "args": {
+     "a": {
+      "type": "hole",
+      "diameter": 30,
+      "which": "all"
+     },
+     "b": {
+      "type": "boss",
+      "diameter": 80
+     }
+    }
+   }
+  ]
+ },
+ "F05": {
+  "description": "Square flange 100x100x12 with 50 bore and 4x10 corners",
+  "oracle_tests": [
+   {
+    "id": "F05-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "F05-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "F05-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      100,
+      100,
+      12
+     ]
+    }
+   },
+   {
+    "id": "F05-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 92668.143914
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "F05-05",
+    "kind": "hole_count",
+    "requirement": "4 x 10 holes",
+    "args": {
+     "count": 4,
+     "diameter": 10.0
+    }
+   },
+   {
+    "id": "F05-06",
+    "kind": "hole_count",
+    "requirement": "1 x 50 holes",
+    "args": {
+     "count": 1,
+     "diameter": 50.0
+    }
+   },
+   {
+    "id": "F05-07",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 10,
+     "points": [
+      [
+       -38,
+       -38
+      ],
+      [
+       -38,
+       38
+      ],
+      [
+       38,
+       -38
+      ],
+      [
+       38,
+       38
+      ]
+     ]
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "F05-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "F05-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "F05-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      100,
+      100,
+      12
+     ]
+    }
+   },
+   {
+    "id": "F05-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 92668.143914
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "F05-05",
+    "kind": "hole_count",
+    "requirement": "4 x 10 holes",
+    "args": {
+     "count": 4,
+     "diameter": 10.0
+    }
+   },
+   {
+    "id": "F05-06",
+    "kind": "hole_count",
+    "requirement": "1 x 50 holes",
+    "args": {
+     "count": 1,
+     "diameter": 50.0
+    }
+   },
+   {
+    "id": "F05-07",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 10,
+     "points": [
+      [
+       -38,
+       -38
+      ],
+      [
+       -38,
+       38
+      ],
+      [
+       38,
+       -38
+      ],
+      [
+       38,
+       38
+      ]
+     ]
+    }
+   },
+   {
+    "id": "F05-08",
+    "kind": "centered",
+    "requirement": "50 bore centred in the square flange",
+    "args": {
+     "a": {
+      "type": "hole",
+      "diameter": 50,
+      "which": "all"
+     }
+    }
+   }
+  ]
+ },
+ "H01": {
+  "description": "Two-step shaft 20x30 / 12x20",
+  "oracle_tests": [
+   {
+    "id": "H01-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "H01-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "H01-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      20,
+      20,
+      50
+     ]
+    }
+   },
+   {
+    "id": "H01-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 11686.724671
+    },
+    "rel_tol": 1e-05
+   }
+  ],
+  "tests": [
+   {
+    "id": "H01-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "H01-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "H01-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      20,
+      20,
+      50
+     ]
+    }
+   },
+   {
+    "id": "H01-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 11686.724671
+    },
+    "rel_tol": 1e-05
+   }
+  ]
+ },
+ "H02": {
+  "description": "Three-step shaft",
+  "oracle_tests": [
+   {
+    "id": "H02-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "H02-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "H02-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      25,
+      25,
+      75
+     ]
+    }
+   },
+   {
+    "id": "H02-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 17914.932107
+    },
+    "rel_tol": 1e-05
+   }
+  ],
+  "tests": [
+   {
+    "id": "H02-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "H02-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "H02-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      25,
+      25,
+      75
+     ]
+    }
+   },
+   {
+    "id": "H02-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 17914.932107
+    },
+    "rel_tol": 1e-05
+   }
+  ]
+ },
+ "H03": {
+  "description": "Four-step hollow shaft with 6 mm bore",
+  "oracle_tests": [
+   {
+    "id": "H03-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "H03-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "H03-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      30,
+      30,
+      105
+     ]
+    }
+   },
+   {
+    "id": "H03-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 37793.359623
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "H03-05",
+    "kind": "hole_count",
+    "requirement": "1 x 6 holes",
+    "args": {
+     "count": 1,
+     "diameter": 6.0
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "H03-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "H03-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "H03-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      30,
+      30,
+      105
+     ]
+    }
+   },
+   {
+    "id": "H03-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 37793.359623
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "H03-05",
+    "kind": "hole_count",
+    "requirement": "1 x 6 holes",
+    "args": {
+     "count": 1,
+     "diameter": 6.0
+    }
+   }
+  ]
+ },
+ "H04": {
+  "description": "Dowel pin D10 L100",
+  "oracle_tests": [
+   {
+    "id": "H04-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "H04-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "H04-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      10,
+      10,
+      100
+     ]
+    }
+   },
+   {
+    "id": "H04-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 7853.981634
+    },
+    "rel_tol": 1e-05
+   }
+  ],
+  "tests": [
+   {
+    "id": "H04-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "H04-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "H04-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      10,
+      10,
+      100
+     ]
+    }
+   },
+   {
+    "id": "H04-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 7853.981634
+    },
+    "rel_tol": 1e-05
+   }
+  ]
+ },
+ "H05": {
+  "description": "Stepped shaft with 1 mm end chamfer",
+  "oracle_tests": [
+   {
+    "id": "H05-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "H05-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "H05-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      22,
+      22,
+      55
+     ]
+    }
+   },
+   {
+    "id": "H05-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 14615.736222
+    },
+    "rel_tol": 1e-05
+   }
+  ],
+  "tests": [
+   {
+    "id": "H05-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "H05-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "H05-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      22,
+      22,
+      55
+     ]
+    }
+   },
+   {
+    "id": "H05-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 14615.736222
+    },
+    "rel_tol": 1e-05
+   }
+  ]
+ },
+ "P01": {
+  "description": "Analytic plate 80x40x8 with four 6 mm corner holes",
+  "oracle_tests": [
+   {
+    "id": "P01-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "P01-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "P01-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      80.0,
+      40.0,
+      8.0
+     ]
+    }
+   },
+   {
+    "id": "P01-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 24695.221316
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "P01-05",
+    "kind": "hole_count",
+    "requirement": "4 x 6 holes",
+    "args": {
+     "count": 4,
+     "diameter": 6.0
+    }
+   },
+   {
+    "id": "P01-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 6.0,
+     "points": [
+      [
+       -30.0,
+       -10.0
+      ],
+      [
+       -30.0,
+       10.0
+      ],
+      [
+       30.0,
+       -10.0
+      ],
+      [
+       30.0,
+       10.0
+      ]
+     ]
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "P01-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "P01-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "P01-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      80.0,
+      40.0,
+      8.0
+     ]
+    }
+   },
+   {
+    "id": "P01-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 24695.221316
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "P01-05",
+    "kind": "hole_count",
+    "requirement": "4 x 6 holes",
+    "args": {
+     "count": 4,
+     "diameter": 6.0
+    }
+   },
+   {
+    "id": "P01-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 6.0,
+     "points": [
+      [
+       -30.0,
+       -10.0
+      ],
+      [
+       -30.0,
+       10.0
+      ],
+      [
+       30.0,
+       -10.0
+      ],
+      [
+       30.0,
+       10.0
+      ]
+     ]
+    }
+   }
+  ]
+ },
+ "P02": {
+  "description": "Mounting plate 100x60x10 with four 8 mm holes",
+  "oracle_tests": [
+   {
+    "id": "P02-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "P02-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "P02-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      100.0,
+      60.0,
+      10.0
+     ]
+    }
+   },
+   {
+    "id": "P02-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 57989.380702
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "P02-05",
+    "kind": "hole_count",
+    "requirement": "4 x 8 holes",
+    "args": {
+     "count": 4,
+     "diameter": 8.0
+    }
+   },
+   {
+    "id": "P02-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 8.0,
+     "points": [
+      [
+       -38.0,
+       -18.0
+      ],
+      [
+       -38.0,
+       18.0
+      ],
+      [
+       38.0,
+       -18.0
+      ],
+      [
+       38.0,
+       18.0
+      ]
+     ]
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "P02-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "P02-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "P02-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      100.0,
+      60.0,
+      10.0
+     ]
+    }
+   },
+   {
+    "id": "P02-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 57989.380702
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "P02-05",
+    "kind": "hole_count",
+    "requirement": "4 x 8 holes",
+    "args": {
+     "count": 4,
+     "diameter": 8.0
+    }
+   },
+   {
+    "id": "P02-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 8.0,
+     "points": [
+      [
+       -38.0,
+       -18.0
+      ],
+      [
+       -38.0,
+       18.0
+      ],
+      [
+       38.0,
+       -18.0
+      ],
+      [
+       38.0,
+       18.0
+      ]
+     ]
+    }
+   }
+  ]
+ },
+ "P03": {
+  "description": "Plate 120x80x6 with a 3x2 grid of 6.6 mm holes",
+  "oracle_tests": [
+   {
+    "id": "P03-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "P03-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "P03-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      120,
+      80,
+      6
+     ]
+    }
+   },
+   {
+    "id": "P03-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 56368.370016
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "P03-05",
+    "kind": "hole_count",
+    "requirement": "6 x 6.6 holes",
+    "args": {
+     "count": 6,
+     "diameter": 6.6
+    }
+   },
+   {
+    "id": "P03-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 6.6,
+     "points": [
+      [
+       -40,
+       -20
+      ],
+      [
+       -40,
+       20
+      ],
+      [
+       0,
+       -20
+      ],
+      [
+       0,
+       20
+      ],
+      [
+       40,
+       -20
+      ],
+      [
+       40,
+       20
+      ]
+     ]
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "P03-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "P03-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "P03-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      120,
+      80,
+      6
+     ]
+    }
+   },
+   {
+    "id": "P03-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 56368.370016
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "P03-05",
+    "kind": "hole_count",
+    "requirement": "6 x 6.6 holes",
+    "args": {
+     "count": 6,
+     "diameter": 6.6
+    }
+   },
+   {
+    "id": "P03-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 6.6,
+     "points": [
+      [
+       -40,
+       -20
+      ],
+      [
+       -40,
+       20
+      ],
+      [
+       0,
+       -20
+      ],
+      [
+       0,
+       20
+      ],
+      [
+       40,
+       -20
+      ],
+      [
+       40,
+       20
+      ]
+     ]
+    }
+   }
+  ]
+ },
+ "P04": {
+  "description": "Plate with R5 outer corners and four 5.5 mm holes",
+  "oracle_tests": [
+   {
+    "id": "P04-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "P04-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "P04-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      90.0,
+      70.0,
+      6.0
+     ]
+    }
+   },
+   {
+    "id": "P04-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 37101.039831
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "P04-05",
+    "kind": "hole_count",
+    "requirement": "4 x 5.5 holes",
+    "args": {
+     "count": 4,
+     "diameter": 5.5
+    }
+   },
+   {
+    "id": "P04-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 5.5,
+     "points": [
+      [
+       -35.0,
+       -25.0
+      ],
+      [
+       -35.0,
+       25.0
+      ],
+      [
+       35.0,
+       -25.0
+      ],
+      [
+       35.0,
+       25.0
+      ]
+     ]
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "P04-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "P04-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "P04-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      90.0,
+      70.0,
+      6.0
+     ]
+    }
+   },
+   {
+    "id": "P04-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 37101.039831
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "P04-05",
+    "kind": "hole_count",
+    "requirement": "4 x 5.5 holes",
+    "args": {
+     "count": 4,
+     "diameter": 5.5
+    }
+   },
+   {
+    "id": "P04-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 5.5,
+     "points": [
+      [
+       -35.0,
+       -25.0
+      ],
+      [
+       -35.0,
+       25.0
+      ],
+      [
+       35.0,
+       -25.0
+      ],
+      [
+       35.0,
+       25.0
+      ]
+     ]
+    }
+   }
+  ]
+ },
+ "P05": {
+  "description": "Imperial plate 4x2x0.25 in with four 0.25 in holes",
+  "oracle_tests": [
+   {
+    "id": "P05-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "P05-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "P05-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      101.6,
+      50.8,
+      6.35
+     ]
+    }
+   },
+   {
+    "id": "P05-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 31969.729877
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "P05-05",
+    "kind": "hole_count",
+    "requirement": "4 x 6.35 holes",
+    "args": {
+     "count": 4,
+     "diameter": 6.35
+    }
+   },
+   {
+    "id": "P05-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 6.35,
+     "points": [
+      [
+       -38.099999999999994,
+       -12.7
+      ],
+      [
+       -38.099999999999994,
+       12.7
+      ],
+      [
+       38.099999999999994,
+       -12.7
+      ],
+      [
+       38.099999999999994,
+       12.7
+      ]
+     ]
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "P05-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "P05-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "P05-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      101.6,
+      50.8,
+      6.35
+     ]
+    }
+   },
+   {
+    "id": "P05-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 31969.729877
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "P05-05",
+    "kind": "hole_count",
+    "requirement": "4 x 6.35 holes",
+    "args": {
+     "count": 4,
+     "diameter": 6.35
+    }
+   },
+   {
+    "id": "P05-06",
+    "kind": "hole_positions",
+    "requirement": "hole centres",
+    "args": {
+     "diameter": 6.35,
+     "points": [
+      [
+       -38.099999999999994,
+       -12.7
+      ],
+      [
+       -38.099999999999994,
+       12.7
+      ],
+      [
+       38.099999999999994,
+       -12.7
+      ],
+      [
+       38.099999999999994,
+       12.7
+      ]
+     ]
+    }
+   }
+  ]
+ },
+ "S01": {
+  "description": "Revolved spacer OD20 ID10 L5",
+  "oracle_tests": [
+   {
+    "id": "S01-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "S01-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "S01-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      20,
+      20,
+      5
+     ]
+    }
+   },
+   {
+    "id": "S01-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 1178.097245
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "S01-05",
+    "kind": "hole_count",
+    "requirement": "1 x 10 holes",
+    "args": {
+     "count": 1,
+     "diameter": 10.0
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "S01-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "S01-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "S01-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      20,
+      20,
+      5
+     ]
+    }
+   },
+   {
+    "id": "S01-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 1178.097245
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "S01-05",
+    "kind": "hole_count",
+    "requirement": "1 x 10 holes",
+    "args": {
+     "count": 1,
+     "diameter": 10.0
+    }
+   }
+  ]
+ },
+ "S02": {
+  "description": "Extruded spacer OD30 ID12.5 L15",
+  "oracle_tests": [
+   {
+    "id": "S02-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "S02-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "S02-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      30,
+      30,
+      15
+     ]
+    }
+   },
+   {
+    "id": "S02-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 8762.09826
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "S02-05",
+    "kind": "hole_count",
+    "requirement": "1 x 12.5 holes",
+    "args": {
+     "count": 1,
+     "diameter": 12.5
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "S02-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "S02-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "S02-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      30,
+      30,
+      15
+     ]
+    }
+   },
+   {
+    "id": "S02-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 8762.09826
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "S02-05",
+    "kind": "hole_count",
+    "requirement": "1 x 12.5 holes",
+    "args": {
+     "count": 1,
+     "diameter": 12.5
+    }
+   },
+   {
+    "id": "S02-06",
+    "kind": "concentric",
+    "requirement": "bore concentric with the spacer",
+    "args": {
+     "a": {
+      "type": "hole",
+      "diameter": 12.5,
+      "which": "all"
+     },
+     "b": {
+      "type": "boss",
+      "diameter": 30
+     }
+    }
+   }
+  ]
+ },
+ "S03": {
+  "description": "Small spacer OD12 ID6.4 L8",
+  "oracle_tests": [
+   {
+    "id": "S03-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "S03-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "S03-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      12,
+      12,
+      8
+     ]
+    }
+   },
+   {
+    "id": "S03-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 647.419414
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "S03-05",
+    "kind": "hole_count",
+    "requirement": "1 x 6.4 holes",
+    "args": {
+     "count": 1,
+     "diameter": 6.4
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "S03-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "S03-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "S03-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      12,
+      12,
+      8
+     ]
+    }
+   },
+   {
+    "id": "S03-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 647.419414
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "S03-05",
+    "kind": "hole_count",
+    "requirement": "1 x 6.4 holes",
+    "args": {
+     "count": 1,
+     "diameter": 6.4
+    }
+   }
+  ]
+ },
+ "S04": {
+  "description": "Thin washer OD50 ID25 T3",
+  "oracle_tests": [
+   {
+    "id": "S04-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "S04-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "S04-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      50,
+      50,
+      3
+     ]
+    }
+   },
+   {
+    "id": "S04-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 4417.864669
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "S04-05",
+    "kind": "hole_count",
+    "requirement": "1 x 25 holes",
+    "args": {
+     "count": 1,
+     "diameter": 25.0
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "S04-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "S04-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "S04-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      50,
+      50,
+      3
+     ]
+    }
+   },
+   {
+    "id": "S04-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 4417.864669
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "S04-05",
+    "kind": "hole_count",
+    "requirement": "1 x 25 holes",
+    "args": {
+     "count": 1,
+     "diameter": 25.0
+    }
+   },
+   {
+    "id": "S04-06",
+    "kind": "concentric",
+    "requirement": "bore concentric with the washer",
+    "args": {
+     "a": {
+      "type": "hole",
+      "diameter": 25,
+      "which": "all"
+     },
+     "b": {
+      "type": "boss",
+      "diameter": 50
+     }
+    }
+   }
+  ]
+ },
+ "S05": {
+  "description": "Spacer OD40 ID20 L10 with 1 mm outer chamfer",
+  "oracle_tests": [
+   {
+    "id": "S05-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "S05-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "S05-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      40,
+      40,
+      10
+     ]
+    }
+   },
+   {
+    "id": "S05-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 9362.993305
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "S05-05",
+    "kind": "hole_count",
+    "requirement": "1 x 20 holes",
+    "args": {
+     "count": 1,
+     "diameter": 20.0
+    }
+   }
+  ],
+  "tests": [
+   {
+    "id": "S05-01",
+    "kind": "valid_solid",
+    "requirement": "valid solid",
+    "args": {}
+   },
+   {
+    "id": "S05-02",
+    "kind": "solid_count",
+    "requirement": "one solid",
+    "args": {
+     "count": 1
+    }
+   },
+   {
+    "id": "S05-03",
+    "kind": "bbox",
+    "requirement": "overall size",
+    "args": {
+     "values": [
+      40,
+      40,
+      10
+     ]
+    }
+   },
+   {
+    "id": "S05-04",
+    "kind": "volume",
+    "requirement": "analytic volume",
+    "args": {
+     "value": 9362.993305
+    },
+    "rel_tol": 1e-05
+   },
+   {
+    "id": "S05-05",
+    "kind": "hole_count",
+    "requirement": "1 x 20 holes",
+    "args": {
+     "count": 1,
+     "diameter": 20.0
+    }
+   },
+   {
+    "id": "S05-06",
+    "kind": "concentric",
+    "requirement": "bore concentric with the spacer",
+    "args": {
+     "a": {
+      "type": "hole",
+      "diameter": 20,
+      "which": "all"
+     },
+     "b": {
+      "type": "boss",
+      "diameter": 40
+     }
+    }
+   }
+  ]
+ }
+}
