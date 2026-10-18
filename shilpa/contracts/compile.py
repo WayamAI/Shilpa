@@ -17,13 +17,19 @@ from pydantic import ValidationError
 from . import expr
 from .errors import ErrorCode, ShilpaError
 from .expr import Quantity
-from .ir import SKETCH_OPS, Param, Recipe
+from . import iso_holes, profile2d
+from .ir import HOLE_OPS, PATH_OPS, SKETCH_OPS, Param, Recipe
 
 LENGTH_TO_MM = {"mm": 1.0, "cm": 10.0, "m": 1000.0, "in": 25.4}
 ANGLE_TO_DEG = {"deg": 1.0, "rad": 180.0 / math.pi}
 
 # Reference fields that may be zero or negative. Everything else must be > 0.
-SIGNED_FIELDS = {"center_x_ref", "center_y_ref", "offset_ref", "start_angle_ref"}
+SIGNED_FIELDS = {"center_x_ref", "center_y_ref", "offset_ref", "start_angle_ref", "rotation_angle_ref",
+                 "start_x_ref", "start_y_ref", "x_ref", "y_ref", "mid_x_ref", "mid_y_ref"}
+# Fields that name other features rather than holding a dimension.
+FEATURE_REF_FIELDS = ("profile_ref", "body_ref", "target_ref", "tool_ref", "path_ref")
+# Sketch axes each plane contains (revolve axes must lie in the sketch plane).
+PLANE_AXES = {"XY": ("X", "Y"), "XZ": ("X", "Z"), "YZ": ("Y", "Z")}
 # May be zero (a pitch along an axis with one hole); negative is still invalid.
 NON_NEGATIVE_FIELDS = {"pitch_x_ref", "pitch_y_ref"}
 
@@ -51,6 +57,8 @@ class CompiledFeature:
     op: str
     spec: Any  # the pydantic feature model
     values: dict[str, float]  # evaluated *_ref fields, mm / deg / count
+    meta: dict[str, Any] = field(default_factory=dict)  # non-geometric facts, e.g. a tapped hole's thread
+    segments: list[profile2d.Seg] | None = None  # profiles and paths: resolved exact geometry
 
 
 @dataclass
@@ -184,7 +192,85 @@ def _eval_ref(text: str, params: dict[str, Quantity], feature_id: str, fname: st
 
 
 def _ref_fields(model) -> dict[str, str]:
-    return {k: v for k, v in model if k.endswith("_ref") and isinstance(v, str) and not k.endswith(("profile_ref", "body_ref", "target_ref", "tool_ref"))}
+    return {k: v for k, v in model if k.endswith("_ref") and isinstance(v, str) and not k.endswith(FEATURE_REF_FIELDS)}
+
+
+def _schema_error(msg: str, fid: str, fname: str | None = None) -> ShilpaError:
+    return ShilpaError(ErrorCode.INVALID_SCHEMA, msg, feature_id=fid, field=fname)
+
+
+def _compile_segments(f, params, values: dict[str, float]) -> list[profile2d.Seg]:
+    """Evaluate a profile's or path's segments and resolve them into exact lines and arcs."""
+    need = {"line": (), "arc": ("mid_x_ref", "mid_y_ref"), "tangent_arc": (), "radius_arc": ("radius_ref",)}
+    resolved = []
+    for i, s in enumerate(f.segments):
+        given = {k for k in ("mid_x_ref", "mid_y_ref", "radius_ref") if getattr(s, k) is not None}
+        if given != set(need[s.kind]):
+            want = ", ".join(need[s.kind]) or "no mid point or radius"
+            raise _schema_error(f"segment {i} ({s.kind}) takes {want}", f.id, f"segments.{i}")
+        seg = {"kind": s.kind, "clockwise": s.clockwise}
+        for k, v in s:
+            if k.endswith("_ref") and v is not None:
+                seg[k[:-4]] = values[f"segments.{i}.{k[:-4]}"] = _eval_ref(v, params, f.id, k)
+        resolved.append(seg)
+    start = (values["start_x_ref"], values["start_y_ref"])
+    segs = profile2d.resolve(start, resolved, closed=f.op == "profile", fid=f.id)
+    if f.op == "path":
+        profile2d.require_smooth(segs, f.id)
+    return segs
+
+
+def _compile_hole_series(f, values: dict[str, float]) -> dict[str, Any]:
+    """Fill hole-series dimensions from the ISO table where no explicit ref was given, and check them."""
+    std = iso_holes.lookup(f.standard_size) if f.standard_size else None
+    kind = f.hole_type
+    extra = {"counterbore": ("cbore_diameter_ref", "cbore_depth_ref"), "countersink": ("csk_diameter_ref", "csk_angle_ref"),
+             "tapped": ("thread_depth_ref",), "simple": ()}
+    for k in ("cbore_diameter_ref", "cbore_depth_ref", "csk_diameter_ref", "csk_angle_ref", "thread_depth_ref"):
+        if getattr(f, k) is not None and k not in extra[kind]:
+            raise _schema_error(f"{k} does not apply to a {kind} hole", f.id, k)
+
+    def need(key: str, table_value: float | None, what: str) -> None:
+        if key in values:
+            return
+        if table_value is None:
+            hint = f" ({f.standard_size} has no {what} in the table)" if std else " or give standard_size"
+            raise _schema_error(f"{key} is required for a {kind} hole{hint}", f.id, key)
+        values[key] = table_value
+
+    need("diameter_ref", (std.tap_drill if kind == "tapped" else std.clearance[f.fit]) if std else None, "diameter")
+    d = values["diameter_ref"]
+    meta: dict[str, Any] = {}
+    if kind == "counterbore":
+        need("cbore_diameter_ref", std.cbore_diameter if std else None, "counterbore")
+        need("cbore_depth_ref", std.cbore_depth if std else None, "counterbore")
+        if values["cbore_diameter_ref"] <= d:
+            raise _schema_error("counterbore diameter must be larger than the hole diameter", f.id, "cbore_diameter_ref")
+        if f.mode == "blind" and values["cbore_depth_ref"] >= values["depth_ref"]:
+            raise _schema_error("counterbore depth must be less than the hole depth", f.id, "cbore_depth_ref")
+    elif kind == "countersink":
+        need("csk_diameter_ref", std.csk_diameter if std else None, "countersink")
+        values.setdefault("csk_angle_ref", std.csk_angle if std else 90.0)
+        if values["csk_diameter_ref"] <= d:
+            raise _schema_error("countersink diameter must be larger than the hole diameter", f.id, "csk_diameter_ref")
+        if not 0 < values["csk_angle_ref"] < 180:
+            raise _schema_error("countersink angle must be between 0 and 180 degrees", f.id, "csk_angle_ref")
+        csk_depth = (values["csk_diameter_ref"] - d) / 2 / math.tan(math.radians(values["csk_angle_ref"] / 2))
+        if f.mode == "blind" and csk_depth >= values["depth_ref"]:
+            raise _schema_error("countersink is deeper than the hole", f.id, "csk_diameter_ref")
+        values["csk_depth"] = csk_depth
+    elif kind == "tapped":
+        if std is None:
+            raise _schema_error("tapped holes need standard_size (the thread spec comes from it)", f.id, "standard_size")
+        meta["thread"] = std.thread
+        meta["thread_standard"] = "ISO 261 coarse, tap drill ISO 2306"
+        if "thread_depth_ref" in values:
+            if f.mode == "blind" and values["thread_depth_ref"] > values["depth_ref"]:
+                raise _schema_error("thread depth exceeds the hole depth", f.id, "thread_depth_ref")
+            meta["thread_depth"] = values["thread_depth_ref"]
+    if std:
+        meta["standard_size"] = std.size
+    return meta
 
 
 def compile_recipe(recipe: Recipe | dict | str, capabilities: set[str] | None = None) -> CompiledRecipe:
@@ -194,8 +280,9 @@ def compile_recipe(recipe: Recipe | dict | str, capabilities: set[str] | None = 
         raise ShilpaError(ErrorCode.UNSUPPORTED_OPERATION, "only the default frame (origin 0, +Z normal) is supported")
 
     params, evidence = resolve_parameters(recipe)
-    seen: dict[str, str] = {}  # id -> "sketch" | "body"
+    seen: dict[str, str] = {}  # id -> "sketch" | "path" | "body"
     compiled: list[CompiledFeature] = []
+    by_id: dict[str, CompiledFeature] = {}
 
     for f in recipe.features:
         if f.id in seen or f.id in params:
@@ -204,8 +291,10 @@ def compile_recipe(recipe: Recipe | dict | str, capabilities: set[str] | None = 
             raise ShilpaError(
                 ErrorCode.UNSUPPORTED_OPERATION, f"operation {f.op!r} is not supported by this adapter", feature_id=f.id
             )
-        for ref_field, want in (("profile_ref", "sketch"), ("body_ref", "body"), ("target_ref", "body"), ("tool_ref", "body")):
-            target = getattr(f, ref_field, None)
+        refs = [(r, getattr(f, r, None), want) for r, want in (("profile_ref", "sketch"), ("body_ref", "body"), ("target_ref", "body"),
+                                                                ("tool_ref", "body"), ("path_ref", "path"))]
+        refs += [(f"profile_refs.{i}", t, "sketch") for i, t in enumerate(getattr(f, "profile_refs", None) or [])]
+        for ref_field, target, want in refs:
             if target is None:
                 continue
             if target not in seen:
@@ -232,6 +321,8 @@ def compile_recipe(recipe: Recipe | dict | str, capabilities: set[str] | None = 
             raise ShilpaError(ErrorCode.INVALID_SCHEMA, "blind holes need depth_ref", feature_id=f.id, field="depth_ref")
 
         values = {k: _eval_ref(v, params, f.id, k) for k, v in _ref_fields(f).items()}
+        meta: dict[str, Any] = {}
+        segments = None
         edges = getattr(f, "edges", None)
         if edges is not None and edges.diameter_ref:
             values["edges.diameter"] = _eval_ref(edges.diameter_ref, params, f.id, "diameter_ref")
@@ -239,8 +330,37 @@ def compile_recipe(recipe: Recipe | dict | str, capabilities: set[str] | None = 
             for i, s in enumerate(f.sections):
                 values[f"sections.{i}.diameter"] = _eval_ref(s.diameter_ref, params, f.id, "diameter_ref")
                 values[f"sections.{i}.length"] = _eval_ref(s.length_ref, params, f.id, "length_ref")
-        compiled.append(CompiledFeature(f.id, f.op, f, values))
-        seen[f.id] = "sketch" if f.op in SKETCH_OPS else "body"
+        elif f.op in ("profile", "path"):
+            segments = _compile_segments(f, params, values)
+        elif f.op in HOLE_OPS:
+            meta = _compile_hole_series(f, values)
+        elif f.op == "circle" and "inner_diameter_ref" in values and values["inner_diameter_ref"] >= values["diameter_ref"]:
+            raise _schema_error("inner_diameter must be smaller than diameter", f.id, "inner_diameter_ref")
+        elif f.op == "revolve":
+            prof = by_id[f.profile_ref]
+            if f.axis not in PLANE_AXES[prof.spec.plane]:
+                raise _schema_error(f"revolve axis {f.axis} does not lie in the {prof.spec.plane} plane of {f.profile_ref!r}; "
+                                    f"use one of {PLANE_AXES[prof.spec.plane]}", f.id, "axis")
+            if prof.values.get("offset_ref"):
+                raise _schema_error("a revolved sketch must not be offset from its plane (the axis must lie in it)", f.id, "profile_ref")
+            if values.get("angle_ref", 360.0) > 360.0 + 1e-9:
+                raise _schema_error("revolve angle cannot exceed 360 degrees", f.id, "angle_ref")
+        elif f.op == "loft":
+            profs = [by_id[p] for p in f.profile_refs]
+            if len({p.spec.plane for p in profs}) != 1:
+                raise _schema_error("loft sections must all be on the same plane type", f.id, "profile_refs")
+            offs = [p.values.get("offset_ref", 0.0) for p in profs]
+            if any(b <= a + 1e-9 for a, b in zip(offs, offs[1:])):
+                raise _schema_error(f"loft sections must have strictly increasing offset_ref (got {offs})", f.id, "profile_refs")
+        elif f.op == "sweep":
+            if by_id[f.path_ref].op == "helix" and by_id[f.profile_ref].spec.plane != "XZ":
+                raise _schema_error("a helical sweep needs its profile on the XZ plane", f.id, "profile_ref")
+        elif f.op == "polar_pattern" and values.get("angle_ref", 360.0) > 360.0 + 1e-9:
+            raise _schema_error("polar pattern angle cannot exceed 360 degrees", f.id, "angle_ref")
+        cf = CompiledFeature(f.id, f.op, f, values, meta, segments)
+        compiled.append(cf)
+        by_id[f.id] = cf
+        seen[f.id] = "sketch" if f.op in SKETCH_OPS else "path" if f.op in PATH_OPS else "body"
 
     bodies = [c.id for c in compiled if seen[c.id] == "body"]
     if not bodies:

@@ -1,0 +1,72 @@
+{
+  "id": "N05",
+  "family": "enclosure",
+  "description": "Shelled enclosure 120x80x40 with R8 corners, 2.5 mm walls, open top",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "Shelled enclosure",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "width": 120,
+      "depth": 80,
+      "height": 40,
+      "corner_radius": 8,
+      "wall": 2.5
+    },
+    "features": [
+      {
+        "id": "outline",
+        "op": "centered_rectangle",
+        "width_ref": "width",
+        "height_ref": "depth"
+      },
+      {
+        "id": "block",
+        "op": "extrude",
+        "profile_ref": "outline",
+        "distance_ref": "height"
+      },
+      {
+        "id": "rounded",
+        "op": "fillet",
+        "body_ref": "block",
+        "radius_ref": "corner_radius",
+        "edges": {
+          "direction": "parallel_z",
+          "boundary": "outer",
+          "expected_count": 4
+        }
+      },
+      {
+        "id": "enclosure",
+        "op": "shell",
+        "body_ref": "rounded",
+        "thickness_ref": "wall",
+        "open_faces": [
+          {
+            "side": "top"
+          }
+        ]
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true,
+      "bbox_ref": [
+        "width",
+        "depth",
+        "height"
+      ]
+    }
+  },
+  "oracle": {
+    "bbox": [
+      120,
+      80,
+      40
+    ],
+    "volume": 59338.733027,
+    "solid_count": 1
+  }
+}

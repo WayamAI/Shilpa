@@ -1,0 +1,50 @@
+{
+  "id": "N15",
+  "family": "tube",
+  "description": "Quarter elbow: OD20 ID14 ring revolved 90 degrees on a 40 bend radius",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "Quarter elbow",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "outer_diameter": 20,
+      "inner_diameter": 14,
+      "bend_radius": 40,
+      "sweep": {
+        "value": 90,
+        "kind": "angle"
+      }
+    },
+    "features": [
+      {
+        "id": "section",
+        "op": "circle",
+        "plane": "XZ",
+        "diameter_ref": "outer_diameter",
+        "inner_diameter_ref": "inner_diameter",
+        "center_x_ref": "bend_radius"
+      },
+      {
+        "id": "elbow",
+        "op": "revolve",
+        "profile_ref": "section",
+        "axis": "Z",
+        "angle_ref": "sweep"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true
+    }
+  },
+  "oracle": {
+    "bbox": [
+      50,
+      50,
+      20
+    ],
+    "volume": 10066.996489,
+    "solid_count": 1
+  }
+}

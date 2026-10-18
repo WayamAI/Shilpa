@@ -1,0 +1,106 @@
+{
+  "id": "N09",
+  "family": "wheel",
+  "description": "Spoked wheel \u00d8100 x 10: rim 5 wide, six 6 mm spokes, \u00d830 hub with 12 bore",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "Spoked wheel",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "rim_diameter": 100,
+      "rim_inner": 90,
+      "hub_diameter": 30,
+      "bore": 12,
+      "thickness": 10,
+      "spoke_width": 6,
+      "spoke_length": 34,
+      "spoke_centre": 30,
+      "spokes": {
+        "value": 6,
+        "kind": "count"
+      }
+    },
+    "features": [
+      {
+        "id": "rim_ring",
+        "op": "circle",
+        "plane": "XY",
+        "diameter_ref": "rim_diameter",
+        "inner_diameter_ref": "rim_inner"
+      },
+      {
+        "id": "rim",
+        "op": "extrude",
+        "profile_ref": "rim_ring",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "spoke_outline",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "spoke_length",
+        "height_ref": "spoke_width",
+        "center_x_ref": "spoke_centre"
+      },
+      {
+        "id": "spoke",
+        "op": "extrude",
+        "profile_ref": "spoke_outline",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "spoke_set",
+        "op": "polar_pattern",
+        "body_ref": "spoke",
+        "count_ref": "spokes"
+      },
+      {
+        "id": "rim_spokes",
+        "op": "boolean",
+        "operation": "union",
+        "target_ref": "rim",
+        "tool_ref": "spoke_set"
+      },
+      {
+        "id": "hub_ring",
+        "op": "circle",
+        "plane": "XY",
+        "diameter_ref": "hub_diameter",
+        "inner_diameter_ref": "bore"
+      },
+      {
+        "id": "hub",
+        "op": "extrude",
+        "profile_ref": "hub_ring",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "wheel",
+        "op": "boolean",
+        "operation": "union",
+        "target_ref": "rim_spokes",
+        "tool_ref": "hub"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true
+    }
+  },
+  "oracle": {
+    "bbox": [
+      100,
+      100,
+      10
+    ],
+    "volume": 31684.386354,
+    "solid_count": 1,
+    "holes": {
+      "12": 1
+    }
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "id": "N10",
+  "family": "bracket",
+  "description": "Rail 120x30x6 with four \u00d810 x 8 bosses at 30 pitch, each drilled \u00d85.5 through",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "Bossed rail",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "length": 120,
+      "width": 30,
+      "thickness": 6,
+      "boss_diameter": 10,
+      "boss_height": 8,
+      "pitch": 30,
+      "hole_diameter": 5.5,
+      "bosses": {
+        "value": 4,
+        "kind": "count"
+      },
+      "one": {
+        "value": 1,
+        "kind": "count"
+      }
+    },
+    "features": [
+      {
+        "id": "rail_outline",
+        "op": "centered_rectangle",
+        "plane": "XY",
+        "width_ref": "length",
+        "height_ref": "width"
+      },
+      {
+        "id": "rail",
+        "op": "extrude",
+        "profile_ref": "rail_outline",
+        "distance_ref": "thickness",
+        "direction": "positive_z"
+      },
+      {
+        "id": "boss_outline",
+        "op": "circle",
+        "plane": "XY",
+        "diameter_ref": "boss_diameter",
+        "center_x_ref": "-(bosses - 1) / 2 * pitch"
+      },
+      {
+        "id": "boss",
+        "op": "extrude",
+        "profile_ref": "boss_outline",
+        "distance_ref": "boss_height",
+        "direction": "positive_z",
+        "offset_ref": "thickness"
+      },
+      {
+        "id": "boss_row",
+        "op": "linear_pattern",
+        "body_ref": "boss",
+        "direction": "X",
+        "count_ref": "bosses",
+        "spacing_ref": "pitch"
+      },
+      {
+        "id": "bossed",
+        "op": "boolean",
+        "operation": "union",
+        "target_ref": "rail",
+        "tool_ref": "boss_row"
+      },
+      {
+        "id": "holes",
+        "op": "linear_hole_pattern",
+        "body_ref": "bossed",
+        "diameter_ref": "hole_diameter",
+        "count_x_ref": "bosses",
+        "count_y_ref": "one",
+        "pitch_x_ref": "pitch",
+        "pitch_y_ref": "pitch"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true
+    }
+  },
+  "oracle": {
+    "bbox": [
+      120,
+      30,
+      14
+    ],
+    "volume": 22782.809634,
+    "solid_count": 1,
+    "holes": {
+      "5.5": 4
+    },
+    "hole_centers": {
+      "diameter": 5.5,
+      "centers": [
+        [
+          -45,
+          0
+        ],
+        [
+          -15,
+          0
+        ],
+        [
+          15,
+          0
+        ],
+        [
+          45,
+          0
+        ]
+      ]
+    }
+  }
+}

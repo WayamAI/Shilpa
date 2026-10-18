@@ -1,0 +1,53 @@
+{
+  "id": "N03",
+  "family": "duct",
+  "description": "Lofted transition nozzle \u00d860 to \u00d836 over 50 with the outlet 10 off-axis",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "Offset nozzle",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "inlet_diameter": 60,
+      "outlet_diameter": 36,
+      "length": 50,
+      "outlet_offset": 10
+    },
+    "features": [
+      {
+        "id": "inlet",
+        "op": "circle",
+        "diameter_ref": "inlet_diameter"
+      },
+      {
+        "id": "outlet",
+        "op": "circle",
+        "diameter_ref": "outlet_diameter",
+        "center_x_ref": "outlet_offset",
+        "offset_ref": "length"
+      },
+      {
+        "id": "nozzle",
+        "op": "loft",
+        "profile_refs": [
+          "inlet",
+          "outlet"
+        ],
+        "ruled": true
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true
+    }
+  },
+  "oracle": {
+    "bbox": [
+      60,
+      60,
+      50
+    ],
+    "volume": 92362.824016,
+    "solid_count": 1
+  }
+}

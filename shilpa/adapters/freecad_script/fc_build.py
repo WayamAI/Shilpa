@@ -6,7 +6,8 @@
 #
 #   build: Params spreadsheet (one alias per IR parameter), one PartDesign Body,
 #          sketches whose every vertex / radius is bound to expressions over Params,
-#          Pad / Pocket / Revolution / Fillet / Chamfer features, STEP export, FCStd save.
+#          Pad / Pocket / Revolution / Groove / Pipe / Helix / Loft / Thickness / Mirrored /
+#          Linear and Polar Pattern / Fillet / Chamfer features, STEP export, FCStd save.
 #   edit:  open FCStd, set Params cells, recompute, verify, export STEP, save, reopen, verify.
 
 import json
@@ -31,12 +32,17 @@ def fail(msg, feature_id=None):
 # ------------------------------------------------------------------ parameters
 
 
+def cell(value, unit):
+    # The sheet reads a leading minus as text, so negative quantities are entered as formulas.
+    text = f"{value!r} {unit}".strip()
+    return "=" + text if value < 0 else text
+
+
 def make_params(doc, params):
     sheet = doc.addObject("Spreadsheet::Sheet", "Params")
     for i, (name, p) in enumerate(params.items(), start=1):
         sheet.set(f"A{i}", name)
-        unit = UNITS.get(p["kind"], "")
-        sheet.set(f"B{i}", f"{p['value']!r} {unit}".strip())
+        sheet.set(f"B{i}", cell(p["value"], UNITS.get(p["kind"], "")))
         sheet.setAlias(f"B{i}", name)
     return sheet
 
@@ -44,27 +50,54 @@ def make_params(doc, params):
 # ------------------------------------------------------------------ sketches
 
 
+def origin(body, role):
+    return [f for f in body.Origin.OriginFeatures if f.Role == role][0]
+
+
+def set_q(feat, prop, q):
+    """Set a property to a value and, when parametric, bind it to its Params expression."""
+    setattr(feat, prop, q["v"])
+    if q.get("e"):
+        feat.setExpression(prop, q["e"])
+
+
 class SketchBuilder:
     def __init__(self, doc, body, sid, spec):
         self.sk = body.newObject("Sketcher::SketchObject", sid)
         plane = {"XY": "XY_Plane", "XZ": "XZ_Plane", "YZ": "YZ_Plane"}[spec.get("plane", "XY")]
-        origin_feature = [f for f in body.Origin.OriginFeatures if f.Role == plane][0]
-        self.sk.AttachmentSupport = [(origin_feature, "")]
+        self.sk.AttachmentSupport = [(origin(body, plane), "")]
         self.sk.MapMode = "FlatFace"
         off = spec.get("offset")
         if off:
             self.sk.AttachmentOffset = App.Placement(V(0, 0, off["v"]), App.Rotation())
             if off.get("e"):
                 self.sk.setExpression(".AttachmentOffset.Base.z", off["e"])
-        self.n = 0
+        # Geometry and constraints are collected and added in one call each (flush): the sketcher
+        # re-solves on every single add, which made a 160-segment gear outline take minutes.
+        self.geos, self.construction, self.cons = [], [], []
+
+    def geo(self, g, construction=False):
+        self.geos.append(g)
+        if construction:
+            self.construction.append(len(self.geos) - 1)
+        return len(self.geos) - 1
 
     def _con(self, c, expr=None, name=None):
-        idx = self.sk.addConstraint(c)
-        if name:
-            self.sk.renameConstraint(idx, name)
-        if expr:
-            self.sk.setExpression(f".Constraints.{name}" if name else f"Constraints[{idx}]", expr)
-        return idx
+        self.cons.append((c, expr, name))
+        return len(self.cons) - 1
+
+    def flush(self):
+        if self.geos:
+            self.sk.addGeometry(self.geos, False)
+        for i in self.construction:
+            self.sk.setConstruction(i, True)
+        if self.cons:
+            self.sk.addConstraint([c for c, _, _ in self.cons])
+        for idx, (_, expr, name) in enumerate(self.cons):
+            if name:
+                self.sk.renameConstraint(idx, name)
+            if expr:
+                self.sk.setExpression(f".Constraints.{name}" if name else f"Constraints[{idx}]", expr)
 
     def fix_point(self, geo, pos, x, y, tag):
         """Pin a vertex to expression-driven coordinates measured from the sketch origin."""
@@ -79,7 +112,7 @@ class SketchBuilder:
         geos = []
         for i in range(len(pts)):
             a, b = pts[i], pts[(i + 1) % len(pts)]
-            geos.append(self.sk.addGeometry(Part.LineSegment(V(a[0]["v"], a[1]["v"], 0), V(b[0]["v"], b[1]["v"], 0)), False))
+            geos.append(self.geo(Part.LineSegment(V(a[0]["v"], a[1]["v"], 0), V(b[0]["v"], b[1]["v"], 0)), False))
         for i, g in enumerate(geos):
             self._con(Sketcher.Constraint("Coincident", g, 2, geos[(i + 1) % len(geos)], 1))
         for i, (x, y) in enumerate(pts):
@@ -113,7 +146,7 @@ class SketchBuilder:
                 segs.append(((coord(cx, w, sx), coord(cy, h, sy, r)), (coord(cx, w, nx), coord(cy, h, ny, r))))
         geos = []
         for i, (p1, p2) in enumerate(segs):
-            g = self.sk.addGeometry(Part.LineSegment(V(p1[0]["v"], p1[1]["v"], 0), V(p2[0]["v"], p2[1]["v"], 0)), False)
+            g = self.geo(Part.LineSegment(V(p1[0]["v"], p1[1]["v"], 0), V(p2[0]["v"], p2[1]["v"], 0)), False)
             geos.append(g)
             self.fix_point(g, 1, p1[0], p1[1], f"{tag}_l{i}a")
             self.fix_point(g, 2, p2[0], p2[1], f"{tag}_l{i}b")
@@ -127,21 +160,73 @@ class SketchBuilder:
             a2 = math.atan2(start[1]["v"] - ccy, start[0]["v"] - ccx)
             while a2 <= a1:
                 a2 += 2 * math.pi
-            arc = self.sk.addGeometry(Part.ArcOfCircle(Part.Circle(V(ccx, ccy, 0), V(0, 0, 1), r["v"]), a1, a2), False)
+            arc = self.geo(Part.ArcOfCircle(Part.Circle(V(ccx, ccy, 0), V(0, 0, 1), r["v"]), a1, a2), False)
             self._con(Sketcher.Constraint("Coincident", arc, 1, g1, 2))
             self._con(Sketcher.Constraint("Coincident", arc, 2, g2, 1))
             self._con(Sketcher.Constraint("Radius", arc, r["v"]), r.get("e"), f"{tag}_r{i}")
 
     def circle(self, s, tag):
-        g = self.sk.addGeometry(Part.Circle(V(s["cx"]["v"], s["cy"]["v"], 0), V(0, 0, 1), s["d"]["v"] / 2), False)
+        g = self.geo(Part.Circle(V(s["cx"]["v"], s["cy"]["v"], 0), V(0, 0, 1), s["d"]["v"] / 2), False)
         self._con(Sketcher.Constraint("Diameter", g, s["d"]["v"]), s["d"].get("e"), f"{tag}_d")
         if abs(s["cx"]["v"]) < 1e-12 and abs(s["cy"]["v"]) < 1e-12 and not s["cx"].get("e") and not s["cy"].get("e"):
             self._con(Sketcher.Constraint("Coincident", g, 3, -1, 1))
         else:
             self.fix_point(g, 3, s["cx"], s["cy"], tag)
 
+    def chain(self, s, tag):
+        """Lines and arcs joined end to end (profiles, slots, sweep paths).
+
+        Every vertex is pinned to its expressions; an arc is then fixed by a pinned through
+        point (3-point arc), a radius constraint, or tangency to the previous segment.
+        """
+        segs = s["segs"]
+        geos = []  # (geometry index, vertex index of the IR start, vertex index of the IR end)
+        for seg in segs:
+            p0, p1 = seg["p0"], seg["p1"]
+            a, b = V(p0[0]["v"], p0[1]["v"], 0), V(p1[0]["v"], p1[1]["v"], 0)
+            if seg["kind"] == "line":
+                geos.append((self.geo(Part.LineSegment(a, b), False), 1, 2))
+                continue
+            c = V(seg["center"][0], seg["center"][1], 0)
+            a0, a1 = math.atan2(a.y - c.y, a.x - c.x), math.atan2(b.y - c.y, b.x - c.x)
+            if not seg["ccw"]:
+                a0, a1 = a1, a0
+            while a1 <= a0:
+                a1 += 2 * math.pi
+            g = self.geo(Part.ArcOfCircle(Part.Circle(c, V(0, 0, 1), seg["radius"]), a0, a1), False)
+            # Sketcher arcs run counter-clockwise: a clockwise IR arc starts at the sketch arc's end vertex.
+            geos.append((g, 1, 2) if seg["ccw"] else (g, 2, 1))
+        n = len(geos)
+        for i in range(n if s["closed"] else n - 1):
+            (g1, _, e1), (g2, s2, _) = geos[i], geos[(i + 1) % n]
+            kind = "Tangent" if segs[(i + 1) % n]["kind"] == "tangent" else "Coincident"
+            self._con(Sketcher.Constraint(kind, g1, e1, g2, s2))
+        for i, (g, st, _) in enumerate(geos):
+            self.fix_point(g, st, segs[i]["p0"][0], segs[i]["p0"][1], f"{tag}_p{i}")
+        if not s["closed"]:
+            g, _, en = geos[-1]
+            self.fix_point(g, en, segs[-1]["p1"][0], segs[-1]["p1"][1], f"{tag}_p{n}")
+        for i, seg in enumerate(segs):
+            g = geos[i][0]
+            if seg["kind"] == "arc3":
+                m = seg["mid"]
+                pt = self.geo(Part.Point(V(m[0]["v"], m[1]["v"], 0)), True)
+                self.fix_point(pt, 1, m[0], m[1], f"{tag}_m{i}")
+                self._con(Sketcher.Constraint("PointOnObject", pt, 1, g))
+            elif seg["kind"] == "radius":
+                self._con(Sketcher.Constraint("Radius", g, seg["r"]["v"]), seg["r"].get("e"), f"{tag}_r{i}")
+
     def add(self, shape, tag):
         getattr(self, shape["type"])(shape, tag) if shape["type"] != "polyline" else self.polygon(shape["pts"], tag)
+
+
+def make_sketch(doc, body, name, spec):
+    sb = SketchBuilder(doc, body, name, spec)
+    for i, shape in enumerate(spec["shapes"]):
+        sb.add(shape, f"s{i}")
+    sb.flush()
+    sb.sk.Visibility = False
+    return sb.sk
 
 
 def combine(base, delta, sign):
@@ -205,7 +290,107 @@ def select_edges(shape, sel):
     return names
 
 
+# ------------------------------------------------------------------ face selection (mirrors Shilpa's side selector)
+
+SIDES = {"top": (2, 1), "bottom": (2, -1), "x_max": (0, 1), "x_min": (0, -1), "y_max": (1, 1), "y_min": (1, -1)}
+
+
+def select_faces(shape, side):
+    """Planar faces lying on one side of the shape's bounding box."""
+    axis, sign = SIDES[side]
+    bb = shape.BoundBox
+    at = (bb.XMax, bb.YMax, bb.ZMax)[axis] if sign > 0 else (bb.XMin, bb.YMin, bb.ZMin)[axis]
+    names = []
+    for i, f in enumerate(shape.Faces, start=1):
+        if type(f.Surface).__name__ != "Plane":
+            continue
+        n, c = f.Surface.Axis, f.CenterOfMass
+        if abs(abs((n.x, n.y, n.z)[axis]) - 1) < 1e-6 and abs((c.x, c.y, c.z)[axis] - at) < 1e-4:
+            names.append(f"Face{i}")
+    return names
+
+
+def mirror_plane(body, fid, plane, off):
+    """Origin plane, or a datum plane moved along the plane's own axis (XZ's normal is -Y)."""
+    base = origin(body, {"XY": "XY_Plane", "XZ": "XZ_Plane", "YZ": "YZ_Plane"}[plane])
+    if not off or (abs(off["v"]) < 1e-12 and not off.get("e")):
+        return (base, [""])
+    sign = -1 if plane == "XZ" else 1
+    dp = body.newObject("PartDesign::Plane", f"{fid}_plane")
+    dp.AttachmentSupport = [(base, "")]
+    dp.MapMode = "FlatFace"
+    dp.AttachmentOffset = App.Placement(V(0, 0, sign * off["v"]), App.Rotation())
+    if off.get("e"):
+        dp.setExpression(".AttachmentOffset.Base.z", f"{'-' if sign < 0 else ''}({off['e']})")
+    dp.Visibility = False
+    return (dp, [""])
+
+
+def qexpr(q, unit="mm"):
+    return q.get("e") or f"{q['v']!r} {unit}".strip()
+
+
 # ------------------------------------------------------------------ build
+
+SKETCHED = ("Pad", "Pocket", "Revolution", "Groove", "AdditivePipe", "SubtractivePipe", "AdditiveHelix", "SubtractiveHelix")
+LOFTS = ("AdditiveLoft", "SubtractiveLoft")
+TRANSFORMS = ("Mirrored", "LinearPattern", "PolarPattern")
+
+
+def build_sketched(doc, body, op, fid, kind):
+    sk = make_sketch(doc, body, f"{fid}_sketch", op["sketch"])
+    spine = make_sketch(doc, body, f"{fid}_spine", op["spine"]) if "spine" in op else None
+    doc.recompute()
+    feat = body.newObject(f"PartDesign::{kind}", fid)
+    feat.Profile = sk
+    if kind in ("Revolution", "Groove"):
+        feat.ReferenceAxis = (sk, [op.get("axis", "V_Axis")])
+        set_q(feat, "Angle", op.get("angle") or {"v": 360.0})
+    elif kind in ("AdditivePipe", "SubtractivePipe"):
+        feat.Spine = (spine, [f"Edge{i}" for i in range(1, len(spine.Shape.Edges) + 1)])
+    elif kind in ("AdditiveHelix", "SubtractiveHelix"):
+        feat.ReferenceAxis = (sk, ["V_Axis"])  # the XZ sketch's vertical axis is global +Z
+        feat.Mode = "pitch-height-angle"
+        set_q(feat, "Pitch", op["pitch"])
+        set_q(feat, "Height", op["height"])
+        feat.LeftHanded = bool(op.get("left_handed"))
+    elif op.get("through_all"):
+        feat.Type = "ThroughAll"
+        set_symmetric(feat, True)
+    else:
+        feat.Type = "Length"
+        set_q(feat, "Length", op["length"])
+        set_symmetric(feat, bool(op.get("midplane")))
+        feat.Reversed = bool(op.get("reversed"))
+        if op.get("taper"):
+            set_q(feat, "TaperAngle", op["taper"])
+    return feat
+
+
+def build_transform(doc, body, op, fid, kind):
+    feat = body.newObject(f"PartDesign::{kind}", fid)
+    if op.get("originals"):
+        feat.TransformMode = "Features"
+        feat.Originals = [doc.getObject(n) for n in op["originals"]]
+    else:
+        feat.TransformMode = "Whole shape"
+    if kind == "Mirrored":
+        feat.MirrorPlane = mirror_plane(body, fid, op["plane"], op.get("offset"))
+    elif kind == "LinearPattern":
+        feat.Direction = (origin(body, f"{op['direction']}_Axis"), [""])
+        feat.Mode = "Extent"
+        n, s = op["count"], op["spacing"]
+        set_q(feat, "Length", {"v": (n["v"] - 1) * s["v"], **({"e": f"(({qexpr(n, '')}) - 1) * ({qexpr(s)})"} if n.get("e") or s.get("e") else {})})
+        set_q(feat, "Occurrences", {"v": int(n["v"]), **({"e": n["e"]} if n.get("e") else {})})
+    else:
+        feat.Axis = (origin(body, f"{op['axis']}_Axis"), [""])
+        feat.Mode = "Extent"
+        set_q(feat, "Angle", op["angle"])
+        set_q(feat, "Occurrences", {"v": int(op["count"]["v"]), **({"e": op["count"]["e"]} if op["count"].get("e") else {})})
+    # A whole-shape transform has no Originals, which the Body does not count as a solid feature,
+    # so it would not become the Tip and later features would skip it.
+    body.Tip = feat
+    return feat
 
 
 def build():
@@ -216,31 +401,32 @@ def build():
     for op in JOB["ops"]:
         fid, kind = op["id"], op["pd"]
         try:
-            if kind in ("Pad", "Pocket", "Revolution"):
-                sb = SketchBuilder(doc, body, f"{fid}_sketch", op["sketch"])
-                for i, shape in enumerate(op["sketch"]["shapes"]):
-                    sb.add(shape, f"s{i}")
-                sk = sb.sk
+            if kind in SKETCHED:
+                feat = build_sketched(doc, body, op, fid, kind)
+            elif kind in LOFTS:
+                secs = [make_sketch(doc, body, f"{fid}_sec{i}", s) for i, s in enumerate(op["sections"])]
                 doc.recompute()
-                if kind == "Revolution":
-                    feat = body.newObject("PartDesign::Revolution", fid)
-                    feat.Profile = sk
-                    feat.ReferenceAxis = (sk, ["V_Axis"])
-                    feat.Angle = 360.0
-                else:
-                    feat = body.newObject(f"PartDesign::{kind}", fid)
-                    feat.Profile = sk
-                    if op.get("through_all"):
-                        feat.Type = "ThroughAll"
-                        set_symmetric(feat, True)
-                    else:
-                        feat.Type = "Length"
-                        feat.Length = op["length"]["v"]
-                        if op["length"].get("e"):
-                            feat.setExpression("Length", op["length"]["e"])
-                        set_symmetric(feat, bool(op.get("midplane")))
-                        feat.Reversed = bool(op.get("reversed"))
-                sk.Visibility = False
+                feat = body.newObject(f"PartDesign::{kind}", fid)
+                feat.Profile = secs[0]
+                feat.Sections = secs[1:]
+                feat.Ruled = bool(op.get("ruled"))
+            elif kind == "Thickness":
+                doc.recompute()
+                faces = []
+                for sel in op["faces"]:
+                    found = select_faces(tip.Shape, sel["side"])
+                    if len(found) != sel["expected_count"]:
+                        fail(f"face selector {sel['side']} matched {len(found)} faces, expected {sel['expected_count']}", fid)
+                    faces += found
+                feat = body.newObject("PartDesign::Thickness", fid)
+                feat.Base = (tip, faces)
+                feat.Mode = "Skin"
+                feat.Join = "Intersection"
+                feat.Reversed = bool(op["inward"])  # Reversed means "thickness inwards" in PartDesign
+                set_q(feat, "Value", op["size"])
+            elif kind in TRANSFORMS:
+                doc.recompute()
+                feat = build_transform(doc, body, op, fid, kind)
             elif kind in ("Fillet", "Chamfer"):
                 doc.recompute()
                 edges = select_edges(tip.Shape, op["selector"])
@@ -254,6 +440,10 @@ def build():
                     feat.setExpression(prop, op["size"]["e"])
             else:
                 fail(f"unknown lowered operation {kind}", fid)
+            for name, value in (op.get("meta") or {}).items():
+                # Cosmetic facts (e.g. a tapped hole's thread spec) travel with the feature.
+                feat.addProperty("App::PropertyString", name, "Shilpa", "Shilpa metadata")
+                setattr(feat, name, value)
             doc.recompute()
             check_feature(feat, fid)
             tip = feat
@@ -302,12 +492,12 @@ def edit():
     doc = App.openDocument(JOB["fcstd"])
     sheet = doc.getObject("Params")
     for name, value in JOB["set"].items():
-        cell = sheet.getCellFromAlias(name)
-        if not cell:
+        cell_name = sheet.getCellFromAlias(name)
+        if not cell_name:
             fail(f"parameter {name!r} is not in the Params sheet")
         old = sheet.get(name)
         unit = str(old).split(" ", 1)[1] if " " in str(old) else ""
-        sheet.set(cell, f"{value!r} {unit}".strip())
+        sheet.set(cell_name, cell(value, unit))
     doc.recompute()
     body = doc.getObject("ShilpaBody")
     for f in body.Group:

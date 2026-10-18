@@ -1,0 +1,91 @@
+{
+  "id": "N08",
+  "family": "bracket",
+  "description": "Link bracket 90x30x8 with round ends and two \u00d88 holes, built as a mirrored half",
+  "recipe": {
+    "schema_version": "1.1",
+    "name": "Mirrored link",
+    "intent": "engineering_cad",
+    "units": "mm",
+    "parameters": {
+      "end_radius": 15,
+      "half_length": 30,
+      "thickness": 8,
+      "hole_diameter": 8,
+      "hole_x": 35
+    },
+    "features": [
+      {
+        "id": "half_outline",
+        "op": "profile",
+        "start_x_ref": "0 * end_radius",
+        "start_y_ref": "-end_radius",
+        "segments": [
+          {
+            "kind": "line",
+            "x_ref": "half_length",
+            "y_ref": "-end_radius"
+          },
+          {
+            "kind": "tangent_arc",
+            "x_ref": "half_length",
+            "y_ref": "end_radius"
+          },
+          {
+            "kind": "line",
+            "x_ref": "0 * end_radius",
+            "y_ref": "end_radius"
+          }
+        ]
+      },
+      {
+        "id": "half",
+        "op": "extrude",
+        "profile_ref": "half_outline",
+        "distance_ref": "thickness"
+      },
+      {
+        "id": "half_drilled",
+        "op": "hole",
+        "body_ref": "half",
+        "diameter_ref": "hole_diameter",
+        "center_x_ref": "hole_x"
+      },
+      {
+        "id": "link",
+        "op": "mirror",
+        "body_ref": "half_drilled",
+        "plane": "YZ"
+      }
+    ],
+    "assertions": {
+      "solid_count": 1,
+      "valid_brep": true
+    }
+  },
+  "oracle": {
+    "bbox": [
+      90,
+      30,
+      8
+    ],
+    "volume": 19250.619057,
+    "solid_count": 1,
+    "holes": {
+      "8": 2
+    },
+    "hole_centers": {
+      "diameter": 8,
+      "centers": [
+        [
+          -35,
+          0
+        ],
+        [
+          35,
+          0
+        ]
+      ]
+    }
+  }
+}

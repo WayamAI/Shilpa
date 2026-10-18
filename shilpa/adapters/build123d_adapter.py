@@ -1,4 +1,4 @@
-"""Headless build123d (Open CASCADE) adapter for Shilpa IR 1.0 (blueprint sections 4.1, 7).
+"""Headless build123d (Open CASCADE) adapter for Shilpa IR 1.1 (blueprint sections 4.1, 7).
 
 Each operation is a trusted implementation over validated numbers from
 ``compile_recipe``. The adapter never executes generated code. Preconditions that
@@ -27,6 +27,13 @@ EXPORTS = {"STEP", "STL", "GLB"}
 TOL = 1e-6
 EPS = 1.0  # mm of overshoot for through cuts
 PLANES = {"XY": bd.Plane.XY, "XZ": bd.Plane.XZ, "YZ": bd.Plane.YZ}
+AXES = {"X": bd.Axis.X, "Y": bd.Axis.Y, "Z": bd.Axis.Z}
+UNIT = {"X": bd.Vector(1, 0, 0), "Y": bd.Vector(0, 1, 0), "Z": bd.Vector(0, 0, 1)}
+# Hole entry sides: (axis index, outward sign, in-face (u, v) axis indices).
+SIDES = {"top": (2, 1, (0, 1)), "bottom": (2, -1, (0, 1)), "x_max": (0, 1, (1, 2)), "x_min": (0, -1, (1, 2)),
+         "y_max": (1, 1, (0, 2)), "y_min": (1, -1, (0, 2))}
+# Body ops whose tools keep the pre-1.1 rule that a boolean cut may not break a side wall.
+WALL_CHECKED_TOOLS = {"extrude", "stepped_shaft"}
 
 
 def engine_versions() -> dict[str, str]:
@@ -83,6 +90,11 @@ def build(recipe, cancel_check=None) -> BuildResult:
             results += [FeatureResult(c.id, c.op, "skipped") for c in compiled.features[len(results):]]
             return BuildResult(None, compiled, results, err)
         objects[cf.id] = out
+        roots = objects.setdefault("__root__", {})
+        src = cf.spec.body_ref if cf.op in ("mirror", "linear_pattern", "polar_pattern") else None
+        roots[cf.id] = roots.get(src, cf.op) if src else cf.op
+        if cf.meta:
+            detail = {**detail, **cf.meta}
         vol = out.volume if isinstance(out, bd.Part) else None
         if isinstance(out, bd.Part):
             _check_solid(out, cf.id)
@@ -121,10 +133,46 @@ def _bbox(part):
     return part.bounding_box()
 
 
+def _sketch_plane(cf: CompiledFeature) -> bd.Plane:
+    return PLANES[cf.spec.plane].offset(_v(cf, "offset_ref"))
+
+
+def _segment_edges(cf: CompiledFeature, plane: bd.Plane) -> list[bd.Edge]:
+    """Exact edges from the compiler's resolved segments (shared with the FreeCAD lowering)."""
+    edges = []
+    for s in cf.segments:
+        p0, p1 = plane.from_local_coords(s.p0), plane.from_local_coords(s.p1)
+        if s.kind == "line":
+            edges.append(bd.Edge.make_line(p0, p1))
+        else:
+            edges.append(bd.Edge.make_three_point_arc(p0, plane.from_local_coords(s.mid), p1))
+    return edges
+
+
+def _profile_face(cf: CompiledFeature) -> bd.Face:
+    from ..contracts import profile2d
+
+    plane = _sketch_plane(cf)
+    try:
+        face = bd.Face(bd.Wire(_segment_edges(cf, plane)))
+    except Exception as exc:
+        raise ShilpaError(ErrorCode.PRECONDITION_FAILED, f"profile does not form a closed outline ({exc})", feature_id=cf.id)
+    want = abs(profile2d.signed_area(cf.segments))
+    # A self-crossing outline can still produce a "valid" face; its area gives it away.
+    if not face.is_valid or abs(face.area - want) > 1e-6 * max(want, 1.0):
+        raise ShilpaError(ErrorCode.PRECONDITION_FAILED, "profile outline crosses itself", feature_id=cf.id,
+                          details={"face_area": face.area, "enclosed_area": want})
+    return face
+
+
 def _sketch_face(cf: CompiledFeature):
-    plane = PLANES[cf.spec.plane]
+    if cf.op == "profile":
+        return _profile_face(cf)
+    plane = _sketch_plane(cf)
     cx, cy = _v(cf, "center_x_ref"), _v(cf, "center_y_ref")
-    if cf.op == "centered_rectangle":
+    if cf.op == "slot":
+        sk = bd.SlotCenterToCenter(cf.values["length_ref"], cf.values["width_ref"], _v(cf, "rotation_angle_ref"))
+    elif cf.op == "centered_rectangle":
         w, h = cf.values["width_ref"], cf.values["height_ref"]
         r = cf.values.get("corner_radius_ref")
         if r is not None:
@@ -139,6 +187,8 @@ def _sketch_face(cf: CompiledFeature):
             sk = bd.Rectangle(w, h)
     else:
         sk = bd.Circle(cf.values["diameter_ref"] / 2)
+        if "inner_diameter_ref" in cf.values:
+            sk = sk - bd.Circle(cf.values["inner_diameter_ref"] / 2)
     return plane * bd.Pos(cx, cy) * sk
 
 
@@ -164,41 +214,111 @@ def _require_inside_top(part, footprint: bd.Sketch | bd.Face, what: str, fid: st
         )
 
 
+def _vec(i: int, s: float = 1.0) -> bd.Vector:
+    return bd.Vector(*[s if k == i else 0.0 for k in range(3)])
+
+
+def _bb_lo_hi(bb, i: int) -> tuple[float, float]:
+    return (bb.min.X, bb.min.Y, bb.min.Z)[i], (bb.max.X, bb.max.Y, bb.max.Z)[i]
+
+
+def side_extent(bb, side: str) -> tuple[tuple[float, float], tuple[float, float]]:
+    """In-face (u, v) extent of a body for a hole entry side."""
+    _, _, (iu, iv) = SIDES[side]
+    return _bb_lo_hi(bb, iu), _bb_lo_hi(bb, iv)
+
+
+def _side_faces(part, side: str) -> list:
+    axis, sign, _ = SIDES[side]
+    lo, hi = _bb_lo_hi(_bbox(part), axis)
+    at = hi if sign > 0 else lo
+    out = []
+    for f in part.faces():
+        if f.geom_type.name != "PLANE":
+            continue
+        n, c = f.normal_at(), f.center()
+        if abs(abs((n.X, n.Y, n.Z)[axis]) - 1) < 1e-6 and abs((c.X, c.Y, c.Z)[axis] - at) < 1e-4:
+            out.append(f)
+    return out
+
+
+def _common_area(a, b) -> float:
+    if not _boxes_touch(a.bounding_box(), b.bounding_box()):
+        return 0.0
+    common = a & b
+    return common.area if common is not None else 0.0
+
+
 def _cut_holes(cf: CompiledFeature, objects, centers: list[tuple[float, float]]):
+    """Drill a hole series into a body from one bounding-box side (top by default)."""
     body = _as_part(objects[cf.spec.body_ref])
-    d = cf.values["diameter_ref"]
+    v, kind, side = cf.values, cf.spec.hole_type, cf.spec.face
+    d = v["diameter_ref"]
     r = d / 2
+    outer = {"counterbore": v.get("cbore_diameter_ref"), "countersink": v.get("csk_diameter_ref")}.get(kind) or d
     for (x1, y1), (x2, y2) in combinations(centers, 2):
         dist = math.hypot(x1 - x2, y1 - y2)
         if dist < TOL:
             raise ShilpaError(ErrorCode.PRECONDITION_FAILED, f"duplicate hole centre at ({x1:g}, {y1:g})", feature_id=cf.id)
-        if dist <= d + TOL:
+        if dist <= outer + TOL:
             raise ShilpaError(
                 ErrorCode.PRECONDITION_FAILED,
-                f"holes at ({x1:g}, {y1:g}) and ({x2:g}, {y2:g}) overlap (spacing {dist:g} <= diameter {d:g})",
+                f"holes at ({x1:g}, {y1:g}) and ({x2:g}, {y2:g}) overlap (spacing {dist:g} <= diameter {outer:g})",
                 feature_id=cf.id,
             )
     bb = _bbox(body)
-    footprint = bd.Sketch() + [bd.Pos(x, y) * bd.Circle(r) for x, y in centers]
-    _require_inside_top(body, footprint, f"hole pattern of diameter {d:g}", cf.id)
-    if cf.spec.mode == "through_all":
-        z0, height = bb.min.Z - EPS, bb.size.Z + 2 * EPS
+    axis, sign, (iu, iv) = SIDES[side]
+    lo, hi = _bb_lo_hi(bb, axis)
+    entry, extent = (hi if sign > 0 else lo), hi - lo
+    inward = _vec(axis, -sign)
+    points = [_vec(iu, u) + _vec(iv, w) + _vec(axis, entry) for u, w in centers]
+    what = f"{kind} hole pattern of diameter {d:g}" if kind != "simple" else f"hole pattern of diameter {d:g}"
+    faces = _side_faces(body, side)
+    if faces:
+        # The largest circle of each hole must lie on the flat entry face.
+        placed = [bd.Plane(origin=p, z_dir=-inward) * bd.Face(bd.Wire([bd.Edge.make_circle(outer / 2)])) for p in points]
+        area = sum(f.area for f in placed)
+        covered = sum(_common_area(f, s) for f in placed for s in faces)
+        if covered < area * (1 - 1e-6) - 1e-6:
+            raise ShilpaError(
+                ErrorCode.PRECONDITION_FAILED,
+                f"{what} is not fully supported by the {side} face (clearance to an edge or existing cut is too small)",
+                feature_id=cf.id,
+                details={"footprint_area": area, "supported_area": covered},
+            )
     else:
-        depth = cf.values["depth_ref"]
-        if depth >= bb.size.Z - TOL:
+        # Curved entry (a cross hole in a round shaft): through holes only, and inside the silhouette box.
+        if cf.spec.mode != "through_all" or kind not in ("simple", "tapped"):
+            raise ShilpaError(ErrorCode.PRECONDITION_FAILED, f"the {side} side of the body is not flat; only plain "
+                              "through holes can enter a curved face", feature_id=cf.id)
+        (u0, u1), (w0, w1) = side_extent(bb, side)
+        if any(u - r < u0 - TOL or u + r > u1 + TOL or w - r < w0 - TOL or w + r > w1 + TOL for u, w in centers):
+            raise ShilpaError(ErrorCode.PRECONDITION_FAILED, f"{what} extends past the body", feature_id=cf.id)
+    if cf.spec.mode == "through_all":
+        depth = extent + EPS
+    else:
+        depth = v["depth_ref"]
+        if depth >= extent - TOL:
             raise ShilpaError(
                 ErrorCode.PRECONDITION_FAILED, f"blind depth {depth:g} reaches through the body; use through_all", feature_id=cf.id
             )
-        z0, height = bb.max.Z - depth, depth + EPS
-    tools = [bd.Pos(x, y, z0) * bd.Cylinder(r, height, align=(bd.Align.CENTER, bd.Align.CENTER, bd.Align.MIN)) for x, y in centers]
-    out = body
-    for t in tools:
-        out = out - t
-    out = _as_part(out)
+    tools = []
+    for p in points:
+        start = bd.Plane(origin=p - inward * EPS, z_dir=inward)
+        tool = bd.Solid.make_cylinder(r, depth + EPS, start)
+        if kind == "counterbore":
+            tool = tool.fuse(bd.Solid.make_cylinder(v["cbore_diameter_ref"] / 2, v["cbore_depth_ref"] + EPS, start))
+        elif kind == "countersink":
+            half = math.radians(v["csk_angle_ref"] / 2)
+            top_r = v["csk_diameter_ref"] / 2 + EPS * math.tan(half)
+            tool = tool.fuse(bd.Solid.make_cone(top_r, r, v["csk_depth"] + EPS, start))
+        tools.append(tool)
+    out = _as_part(body.cut(*tools))
     removed = body.volume - out.volume
     if removed <= TOL:
         raise ShilpaError(ErrorCode.PRECONDITION_FAILED, "holes removed no material", feature_id=cf.id)
-    return out, {"centers": [[round(x, 6), round(y, 6)] for x, y in centers], "diameter": d, "removed_volume": removed}
+    return out, {"centers": [[round(x, 6), round(y, 6)] for x, y in centers], "diameter": d, "face": side,
+                 "hole_type": kind, "removed_volume": removed}
 
 
 # ---------------------------------------------------------------- operations
@@ -228,6 +348,76 @@ def op_extrude(cf, objects):
 
 def prof_cf_plane(objects, cf) -> str:
     return objects["__planes__"][cf.spec.profile_ref]
+
+
+def _faces(sketch) -> list:
+    return list(sketch.faces()) if not isinstance(sketch, bd.Face) else [sketch]
+
+
+def op_path(cf, objects):
+    try:
+        wire = bd.Wire(_segment_edges(cf, _sketch_plane(cf)))
+    except Exception as exc:
+        raise ShilpaError(ErrorCode.PRECONDITION_FAILED, f"path segments do not join ({exc})", feature_id=cf.id)
+    return wire, {"length": wire.length}
+
+
+def op_helix(cf, objects):
+    v = cf.values
+    if v["height_ref"] < v["pitch_ref"] / 100:
+        raise ShilpaError(ErrorCode.PRECONDITION_FAILED, "helix is shorter than 1/100 of a turn", feature_id=cf.id)
+    wire = bd.Edge.make_helix(v["pitch_ref"], v["height_ref"], v["diameter_ref"] / 2, center=(0, 0, _v(cf, "offset_ref")),
+                              lefthand=cf.spec.left_handed)
+    return wire, {"turns": v["height_ref"] / v["pitch_ref"]}
+
+
+def op_revolve(cf, objects):
+    from ..contracts.compile import PLANE_AXES
+
+    sk = objects["__sketch__"][cf.spec.profile_ref]
+    faces = _faces(objects[cf.spec.profile_ref])
+    a, b = PLANE_AXES[sk.spec.plane]
+    radial = "XYZ".index(b if cf.spec.axis == a else a)
+    lo = min(_bb_lo_hi(f.bounding_box(), radial)[0] for f in faces)
+    hi = max(_bb_lo_hi(f.bounding_box(), radial)[1] for f in faces)
+    if lo < -TOL and hi > TOL:
+        raise ShilpaError(ErrorCode.PRECONDITION_FAILED, f"profile {cf.spec.profile_ref!r} crosses the {cf.spec.axis} axis; "
+                          "a revolved profile must stay on one side of its axis", feature_id=cf.id)
+    angle = _v(cf, "angle_ref", 360.0)
+    part = bd.revolve(faces, AXES[cf.spec.axis], angle)
+    return _as_part(part), {"angle": angle}
+
+
+def op_sweep(cf, objects):
+    path = objects[cf.spec.path_ref]
+    path_cf = objects["__sketch__"][cf.spec.path_ref]
+    sk = objects["__sketch__"][cf.spec.profile_ref]
+    faces = _faces(objects[cf.spec.profile_ref])
+    plane = _sketch_plane(sk)
+    p0 = path.position_at(0)
+    if path_cf.op == "helix":
+        bb = faces[0].bounding_box()
+        if not (bb.min.X - TOL <= p0.X <= bb.max.X + TOL and bb.min.Z - TOL <= p0.Z <= bb.max.Z + TOL and abs(p0.Y) < TOL):
+            raise ShilpaError(ErrorCode.PRECONDITION_FAILED, "the helix must start inside the profile (profile on XZ, around "
+                              f"X = helix radius, Z = helix offset); it starts at ({p0.X:g}, {p0.Y:g}, {p0.Z:g})", feature_id=cf.id)
+        part = bd.sweep(faces, path=path, is_frenet=True)
+    else:
+        t0 = path.tangent_at(0)
+        if plane.z_dir.cross(t0).length > 1e-6 or abs((p0 - plane.origin).dot(plane.z_dir)) > 1e-6:
+            raise ShilpaError(ErrorCode.PRECONDITION_FAILED, f"profile {cf.spec.profile_ref!r} must lie in the plane through the "
+                              f"path start ({p0.X:g}, {p0.Y:g}, {p0.Z:g}) normal to the path", feature_id=cf.id)
+        part = bd.sweep(faces, path=path)
+    return _as_part(part), {}
+
+
+def op_loft(cf, objects):
+    faces = []
+    for p in cf.spec.profile_refs:
+        fs = _faces(objects[p])
+        if len(fs) != 1:
+            raise ShilpaError(ErrorCode.PRECONDITION_FAILED, f"loft section {p!r} must be a single region", feature_id=cf.id)
+        faces.append(fs[0])
+    return _as_part(bd.loft(faces, ruled=cf.spec.ruled)), {}
 
 
 def op_stepped_shaft(cf, objects):
@@ -262,7 +452,7 @@ def op_hole(cf, objects):
 
 def op_corner_hole_pattern(cf, objects):
     body = _as_part(objects[cf.spec.body_ref])
-    bb = _bbox(body)
+    (u0, u1), (w0, w1) = side_extent(_bbox(body), cf.spec.face)
     e, r = cf.values["edge_offset_ref"], cf.values["diameter_ref"] / 2
     if e <= r + TOL:
         raise ShilpaError(
@@ -271,8 +461,8 @@ def op_corner_hole_pattern(cf, objects):
             feature_id=cf.id,
             field="edge_offset_ref",
         )
-    xs = (bb.min.X + e, bb.max.X - e)
-    ys = (bb.min.Y + e, bb.max.Y - e)
+    xs = (u0 + e, u1 - e)
+    ys = (w0 + e, w1 - e)
     if xs[0] >= xs[1] - TOL or ys[0] >= ys[1] - TOL:
         raise ShilpaError(ErrorCode.PRECONDITION_FAILED, "edge offset is too large for the body", feature_id=cf.id)
     centers = [(x, y) for x in xs for y in ys]
@@ -348,7 +538,7 @@ def _require_cut_inside_walls(target, tool, fid: str) -> None:
 
 def op_boolean(cf, objects):
     a, b = _as_part(objects[cf.spec.target_ref]), _as_part(objects[cf.spec.tool_ref])
-    if cf.spec.operation == "cut":
+    if cf.spec.operation == "cut" and objects["__root__"].get(cf.spec.tool_ref) in WALL_CHECKED_TOOLS:
         _require_cut_inside_walls(a, b, cf.id)
     if cf.spec.operation == "union":
         out = a + b
@@ -360,6 +550,70 @@ def op_boolean(cf, objects):
     if cf.spec.operation == "union" and len(out.solids()) > 1:
         raise ShilpaError(ErrorCode.PRECONDITION_FAILED, "union produced disconnected solids; the bodies do not touch", feature_id=cf.id)
     return out, {}
+
+
+def op_shell(cf, objects):
+    body = _as_part(objects[cf.spec.body_ref])
+    openings = []
+    for sel in cf.spec.open_faces:
+        faces = _side_faces(body, sel.side)
+        if len(faces) != sel.expected_count:
+            code = ErrorCode.SELECTOR_EMPTY if not faces else ErrorCode.SELECTOR_AMBIGUOUS
+            raise ShilpaError(code, f"face selector {sel.side} matched {len(faces)} planar faces but {sel.expected_count} "
+                              "were expected", feature_id=cf.id, field="open_faces",
+                              details={"matched": len(faces), "expected": sel.expected_count})
+        openings += faces
+    t = cf.values["thickness_ref"]
+    amount = -t if cf.spec.direction == "inward" else t
+    try:
+        out = _as_part(bd.offset(body, amount=amount, openings=openings, kind=bd.Kind.INTERSECTION))
+    except Exception as exc:
+        raise ShilpaError(ErrorCode.KERNEL_FAILURE, f"shell of thickness {t:g} failed; the wall may be thicker than the "
+                          f"local geometry allows ({exc})", feature_id=cf.id, field="thickness_ref")
+    if len(out.solids()) != 1 or out.volume >= body.volume * (1 - 1e-9) and cf.spec.direction == "inward":
+        raise ShilpaError(ErrorCode.KERNEL_FAILURE, f"shell of thickness {t:g} did not produce one hollow solid", feature_id=cf.id)
+    return out, {"open_faces": len(openings)}
+
+
+def _principal_plane(plane: str, at: float) -> bd.Plane:
+    """Mirror plane at a coordinate along its own axis (z for XY, y for XZ, x for YZ)."""
+    i = {"XY": 2, "XZ": 1, "YZ": 0}[plane]
+    return bd.Plane(origin=_vec(i, at), z_dir=_vec(i))
+
+
+def op_mirror(cf, objects):
+    body = _as_part(objects[cf.spec.body_ref])
+    image = _as_part(bd.mirror(body, about=_principal_plane(cf.spec.plane, _v(cf, "offset_ref"))))
+    out = _as_part(body.fuse(image)) if cf.spec.keep_original else image
+    return out, {"solids": len(out.solids())}
+
+
+def _pattern(body: bd.Part, placements: list) -> bd.Part:
+    if not placements:
+        return body
+    return _as_part(body.fuse(*[loc * body for loc in placements]))
+
+
+def op_linear_pattern(cf, objects):
+    body = _as_part(objects[cf.spec.body_ref])
+    n, s = int(cf.values["count_ref"]), cf.values["spacing_ref"]
+    out = _pattern(body, [bd.Location(UNIT[cf.spec.direction] * s * i) for i in range(1, n)])
+    return out, {"copies": n, "solids": len(out.solids())}
+
+
+def polar_step(n: int, angle: float) -> float:
+    if abs(angle - 360.0) < 1e-9:
+        return 360.0 / n
+    return angle / (n - 1) if n > 1 else 0.0
+
+
+def op_polar_pattern(cf, objects):
+    body = _as_part(objects[cf.spec.body_ref])
+    n = int(cf.values["count_ref"])
+    step = polar_step(n, _v(cf, "angle_ref", 360.0))
+    rot = {"X": lambda a: bd.Rot(a, 0, 0), "Y": lambda a: bd.Rot(0, a, 0), "Z": lambda a: bd.Rot(0, 0, a)}[cf.spec.axis]
+    out = _pattern(body, [rot(step * i) for i in range(1, n)])
+    return out, {"copies": n, "step_deg": step, "solids": len(out.solids())}
 
 
 def select_edges(part: bd.Part, sel: EdgeSelector, diameter: float | None = None) -> list:
@@ -450,7 +704,9 @@ def op_chamfer(cf, objects):
 
 def _with_plane(fn):
     def wrapped(cf, objects):
-        objects.setdefault("__planes__", {})[cf.id] = cf.spec.plane
+        if hasattr(cf.spec, "plane"):
+            objects.setdefault("__planes__", {})[cf.id] = cf.spec.plane
+        objects.setdefault("__sketch__", {})[cf.id] = cf
         return fn(cf, objects)
 
     return wrapped
@@ -459,8 +715,19 @@ def _with_plane(fn):
 _OPS = {
     "centered_rectangle": _with_plane(op_sketch),
     "circle": _with_plane(op_sketch),
+    "slot": _with_plane(op_sketch),
+    "profile": _with_plane(op_sketch),
+    "path": _with_plane(op_path),
+    "helix": _with_plane(op_helix),
     "extrude": op_extrude,
     "stepped_shaft": op_stepped_shaft,
+    "revolve": op_revolve,
+    "sweep": op_sweep,
+    "loft": op_loft,
+    "shell": op_shell,
+    "mirror": op_mirror,
+    "linear_pattern": op_linear_pattern,
+    "polar_pattern": op_polar_pattern,
     "hole": op_hole,
     "corner_hole_pattern": op_corner_hole_pattern,
     "linear_hole_pattern": op_linear_hole_pattern,

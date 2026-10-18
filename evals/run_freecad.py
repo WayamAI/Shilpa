@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from shilpa.adapters import freecad_adapter  # noqa: E402
 from shilpa.agent.planner import apply_parameter_edit  # noqa: E402
+from shilpa.contracts.errors import ShilpaError  # noqa: E402
 from shilpa.pipeline import execute  # noqa: E402
 from shilpa.validators import geometry  # noqa: E402
 
@@ -40,6 +41,18 @@ EDITS = [
     ("H02", "l2", 50.0),            # revolution profile
     ("E02", "wall", 3.0),           # pocket with rounded inner corners
     ("E04", "top_chamfer", 2.0),
+    # IR 1.1 operations
+    ("N01", "groove_depth", 8.0),   # revolved profile vertex expressions
+    ("N02", "bend_radius", 50.0),   # sweep spine with a tangent arc
+    ("N04", "wall", 4.0),           # Thickness on a ruled loft
+    ("N07", "port_z", 8.0),         # tapped side hole position
+    ("N08", "half_length", 36.0),   # mirrored whole shape
+    ("N09", "spokes", 8.0),         # polar pattern occurrences
+    ("N10", "pitch", 28.0),         # linear pattern spacing and the matching hole row
+    ("N12", "module", 2.5),         # 160-segment gear outline scales with the module
+    ("N13", "cross_x", 14.0),       # intersecting side drillings
+    ("N14", "slot_y", 18.0),        # mirrored cut tool
+    ("N15", "sweep", 120.0),        # partial revolve angle
 ]
 
 
@@ -60,7 +73,11 @@ def edit_one(fid: str, param: str, value: float) -> dict:
     out = OUT / f"{fid}_edit"
     if not src.exists():
         return {"id": fid, "ok": False, "failed": ["source FCStd missing"]}
-    res = freecad_adapter.edit_fcstd(src, {param: value}, out)
+    t0 = time.perf_counter()
+    try:
+        res = freecad_adapter.edit_fcstd(src, {param: value}, out)
+    except ShilpaError as exc:  # e.g. a FreeCAD timeout: report it as a failed row, keep going
+        return {"id": fid, "edit": f"{param} = {value:g}", "ok": False, "failed": [exc.info.message]}
     if not res.get("ok"):
         return {"id": fid, "ok": False, "failed": [json.dumps(res.get("error"))[:400]]}
     # Reference: build123d build of the same edit, independently validated.
@@ -81,7 +98,8 @@ def edit_one(fid: str, param: str, value: float) -> dict:
         failed.append(f"holes {geometry.hole_groups(got)} != {_holes(want)}")
     if not res.get("reopen_ok"):
         failed.append("reopened document did not recompute cleanly")
-    return {"id": fid, "edit": f"{param} = {value:g}", "ok": not failed, "failed": failed, "volume": got.volume}
+    return {"id": fid, "edit": f"{param} = {value:g}", "ok": not failed, "failed": failed, "volume": got.volume,
+            "s": round(time.perf_counter() - t0, 1)}
 
 
 def _holes(m: dict) -> dict:
