@@ -6,3 +6,4 @@ var/
 evals/out/
 .pytest_cache/
 tools/
+evals/external/data/
