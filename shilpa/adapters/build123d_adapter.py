@@ -319,8 +319,29 @@ def op_pocket(cf, objects):
     return out, {"removed_volume": body.volume - out.volume}
 
 
+def _require_cut_inside_walls(target, tool, fid: str) -> None:
+    """A generic cut may not break through the target's side walls.
+
+    Hole and pocket operations check their own footprints; this applies the same
+    rule to boolean cuts so an impossible hole cannot be built as an edge notch.
+    """
+    for face in target.faces():
+        if abs(face.normal_at().Z) > 1 - 1e-6:
+            continue  # top and bottom faces are where holes and pockets enter and exit
+        touched = (tool & face).area if tool.bounding_box().overlaps(face.bounding_box(), 1e-6) else 0.0
+        if touched > 1e-6:
+            raise ShilpaError(
+                ErrorCode.PRECONDITION_FAILED,
+                "cut breaks through a side wall of the target body; check hole positions and edge clearance",
+                feature_id=fid,
+                details={"breached_area": touched},
+            )
+
+
 def op_boolean(cf, objects):
     a, b = _as_part(objects[cf.spec.target_ref]), _as_part(objects[cf.spec.tool_ref])
+    if cf.spec.operation == "cut":
+        _require_cut_inside_walls(a, b, cf.id)
     if cf.spec.operation == "union":
         out = a + b
     elif cf.spec.operation == "cut":

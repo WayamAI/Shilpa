@@ -58,6 +58,7 @@ class Requirements(_S):
     units: Literal["mm", "cm", "m", "in"] | None
     dimensions: list[Dimension]
     features: list[str] = Field(description="plain-language list of features, e.g. 'four through holes at the corners'")
+    assumptions: list[str] = Field(description="engineering conventions applied because the request did not say otherwise")
     missing: list[MissingItem]
     conflicts: list[Conflict]
     unsupported_reason: str | None

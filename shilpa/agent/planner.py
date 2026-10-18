@@ -84,7 +84,24 @@ For each dimension, record the exact words that state it as evidence. If a value
 and add it to missing with a short question. A dimension is critical if the geometry is undefined without it
 (overall sizes, thickness, hole diameters and positions or spacing, counts). Never fill a critical value with a guess.
 Small edge breaks or fillet radii that were not requested may be omitted rather than assumed.
-Record contradictory statements in conflicts. If units are not stated, set units null.
+Record contradictory statements in conflicts. If units are not stated, set units null; never ask about units.
+
+Apply these standard engineering conventions instead of asking, and list each one you apply in assumptions:
+- Holes, bores and bolt holes go through the full part unless a depth is stated.
+- A distance of a hole "from the edge" is measured from the edge to the hole centre.
+- Features are centred and symmetric on the part unless a position is stated (e.g. two holes "90 mm apart" are centred).
+- "Corner" holes are four holes, one per corner, at the stated edge distance.
+- Bolt circles and other features are concentric with the part; the first bolt hole sits on +X unless an angle is stated.
+- A grid or row of holes is centred on the part.
+- An L bracket's vertical leg stands at the back edge of the base, full width; "height" is the overall height.
+- Stepped shafts are listed from the bottom up; a box is open at the top with the stated wall and floor thickness.
+- Chamfers are 45 degrees with the stated leg size; "rounded corners" on a plate mean its vertical edges.
+If any requested feature cannot be built with the operations listed below (for example engraved text or logos,
+threads, gear teeth, springs, spheres, freeform or organic surfaces), set task_class "unsupported", name the feature
+in unsupported_reason, and do not ask questions about it.
+
+Only ask about a value that no convention supplies and without which the geometry is undefined
+(for example a missing thickness, hole diameter, overall size, or a bolt circle diameter).
 
 Operations Shilpa can build:
 {IR_GUIDE}
@@ -108,7 +125,8 @@ def apply_clarification_policy(req: dict) -> dict:
         req["status_reason"] = req.get("unsupported_reason") or f"{req['task_class']} is not available in this release"
         return req
     stated = {d["name"] for d in req["dimensions"] if d["value"] is not None}
-    missing = [m for m in req["missing"] if m["name"] not in stated]
+    # Units follow the explicit project-default policy (T023); they are never a blocking question.
+    missing = [m for m in req["missing"] if m["name"] not in stated and "unit" not in m["name"].lower()]
     for d in req["dimensions"]:
         if d["value"] is None and d["critical"] and d["name"] not in {m["name"] for m in missing}:
             missing.append({"name": d["name"], "question": f"What is the {d['name'].replace('_', ' ')}?", "critical": True})
@@ -159,8 +177,10 @@ Use the stated units. Prefer the simplest feature sequence that matches the requ
 """
 
 
-def _plan_call(user: str, budget: Budget, purpose: str) -> dict:
+def _plan_call(user: str, budget: Budget, purpose: str, feedback: str | None = None) -> dict:
     system = PLAN_SYSTEM.replace("{examples}", _examples())
+    if feedback:
+        user += f"\n\nYour previous answer was rejected: {feedback}\nReturn a corrected answer."
     data = call_structured(system=system, user=user, schema_name="recipe_plan", schema=_schema("plan"),
                            budget=budget, max_output_tokens=4000, purpose=purpose)
     try:
@@ -182,9 +202,9 @@ def check_recipe(recipe: dict) -> dict:
     return clean
 
 
-def plan_recipe(requirements: dict, budget: Budget) -> dict:
-    req = {k: requirements[k] for k in ("family", "summary", "units", "dimensions", "features") if k in requirements}
-    return _plan_call("Confirmed requirements:\n" + json.dumps(req, indent=1), budget, "plan")
+def plan_recipe(requirements: dict, budget: Budget, feedback: str | None = None) -> dict:
+    req = {k: requirements[k] for k in ("family", "summary", "units", "dimensions", "features", "assumptions") if k in requirements}
+    return _plan_call("Confirmed requirements:\n" + json.dumps(req, indent=1), budget, "plan", feedback)
 
 
 def repair_recipe(recipe: dict, error: dict, feature_results: list | None, budget: Budget) -> dict:
@@ -199,7 +219,7 @@ def repair_recipe(recipe: dict, error: dict, feature_results: list | None, budge
     return _plan_call(user, budget, "repair")
 
 
-def edit_recipe(recipe: dict, instruction: str, budget: Budget) -> dict:
+def edit_recipe(recipe: dict, instruction: str, budget: Budget, feedback: str | None = None) -> dict:
     user = (
         "Apply the engineer's edit to this recipe and return the full updated recipe. Keep parameter names and "
         "feature ids stable for everything that does not change. Prefer changing parameter values over "
@@ -208,7 +228,7 @@ def edit_recipe(recipe: dict, instruction: str, budget: Budget) -> dict:
         f"Current recipe:\n{json.dumps(from_recipe(recipe), separators=(',', ':'))}\n\n"
         f"Edit request: {instruction}"
     )
-    return _plan_call(user, budget, "edit")
+    return _plan_call(user, budget, "edit", feedback)
 
 
 def apply_parameter_edit(recipe: dict, changes: dict[str, float]) -> dict:

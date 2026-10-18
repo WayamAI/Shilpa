@@ -19,6 +19,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-studio", action="store_true")
     ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--coordinators", type=int, default=1)
     ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
 
@@ -28,8 +29,9 @@ def main() -> None:
     py = sys.executable
     procs: list[tuple[str, subprocess.Popen]] = [
         ("api", subprocess.Popen([py, "-m", "uvicorn", "shilpa.api.app:app", "--port", str(args.port), "--host", "127.0.0.1"], cwd=ROOT)),
-        ("coordinator", subprocess.Popen([py, "-m", "shilpa.coordinator"], cwd=ROOT)),
     ]
+    for i in range(args.coordinators):
+        procs.append((f"coordinator{i}", subprocess.Popen([py, "-m", "shilpa.coordinator"], cwd=ROOT)))
     for i in range(args.workers):
         procs.append((f"worker{i}", subprocess.Popen([py, "-m", "shilpa.workers.cad"], cwd=ROOT)))
     if not args.no_studio:

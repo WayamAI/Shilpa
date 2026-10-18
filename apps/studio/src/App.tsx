@@ -604,6 +604,14 @@ function SpecCard({ spec, canWrite, projectId, onUpdate, trackJob, say }: { spec
           ))}
         </tbody>
       </table>
+      {r.assumptions && r.assumptions.length > 0 && (
+        <div className="small">
+          <div className="muted">Assumed (standard conventions — tell Shilpa if any are wrong):</div>
+          <ul className="assumed">
+            {r.assumptions.map((a, i) => <li key={i}>{a}</li>)}
+          </ul>
+        </div>
+      )}
       {r.conflicts.length > 0 && (
         <div className="error small">
           {r.conflicts.map((c, i) => <div key={i}>Conflict: {c.description}</div>)}

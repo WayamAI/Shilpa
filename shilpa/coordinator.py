@@ -22,6 +22,9 @@ from .settings import settings
 
 log = logging.getLogger("shilpa.coordinator")
 
+# Static errors that mean the planner wrote a bad recipe (not that the user asked for one).
+PLANNER_FIXABLE = {ErrorCode.INVALID_PARAMETER, ErrorCode.UNIT_MISMATCH, ErrorCode.REFERENCE_CYCLE}
+
 
 def _budget(job: Job) -> Budget:
     b = settings.budgets
@@ -71,6 +74,7 @@ def handle_plan(msg: dict) -> None:
     pending_error = snapshot["last_error"] if mode == "repair" else None
     current = snapshot["recipe"]
     first_summary = None
+    feedback: str | None = None
 
     while True:
         try:
@@ -82,10 +86,10 @@ def handle_plan(msg: dict) -> None:
                     recipe = planner.apply_parameter_edit(snapshot["base_recipe"], inp["parameters"])
                 elif inp.get("instruction") and snapshot["base_recipe"]:
                     used["plan_calls"] = used.get("plan_calls", 0) + 1
-                    recipe = planner.edit_recipe(snapshot["base_recipe"], inp["instruction"], budget)
+                    recipe = planner.edit_recipe(snapshot["base_recipe"], inp["instruction"], budget, feedback)
                 elif snapshot["spec"]:
                     used["plan_calls"] = used.get("plan_calls", 0) + 1
-                    recipe = planner.plan_recipe(snapshot["spec"], budget)
+                    recipe = planner.plan_recipe(snapshot["spec"], budget, feedback)
                 else:
                     raise ShilpaError(ErrorCode.INTERNAL, "job has nothing to plan from")
             else:
@@ -101,7 +105,8 @@ def handle_plan(msg: dict) -> None:
         except ShilpaError as exc:
             # A plan that fails static checks, or malformed model output, is retried within
             # the same shared repair budget (T027). Nothing untyped ever executes.
-            retry_ok = (exc.info.retryable and exc.code != ErrorCode.BUDGET_EXHAUSTED
+            planner_mistake = recipe is not None and exc.code in PLANNER_FIXABLE
+            retry_ok = ((exc.info.retryable or planner_mistake) and exc.code != ErrorCode.BUDGET_EXHAUSTED
                         and used.get("repair_calls", 0) < settings.budgets.repair_calls)
             if retry_ok and recipe is not None:
                 current, pending_error, recipe = recipe, exc.info.model_dump(mode="json"), None
@@ -109,6 +114,7 @@ def handle_plan(msg: dict) -> None:
             if retry_ok and recipe is None:
                 if pending_error is None:
                     used["repair_calls"] = used.get("repair_calls", 0) + 1
+                    feedback = exc.info.message  # tell the planner what was wrong with its output
                 continue
             error = exc.info.model_dump(mode="json")
             break

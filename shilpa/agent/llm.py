@@ -18,7 +18,7 @@ from ..contracts.errors import ErrorCode, ShilpaError
 from ..settings import settings
 
 _UNSUPPORTED_KEYWORDS = {
-    "default", "title", "pattern", "minLength", "maxLength", "minItems", "maxItems",
+    "default", "title", "minLength", "maxLength", "minItems", "maxItems",
     "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "discriminator", "format",
 }
 
@@ -143,8 +143,9 @@ def call_structured(
     except openai.BadRequestError as exc:
         body = getattr(exc, "body", None) or {}
         code = (body.get("code") if isinstance(body, dict) else None) or ""
-        if "content_filter" in str(code) or "content_filter" in str(exc):
-            raise ShilpaError(ErrorCode.MODEL_REFUSAL, "request was blocked by the content filter")
+        if "content_filter" in str(code) or "content_filter" in str(exc) or "flagged" in str(exc).lower():
+            raise ShilpaError(ErrorCode.MODEL_REFUSAL, "the model service declined this request (content safety filter); "
+                              "remove unrelated instructions or code from the text and try again")
         raise ShilpaError(ErrorCode.INTERNAL, f"model request rejected: {exc}")
     except openai.APIError as exc:
         raise ShilpaError(ErrorCode.INTERNAL, f"model service error: {exc}")

@@ -24,6 +24,8 @@ ANGLE_TO_DEG = {"deg": 1.0, "rad": 180.0 / math.pi}
 
 # Reference fields that may be zero or negative. Everything else must be > 0.
 SIGNED_FIELDS = {"center_x_ref", "center_y_ref", "offset_ref", "start_angle_ref"}
+# May be zero (a pitch along an axis with one hole); negative is still invalid.
+NON_NEGATIVE_FIELDS = {"pitch_x_ref", "pitch_y_ref"}
 
 
 def field_kind(name: str) -> str:
@@ -168,7 +170,10 @@ def _eval_ref(text: str, params: dict[str, Quantity], feature_id: str, fname: st
         raise ShilpaError(
             ErrorCode.INVALID_PARAMETER, f"{fname} must be a positive integer", feature_id=feature_id, field=fname
         )
-    if fname not in SIGNED_FIELDS and q.value <= 0:
+    if fname in NON_NEGATIVE_FIELDS and q.value < 0:
+        raise ShilpaError(ErrorCode.INVALID_PARAMETER, f"{fname} cannot be negative (got {q.value:g})",
+                          feature_id=feature_id, field=fname)
+    if fname not in SIGNED_FIELDS and fname not in NON_NEGATIVE_FIELDS and q.value <= 0:
         raise ShilpaError(
             ErrorCode.INVALID_PARAMETER,
             f"{fname} must be greater than zero (got {q.value:g})",

@@ -37,7 +37,7 @@ export type Version = {
 };
 export type Dimension = { name: string; value: number | null; unit: string | null; kind: string; critical: boolean; source: string; evidence: string | null };
 export type Requirements = {
-  task_class: string; family: string; summary: string; units: string; units_source?: string; dimensions: Dimension[]; features: string[];
+  task_class: string; family: string; summary: string; units: string; units_source?: string; dimensions: Dimension[]; features: string[]; assumptions?: string[];
   missing: { name: string; question: string; critical: boolean }[]; conflicts: { description: string; fields: string[] }[];
   status: string; status_reason: string | null;
 };

@@ -137,7 +137,7 @@ def test_plan_roundtrip_and_strict_schema():
                 if n.get("type") == "object" and "properties" in n:
                     assert n["additionalProperties"] is False
                     assert set(n["required"]) == set(n["properties"])
-                assert "pattern" not in n and "default" not in n and "const" not in n
+                assert "default" not in n and "const" not in n
                 for v in n.values():
                     walk(v)
             elif isinstance(n, list):

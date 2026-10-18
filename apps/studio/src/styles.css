@@ -128,3 +128,4 @@ h3 { font-size: 13px; margin: 18px 0 6px; text-transform: uppercase; letter-spac
   .center { min-height: 420px; }
 }
 .checks td:last-child { white-space: nowrap; word-break: normal; }
+.assumed { margin: 2px 0 6px; padding-left: 18px; }

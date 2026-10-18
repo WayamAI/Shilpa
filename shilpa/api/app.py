@@ -191,7 +191,9 @@ def create_specification(project_id: str, body: SpecIn, p: Principal = Depends(p
         _project(s, p, project_id)
     b = settings.budgets
     budget = Budget(input_tokens=b.input_tokens, output_tokens=b.output_tokens, deadline=time.time() + 120)
+    t0 = time.time()
     req = planner.extract_requirements(body.prompt, budget)
+    req["_usage"] = {"input_tokens": budget.used_input, "output_tokens": budget.used_output, "ms": round((time.time() - t0) * 1000)}
     with tx() as s:
         for c in budget.calls:
             s.add(UsageEvent(tenant_id=p.tenant_id, job_id=None, kind="llm", input_tokens=c["input_tokens"],
