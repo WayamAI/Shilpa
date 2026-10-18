@@ -1,6 +1,6 @@
 """FreeCAD adapter acceptance (backlog B030/B031, workbook T070).
 
-1. Build all 30 golden recipes as native FreeCAD documents. Each must pass the analytic
+1. Build every golden recipe (IR 1.0 and 1.1 parts) as a native FreeCAD document. Each must pass the analytic
    oracle and match the build123d solid (volume and bounding box).
 2. Edit round trip: open selected FCStd files, change a parameter in the Params sheet,
    recompute, save, reopen, and compare with a fresh build123d build of the edited recipe.
