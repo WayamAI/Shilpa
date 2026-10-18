@@ -124,6 +124,7 @@ def call_structured(
     budget: Budget,
     max_output_tokens: int = 4000,
     purpose: str = "",
+    timeout_s: float | None = None,
 ) -> dict:
     budget.check()
     import openai
@@ -131,15 +132,28 @@ def call_structured(
     max_out = min(max_output_tokens, budget.output_tokens - budget.used_output)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     t0 = time.time()
-    try:
-        resp = _client().chat.completions.create(
+    client = _client() if timeout_s is None else _client().with_options(timeout=timeout_s)
+
+    def create():
+        return client.chat.completions.create(
             model=settings.aoai_deployment,
             messages=messages,
             response_format={"type": "json_schema", "json_schema": {"name": schema_name, "strict": True, "schema": schema}},
             max_completion_tokens=max_out,
         )
+
+    try:
+        try:
+            resp = create()
+        except (openai.InternalServerError, openai.APIConnectionError) as exc:
+            if isinstance(exc, openai.APITimeoutError):
+                raise
+            # One retry for a transient service error; this is the only retry layer (SDK retries are off).
+            budget.check()
+            time.sleep(2)
+            resp = create()
     except openai.APITimeoutError:
-        raise ShilpaError(ErrorCode.MODEL_TIMEOUT, f"model call timed out after {settings.aoai_timeout_s:g} s")
+        raise ShilpaError(ErrorCode.MODEL_TIMEOUT, f"model call timed out after {timeout_s or settings.aoai_timeout_s:g} s")
     except openai.BadRequestError as exc:
         body = getattr(exc, "body", None) or {}
         code = (body.get("code") if isinstance(body, dict) else None) or ""

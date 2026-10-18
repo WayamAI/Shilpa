@@ -41,7 +41,8 @@ export type Requirements = {
   missing: { name: string; question: string; critical: boolean }[]; conflicts: { description: string; fields: string[] }[];
   status: string; status_reason: string | null;
 };
-export type Spec = { id: string; project_id: string; prompt: string; status: string; revision: number; requirements: Requirements };
+export type Spec = { id: string; project_id: string; prompt: string; status: string; revision: number; requirements: Requirements; upload_id?: string | null };
+export type UploadInfo = { id: string; filename: string; state: string; has_text_layer: boolean; pages: { number: number }[] };
 export type Example = { id: string; family: string; description: string; recipe: Recipe };
 
 export class ApiError extends Error {
@@ -90,8 +91,10 @@ export const api = {
   project: (id: string) => req<ProjectDetail>("GET", `/v1/projects/${id}`),
   examples: () => req<Example[]>("GET", "/v1/examples"),
   createSpec: (projectId: string, prompt: string) => req<Spec>("POST", `/v1/projects/${projectId}/specifications`, { prompt }),
-  answerSpec: (id: string, revision: number, answers: Record<string, number>, resolved_conflicts = false) =>
-    req<Spec>("PATCH", `/v1/specifications/${id}`, { revision, answers, resolved_conflicts }),
+  answerSpec: (id: string, revision: number, answers: Record<string, number>, resolved_conflicts = false, confirm_drawing = false) =>
+    req<Spec>("PATCH", `/v1/specifications/${id}`, { revision, answers, resolved_conflicts, confirm_drawing }),
+  specFromUpload: (projectId: string, upload_id: string, prompt?: string) =>
+    req<Spec>("POST", `/v1/projects/${projectId}/specifications`, { upload_id, prompt: prompt || null }),
   runSpec: (projectId: string, specification_id: string) =>
     req<Job>("POST", `/v1/projects/${projectId}/jobs`, { specification_id }, { "Idempotency-Key": key() }),
   runRecipe: (projectId: string, recipe: Recipe) => req<Job>("POST", `/v1/projects/${projectId}/jobs`, { recipe }, { "Idempotency-Key": key() }),
@@ -183,4 +186,13 @@ export function streamJob(jobId: string, onEvent: (e: JobEvent) => void, onEnd: 
     stopped = true;
     ctrl.abort();
   };
+}
+
+export async function uploadDrawing(projectId: string, file: File): Promise<UploadInfo> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`/v1/projects/${projectId}/uploads`, { method: "POST", headers: { Authorization: `Bearer ${getToken()}` }, body: form });
+  const data = await res.json();
+  if (!res.ok) throw new ApiError(res.status, data);
+  return data as UploadInfo;
 }

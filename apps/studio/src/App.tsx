@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  api, ApiError, DEV_USERS, downloadArtifact, getToken, setToken, streamJob,
+  api, ApiError, DEV_USERS, downloadArtifact, getToken, setToken, streamJob, uploadDrawing,
   type Example, type Health, type Job, type JobEvent, type Me, type ModelSummary, type Param, type Project,
   type ProjectDetail, type Spec, type Version,
 } from "./api";
+import { DrawingReview } from "./DrawingReview";
 import { Viewer } from "./Viewer";
 
 const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
@@ -553,6 +554,34 @@ function Conversation(props: {
           />
           <div className="row">
             <button className="primary" disabled={!llm || sending || busy || !text.trim()} onClick={send}>{sending ? "Reading…" : "Send"}</button>
+            {!editTarget && llm && (
+              <label className={`upload-btn ${sending || busy ? "disabled" : ""}`}>
+                Upload drawing
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                  disabled={sending || busy}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!file) return;
+                    setSending(true);
+                    say({ kind: "user", text: `Drawing: ${file.name}${text.trim() ? ` — ${text.trim()}` : ""}` });
+                    try {
+                      const up = await uploadDrawing(projectId, file);
+                      say({ kind: "system", text: `Reading ${up.filename} (${up.pages.length} page${up.pages.length === 1 ? "" : "s"}, ${up.has_text_layer ? "text layer" : "scanned image"})…` });
+                      const spec = await api.specFromUpload(projectId, up.id, text.trim());
+                      setText("");
+                      say({ kind: "spec", spec });
+                    } catch (err) {
+                      say({ kind: "system", text: errText(err), tone: "error" });
+                    } finally {
+                      setSending(false);
+                    }
+                  }}
+                />
+              </label>
+            )}
             {!editTarget && (
               <select
                 aria-label="Start from an example"
@@ -586,6 +615,8 @@ function SpecCard({ spec, canWrite, projectId, onUpdate, trackJob, say }: { spec
   const r = spec.requirements;
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const isDrawing = (r as unknown as { source?: string }).source === "drawing";
+  const [reviewOpen, setReviewOpen] = useState(isDrawing && spec.status !== "ready");
   const submit = async (resolved = false) => {
     const nums: Record<string, number> = {};
     for (const [k, v] of Object.entries(answers)) if (v.trim() && Number.isFinite(Number(v))) nums[k] = Number(v);
@@ -631,13 +662,24 @@ function SpecCard({ spec, canWrite, projectId, onUpdate, trackJob, say }: { spec
           </ul>
         </div>
       )}
-      {r.conflicts.length > 0 && (
+      {isDrawing && (
+        <div className="row small">
+          <button className={spec.status === "ready" ? "" : "primary"} onClick={() => setReviewOpen(true)}>
+            {spec.status === "ready" ? "View drawing review" : "Review drawing values"}
+          </button>
+          <span className="muted">{spec.status === "ready" ? "reviewed" : r.status_reason}</span>
+        </div>
+      )}
+      {reviewOpen && isDrawing && (
+        <DrawingReview spec={spec} canWrite={canWrite} onClose={() => setReviewOpen(false)} onUpdate={(s2) => { onUpdate(s2); if (s2.status === "ready") setReviewOpen(false); }} />
+      )}
+      {!isDrawing && r.conflicts.length > 0 && (
         <div className="error small">
           {r.conflicts.map((c, i) => <div key={i}>Conflict: {c.description}</div>)}
           {canWrite && <button className="small-btn" disabled={busy} onClick={() => submit(true)}>I've corrected the values below</button>}
         </div>
       )}
-      {r.missing.length > 0 && (
+      {!isDrawing && r.missing.length > 0 && (
         <div className="questions">
           {r.missing.map((m) => (
             <label key={m.name}>

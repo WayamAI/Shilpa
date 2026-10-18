@@ -19,6 +19,7 @@ This repository runs **entirely on your machine**. The only cloud dependency is 
 | §15 REST API `/v1` with SSE progress, idempotency keys, 409 on stale edits | `shilpa/api/` |
 | §14 Studio: projects, conversation with clarification, 3D viewer, parameters, validation, versions, export | `apps/studio/` |
 | G2 language evaluation: 60 tasks with fixed outcomes and analytic oracles, isolated end-to-end runner | `evals/run_language.py` |
+| §11 Drawing reconstruction: sandboxed PDF/image intake, vision extraction with text-layer verification and page coordinates, cross-view consistency, mandatory engineer review | `shilpa/drawings/`, `apps/studio/src/DrawingReview.tsx` |
 | §7 FreeCAD adapter: native Sketcher/PartDesign features driven by a `Params` spreadsheet, FCStd export derivative, edit round trip | `shilpa/adapters/freecad_adapter.py` |
 
 ## Local stand-ins for Azure services
@@ -54,6 +55,8 @@ uv run pytest                           # contract, geometry and workflow tests
 uv run python -m shilpa.dev             # API :8000 + coordinator + CAD worker + studio :5173
 uv run python evals/run_language.py     # gate G2: 60 language tasks through the live planner
 uv run python evals/run_freecad.py      # 30 native FreeCAD builds + 10 FCStd edit round trips
+uv run python evals/make_drawings.py    # 28 synthetic drawings (vector, scanned, defect variants) with ground truth
+uv run python evals/run_drawings.py     # drawing -> review -> CAD, scored against analytic oracles
 ```
 
 ### FreeCAD (optional, for native .FCStd export)

@@ -1,0 +1,1074 @@
+[
+  {
+    "id": "P01_vector",
+    "fixture": "P01",
+    "family": "plate",
+    "variant": "vector",
+    "file": "P01_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        80.0,
+        40.0,
+        8.0
+      ],
+      "volume": 24695.221316,
+      "solid_count": 1,
+      "holes": {
+        "6.0": 4
+      },
+      "hole_centers": {
+        "diameter": 6.0,
+        "centers": [
+          [
+            -30.0,
+            -10.0
+          ],
+          [
+            -30.0,
+            10.0
+          ],
+          [
+            30.0,
+            -10.0
+          ],
+          [
+            30.0,
+            10.0
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      6.0,
+      8.0,
+      10.0,
+      40.0,
+      80.0
+    ]
+  },
+  {
+    "id": "P02_vector",
+    "fixture": "P02",
+    "family": "plate",
+    "variant": "vector",
+    "file": "P02_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        100.0,
+        60.0,
+        10.0
+      ],
+      "volume": 57989.380702,
+      "solid_count": 1,
+      "holes": {
+        "8.0": 4
+      },
+      "hole_centers": {
+        "diameter": 8.0,
+        "centers": [
+          [
+            -38.0,
+            -18.0
+          ],
+          [
+            -38.0,
+            18.0
+          ],
+          [
+            38.0,
+            -18.0
+          ],
+          [
+            38.0,
+            18.0
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      8.0,
+      10.0,
+      12.0,
+      60.0,
+      100.0
+    ]
+  },
+  {
+    "id": "P03_vector",
+    "fixture": "P03",
+    "family": "plate",
+    "variant": "vector",
+    "file": "P03_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        120,
+        80,
+        6
+      ],
+      "volume": 56368.370016,
+      "solid_count": 1,
+      "holes": {
+        "6.6": 6
+      },
+      "hole_centers": {
+        "diameter": 6.6,
+        "centers": [
+          [
+            -40,
+            -20
+          ],
+          [
+            -40,
+            20
+          ],
+          [
+            0,
+            -20
+          ],
+          [
+            0,
+            20
+          ],
+          [
+            40,
+            -20
+          ],
+          [
+            40,
+            20
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      6.0,
+      6.6,
+      40.0,
+      80.0,
+      120.0
+    ]
+  },
+  {
+    "id": "P04_vector",
+    "fixture": "P04",
+    "family": "plate",
+    "variant": "vector",
+    "file": "P04_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        90.0,
+        70.0,
+        6.0
+      ],
+      "volume": 37101.039831,
+      "solid_count": 1,
+      "holes": {
+        "5.5": 4
+      },
+      "hole_centers": {
+        "diameter": 5.5,
+        "centers": [
+          [
+            -35.0,
+            -25.0
+          ],
+          [
+            -35.0,
+            25.0
+          ],
+          [
+            35.0,
+            -25.0
+          ],
+          [
+            35.0,
+            25.0
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      5.0,
+      5.5,
+      6.0,
+      10.0,
+      70.0,
+      90.0
+    ]
+  },
+  {
+    "id": "P05_vector",
+    "fixture": "P05",
+    "family": "plate",
+    "variant": "vector",
+    "file": "P05_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        101.6,
+        50.8,
+        6.35
+      ],
+      "volume": 31969.729877,
+      "solid_count": 1,
+      "holes": {
+        "6.35": 4
+      },
+      "hole_centers": {
+        "diameter": 6.35,
+        "centers": [
+          [
+            -38.099999999999994,
+            -12.7
+          ],
+          [
+            -38.099999999999994,
+            12.7
+          ],
+          [
+            38.099999999999994,
+            -12.7
+          ],
+          [
+            38.099999999999994,
+            12.7
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      6.35,
+      12.7,
+      50.8,
+      101.6
+    ]
+  },
+  {
+    "id": "F01_vector",
+    "fixture": "F01",
+    "family": "flange",
+    "variant": "vector",
+    "file": "F01_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        100,
+        100,
+        12
+      ],
+      "volume": 75398.223686,
+      "solid_count": 1,
+      "holes": {
+        "10": 4,
+        "40": 1
+      },
+      "hole_centers": {
+        "diameter": 10,
+        "centers": [
+          [
+            35.0,
+            0.0
+          ],
+          [
+            2.1431318985078682e-15,
+            35.0
+          ],
+          [
+            -35.0,
+            4.2862637970157365e-15
+          ],
+          [
+            -6.429395695523604e-15,
+            -35.0
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      10.0,
+      12.0,
+      40.0,
+      70.0,
+      100.0
+    ]
+  },
+  {
+    "id": "F02_vector",
+    "fixture": "F02",
+    "family": "flange",
+    "variant": "vector",
+    "file": "F02_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        150,
+        150,
+        16
+      ],
+      "volume": 222726.352769,
+      "solid_count": 1,
+      "holes": {
+        "14": 6,
+        "60": 1
+      },
+      "hole_centers": {
+        "diameter": 14,
+        "centers": [
+          [
+            49.79646071760523,
+            28.749999999999996
+          ],
+          [
+            3.5208595475486406e-15,
+            57.5
+          ],
+          [
+            -49.796460717605214,
+            28.750000000000018
+          ],
+          [
+            -49.796460717605235,
+            -28.749999999999986
+          ],
+          [
+            -1.056257864264592e-14,
+            -57.5
+          ],
+          [
+            49.796460717605235,
+            -28.749999999999982
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      14.0,
+      16.0,
+      60.0,
+      115.0,
+      150.0
+    ]
+  },
+  {
+    "id": "F03_vector",
+    "fixture": "F03",
+    "family": "flange",
+    "variant": "vector",
+    "file": "F03_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        120,
+        120,
+        37
+      ],
+      "volume": 165375.793479,
+      "solid_count": 1,
+      "holes": {
+        "12": 4,
+        "35": 1
+      },
+      "hole_centers": {
+        "diameter": 12,
+        "centers": [
+          [
+            45,
+            0
+          ],
+          [
+            0,
+            45
+          ],
+          [
+            -45,
+            0
+          ],
+          [
+            0,
+            -45
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      12.0,
+      25.0,
+      35.0,
+      60.0,
+      90.0,
+      120.0
+    ]
+  },
+  {
+    "id": "F05_vector",
+    "fixture": "F05",
+    "family": "flange",
+    "variant": "vector",
+    "file": "F05_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        100,
+        100,
+        12
+      ],
+      "volume": 92668.143914,
+      "solid_count": 1,
+      "holes": {
+        "10": 4,
+        "50": 1
+      },
+      "hole_centers": {
+        "diameter": 10,
+        "centers": [
+          [
+            -38,
+            -38
+          ],
+          [
+            -38,
+            38
+          ],
+          [
+            38,
+            -38
+          ],
+          [
+            38,
+            38
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      10.0,
+      12.0,
+      50.0,
+      100.0
+    ]
+  },
+  {
+    "id": "H01_vector",
+    "fixture": "H01",
+    "family": "shaft",
+    "variant": "vector",
+    "file": "H01_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        20,
+        20,
+        50
+      ],
+      "volume": 11686.724671,
+      "solid_count": 1
+    },
+    "key_values_mm": [
+      12.0,
+      20.0,
+      30.0
+    ]
+  },
+  {
+    "id": "H03_vector",
+    "fixture": "H03",
+    "family": "shaft",
+    "variant": "vector",
+    "file": "H03_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        30,
+        30,
+        105
+      ],
+      "volume": 37793.359623,
+      "solid_count": 1,
+      "holes": {
+        "6": 1
+      }
+    },
+    "key_values_mm": [
+      6.0,
+      15.0,
+      16.0,
+      20.0,
+      24.0,
+      30.0,
+      40.0
+    ]
+  },
+  {
+    "id": "H05_vector",
+    "fixture": "H05",
+    "family": "shaft",
+    "variant": "vector",
+    "file": "H05_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        22,
+        22,
+        55
+      ],
+      "volume": 14615.736222,
+      "solid_count": 1
+    },
+    "key_values_mm": [
+      1.0,
+      16.0,
+      20.0,
+      22.0,
+      35.0
+    ]
+  },
+  {
+    "id": "S02_vector",
+    "fixture": "S02",
+    "family": "spacer",
+    "variant": "vector",
+    "file": "S02_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        30,
+        30,
+        15
+      ],
+      "volume": 8762.09826,
+      "solid_count": 1,
+      "holes": {
+        "12.5": 1
+      }
+    },
+    "key_values_mm": [
+      12.5,
+      15.0,
+      30.0
+    ]
+  },
+  {
+    "id": "S05_vector",
+    "fixture": "S05",
+    "family": "spacer",
+    "variant": "vector",
+    "file": "S05_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        40,
+        40,
+        10
+      ],
+      "volume": 9362.993305,
+      "solid_count": 1,
+      "holes": {
+        "20": 1
+      }
+    },
+    "key_values_mm": [
+      1.0,
+      10.0,
+      20.0,
+      40.0
+    ]
+  },
+  {
+    "id": "B02_vector",
+    "fixture": "B02",
+    "family": "bracket",
+    "variant": "vector",
+    "file": "B02_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        80,
+        60,
+        60
+      ],
+      "volume": 70772.079723,
+      "solid_count": 1,
+      "holes": {
+        "8.5": 2
+      },
+      "hole_centers": {
+        "diameter": 8.5,
+        "centers": [
+          [
+            -25.0,
+            -4.0
+          ],
+          [
+            25.0,
+            -4.0
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      8.0,
+      8.5,
+      50.0,
+      60.0,
+      80.0
+    ]
+  },
+  {
+    "id": "B03_vector",
+    "fixture": "B03",
+    "family": "bracket",
+    "variant": "vector",
+    "file": "B03_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        50,
+        40,
+        45
+      ],
+      "volume": 20171.681469,
+      "solid_count": 1
+    },
+    "key_values_mm": [
+      4.0,
+      5.0,
+      40.0,
+      45.0,
+      50.0
+    ]
+  },
+  {
+    "id": "E01_vector",
+    "fixture": "E01",
+    "family": "enclosure",
+    "variant": "vector",
+    "file": "E01_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        100,
+        60,
+        40
+      ],
+      "volume": 52188,
+      "solid_count": 1
+    },
+    "key_values_mm": [
+      3.0,
+      40.0,
+      60.0,
+      100.0
+    ]
+  },
+  {
+    "id": "E02_vector",
+    "fixture": "E02",
+    "family": "enclosure",
+    "variant": "vector",
+    "file": "E02_vector.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        120,
+        80,
+        35
+      ],
+      "volume": 59254.902423,
+      "solid_count": 1
+    },
+    "key_values_mm": [
+      2.5,
+      3.0,
+      3.5,
+      6.0,
+      35.0,
+      80.0,
+      120.0
+    ]
+  },
+  {
+    "id": "P02_scan",
+    "fixture": "P02",
+    "family": "plate",
+    "variant": "scan",
+    "file": "P02_scan.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        100.0,
+        60.0,
+        10.0
+      ],
+      "volume": 57989.380702,
+      "solid_count": 1,
+      "holes": {
+        "8.0": 4
+      },
+      "hole_centers": {
+        "diameter": 8.0,
+        "centers": [
+          [
+            -38.0,
+            -18.0
+          ],
+          [
+            -38.0,
+            18.0
+          ],
+          [
+            38.0,
+            -18.0
+          ],
+          [
+            38.0,
+            18.0
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      8.0,
+      10.0,
+      12.0,
+      60.0,
+      100.0
+    ]
+  },
+  {
+    "id": "F01_scan",
+    "fixture": "F01",
+    "family": "flange",
+    "variant": "scan",
+    "file": "F01_scan.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        100,
+        100,
+        12
+      ],
+      "volume": 75398.223686,
+      "solid_count": 1,
+      "holes": {
+        "10": 4,
+        "40": 1
+      },
+      "hole_centers": {
+        "diameter": 10,
+        "centers": [
+          [
+            35.0,
+            0.0
+          ],
+          [
+            2.1431318985078682e-15,
+            35.0
+          ],
+          [
+            -35.0,
+            4.2862637970157365e-15
+          ],
+          [
+            -6.429395695523604e-15,
+            -35.0
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      10.0,
+      12.0,
+      40.0,
+      70.0,
+      100.0
+    ]
+  },
+  {
+    "id": "H01_scan",
+    "fixture": "H01",
+    "family": "shaft",
+    "variant": "scan",
+    "file": "H01_scan.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        20,
+        20,
+        50
+      ],
+      "volume": 11686.724671,
+      "solid_count": 1
+    },
+    "key_values_mm": [
+      12.0,
+      20.0,
+      30.0
+    ]
+  },
+  {
+    "id": "B03_scan",
+    "fixture": "B03",
+    "family": "bracket",
+    "variant": "scan",
+    "file": "B03_scan.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        50,
+        40,
+        45
+      ],
+      "volume": 20171.681469,
+      "solid_count": 1
+    },
+    "key_values_mm": [
+      4.0,
+      5.0,
+      40.0,
+      45.0,
+      50.0
+    ]
+  },
+  {
+    "id": "E01_scan",
+    "fixture": "E01",
+    "family": "enclosure",
+    "variant": "scan",
+    "file": "E01_scan.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        100,
+        60,
+        40
+      ],
+      "volume": 52188,
+      "solid_count": 1
+    },
+    "key_values_mm": [
+      3.0,
+      40.0,
+      60.0,
+      100.0
+    ]
+  },
+  {
+    "id": "S02_scan",
+    "fixture": "S02",
+    "family": "spacer",
+    "variant": "scan",
+    "file": "S02_scan.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        30,
+        30,
+        15
+      ],
+      "volume": 8762.09826,
+      "solid_count": 1,
+      "holes": {
+        "12.5": 1
+      }
+    },
+    "key_values_mm": [
+      12.5,
+      15.0,
+      30.0
+    ]
+  },
+  {
+    "id": "P01_missing",
+    "fixture": "P01",
+    "family": "plate",
+    "variant": "missing",
+    "file": "P01_missing.pdf",
+    "expected": "clarify",
+    "oracle": {
+      "bbox": [
+        80.0,
+        40.0,
+        8.0
+      ],
+      "volume": 24695.221316,
+      "solid_count": 1,
+      "holes": {
+        "6.0": 4
+      },
+      "hole_centers": {
+        "diameter": 6.0,
+        "centers": [
+          [
+            -30.0,
+            -10.0
+          ],
+          [
+            -30.0,
+            10.0
+          ],
+          [
+            30.0,
+            -10.0
+          ],
+          [
+            30.0,
+            10.0
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      6.0,
+      8.0,
+      10.0,
+      40.0,
+      80.0
+    ],
+    "expect_missing": [
+      "thick"
+    ]
+  },
+  {
+    "id": "P01_conflict",
+    "fixture": "P01",
+    "family": "plate",
+    "variant": "conflict",
+    "file": "P01_conflict.pdf",
+    "expected": "no_build",
+    "oracle": {
+      "bbox": [
+        80.0,
+        40.0,
+        8.0
+      ],
+      "volume": 24695.221316,
+      "solid_count": 1,
+      "holes": {
+        "6.0": 4
+      },
+      "hole_centers": {
+        "diameter": 6.0,
+        "centers": [
+          [
+            -30.0,
+            -10.0
+          ],
+          [
+            -30.0,
+            10.0
+          ],
+          [
+            30.0,
+            -10.0
+          ],
+          [
+            30.0,
+            10.0
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      6.0,
+      8.0,
+      10.0,
+      40.0,
+      80.0
+    ]
+  },
+  {
+    "id": "P02_injection",
+    "fixture": "P02",
+    "family": "plate",
+    "variant": "injection",
+    "file": "P02_injection.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        100.0,
+        60.0,
+        10.0
+      ],
+      "volume": 57989.380702,
+      "solid_count": 1,
+      "holes": {
+        "8.0": 4
+      },
+      "hole_centers": {
+        "diameter": 8.0,
+        "centers": [
+          [
+            -38.0,
+            -18.0
+          ],
+          [
+            -38.0,
+            18.0
+          ],
+          [
+            38.0,
+            -18.0
+          ],
+          [
+            38.0,
+            18.0
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      8.0,
+      10.0,
+      12.0,
+      60.0,
+      100.0
+    ]
+  },
+  {
+    "id": "B05_lowres",
+    "fixture": "B05",
+    "family": "bracket",
+    "variant": "lowres",
+    "file": "B05_lowres.pdf",
+    "expected": "build",
+    "oracle": {
+      "bbox": [
+        120,
+        25,
+        5
+      ],
+      "volume": 14668.169276,
+      "solid_count": 1,
+      "holes": {
+        "6.5": 2
+      },
+      "hole_centers": {
+        "diameter": 6.5,
+        "centers": [
+          [
+            -45,
+            0
+          ],
+          [
+            45,
+            0
+          ]
+        ]
+      }
+    },
+    "key_values_mm": [
+      5.0,
+      6.5,
+      25.0,
+      90.0,
+      120.0
+    ],
+    "must_not_contain_mm": [
+      65.0
+    ]
+  }
+]

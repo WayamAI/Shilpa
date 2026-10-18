@@ -79,9 +79,27 @@ class Specification(Base):
     tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id"), index=True)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), index=True)
     prompt: Mapped[str] = mapped_column(Text)
+    upload_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     parsed: Mapped[dict] = mapped_column(JSON)  # requirements with provenance
     status: Mapped[str] = mapped_column(String(32))  # needs_clarification | ready | confirmed | unsupported
     revision: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class Upload(Base):
+    __tablename__ = "uploads"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id"), index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), index=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    media_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    sha256: Mapped[str] = mapped_column(String(64))
+    bytes: Mapped[int] = mapped_column(Integer)
+    state: Mapped[str] = mapped_column(String(16))  # quarantined | ready | rejected
+    blob_prefix: Mapped[str] = mapped_column(String(600))
+    pages: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str] = mapped_column(String(36))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
@@ -251,8 +269,19 @@ if _is_sqlite:
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
+# Additive migrations (expand only): columns added after a table first shipped.
+_ADDED_COLUMNS = [("specifications", "upload_id", "VARCHAR(36)")]
+
+
 def init_db() -> None:
     Base.metadata.create_all(engine)
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table, column, ddl in _ADDED_COLUMNS:
+            if column not in {c["name"] for c in insp.get_columns(table)}:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
 
 
 @contextmanager

@@ -129,3 +129,24 @@ h3 { font-size: 13px; margin: 18px 0 6px; text-transform: uppercase; letter-spac
 }
 .checks td:last-child { white-space: nowrap; word-break: normal; }
 .assumed { margin: 2px 0 6px; padding-left: 18px; }
+
+.upload-btn { border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 12px; cursor: pointer; background: var(--panel); white-space: nowrap; }
+.upload-btn input { display: none; }
+.upload-btn.disabled { opacity: 0.5; pointer-events: none; }
+.modal { position: fixed; inset: 0; background: rgba(20, 26, 33, 0.55); display: grid; place-items: center; z-index: 50; padding: 16px; }
+.modal-body { background: var(--panel); border-radius: 8px; width: min(1500px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; overflow: hidden; }
+.review-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 12px 16px; border-bottom: 1px solid var(--line); gap: 12px; }
+.review-grid { display: grid; grid-template-columns: minmax(0, 1fr) 420px; min-height: 0; flex: 1; }
+.sheet { padding: 12px; overflow: auto; background: #f0f2f5; }
+.sheet-frame { position: relative; display: inline-block; width: 100%; }
+.sheet-frame img { width: 100%; display: block; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.box { position: absolute; border: 2px solid rgba(43, 122, 61, 0.75); border-radius: 2px; margin: -3px; padding: 3px; box-sizing: content-box; }
+.box.warn { border-color: rgba(180, 35, 24, 0.8); }
+.box.hot { background: rgba(180, 83, 42, 0.18); border-color: var(--accent); }
+.review-side { padding: 12px 16px; overflow: auto; display: grid; gap: 10px; align-content: start; border-left: 1px solid var(--line); }
+.review-table { width: 100%; border-collapse: collapse; }
+.review-table th, .review-table td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.review-table tr.hot { background: #fbefe8; }
+.review-table input { width: 90px; }
+.review-table code { font-size: 12px; }
+@media (max-width: 1000px) { .review-grid { grid-template-columns: 1fr; } .review-side { border-left: none; border-top: 1px solid var(--line); } }

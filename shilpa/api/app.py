@@ -12,7 +12,7 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
@@ -34,6 +34,7 @@ from ..db import (
     ModelVersion,
     Project,
     Specification,
+    Upload,
     UsageEvent,
     init_db,
     tx,
@@ -166,39 +167,131 @@ def get_project(project_id: str, p: Principal = Depends(principal)):
         return {**_project_out(proj, len(models)), "models": [_model_out(s, m) for m in models], "recent_jobs": [_job_out(j) for j in jobs]}
 
 
+# ---------------------------------------------------------------- uploads (drawings)
+
+
+def _upload_out(u: Upload) -> dict:
+    pages = (u.pages or {}).get("pages", [])
+    return {"id": u.id, "project_id": u.project_id, "filename": u.filename, "media_type": u.media_type, "bytes": u.bytes,
+            "sha256": u.sha256, "state": u.state, "error": u.error, "has_text_layer": (u.pages or {}).get("has_text_layer"),
+            "pages": [{"number": pg["number"], "width_px": pg["width_px"], "height_px": pg["height_px"]} for pg in pages],
+            "created_at": u.created_at.isoformat()}
+
+
+@app.post("/v1/projects/{project_id}/uploads", status_code=201)
+def create_upload(project_id: str, file: UploadFile = File(...), p: Principal = Depends(principal)):
+    """Quarantine an uploaded drawing, then parse it in a separate restricted process."""
+    import hashlib
+    import subprocess
+    import sys
+
+    from ..drawings.ingest import MAX_BYTES
+    from ..settings import ROOT
+    from ..workers.cad import _scrubbed_env
+
+    require_write(p)
+    with tx() as s:
+        _project(s, p, project_id)
+    data = file.file.read(MAX_BYTES + 1)
+    if len(data) > MAX_BYTES:
+        raise _err(413, "too_large", f"uploads are limited to {MAX_BYTES // (1024 * 1024)} MB")
+    upload_id = str(uuid.uuid4())
+    prefix = f"tenants/{p.tenant_id}/projects/{project_id}/uploads/{upload_id}"
+    original = blobs.path(f"{prefix}/original.bin")  # never the client's file name: no path tricks
+    original.parent.mkdir(parents=True, exist_ok=True)
+    original.write_bytes(data)
+    base = (file.filename or "drawing").replace("\\", "/").rsplit("/", 1)[-1]  # display only; never a path
+    safe_name = "".join(ch for ch in base[-120:] if ch.isalnum() or ch in "._- ").lstrip(". ") or "drawing"
+    with tx() as s:
+        s.add(Upload(id=upload_id, tenant_id=p.tenant_id, project_id=project_id, filename=safe_name,
+                     sha256=hashlib.sha256(data).hexdigest(), bytes=len(data), state="quarantined", blob_prefix=prefix,
+                     created_by=p.user_id))
+    out = blobs.path(f"{prefix}/pages")
+    try:
+        subprocess.run([sys.executable, "-E", "-s", "-m", "shilpa.drawings.ingest", str(original), str(out)], cwd=str(ROOT),
+                       env=_scrubbed_env(), timeout=90, capture_output=True, check=False)
+        result = json.loads((out / "ingest.json").read_text(encoding="utf-8"))
+    except Exception as exc:  # timeout or crash in the parser process
+        result = {"ok": False, "error": f"the file could not be processed ({type(exc).__name__})"}
+    with tx() as s:
+        u = s.get(Upload, upload_id)
+        if result.get("ok"):
+            u.state, u.media_type, u.pages = "ready", result["media_type"], result
+        else:
+            u.state, u.error = "rejected", result.get("error")
+        _audit(s, p, f"upload:{u.id}", "create", {"state": u.state, "bytes": u.bytes})
+        out_u = _upload_out(u)
+    if out_u["state"] == "rejected":
+        raise _err(422, "upload_rejected", out_u["error"] or "rejected", upload_id=upload_id)
+    return out_u
+
+
+@app.get("/v1/uploads/{upload_id}")
+def get_upload(upload_id: str, p: Principal = Depends(principal)):
+    with tx() as s:
+        return _upload_out(_owned(s, p, Upload, upload_id, "upload"))
+
+
+@app.get("/v1/uploads/{upload_id}/pages/{number}")
+def upload_page(upload_id: str, number: int, p: Principal = Depends(principal)):
+    with tx() as s:
+        u = _owned(s, p, Upload, upload_id, "upload")
+        if u.state != "ready" or not 1 <= number <= len(u.pages["pages"]):
+            raise _err(404, "not_found", "page not found")
+        path = blobs.path(f"{u.blob_prefix}/pages/page-{number}.png")
+    return FileResponse(path, media_type="image/png")
+
+
 # ---------------------------------------------------------------- specifications
 
 
 class SpecIn(BaseModel):
-    prompt: str = Field(min_length=3, max_length=8000)
+    prompt: str | None = Field(default=None, max_length=8000)
+    upload_id: str | None = None
 
 
 class SpecPatch(BaseModel):
     revision: int
     answers: dict[str, float] = Field(default_factory=dict)
     resolved_conflicts: bool = False
+    confirm_drawing: bool = False
 
 
 def _spec_out(spec: Specification) -> dict:
     return {"id": spec.id, "project_id": spec.project_id, "prompt": spec.prompt, "status": spec.status,
-            "revision": spec.revision, "requirements": spec.parsed, "created_at": spec.created_at.isoformat()}
+            "revision": spec.revision, "requirements": spec.parsed, "upload_id": spec.upload_id,
+            "created_at": spec.created_at.isoformat()}
 
 
 @app.post("/v1/projects/{project_id}/specifications", status_code=201)
 def create_specification(project_id: str, body: SpecIn, p: Principal = Depends(principal)):
     require_write(p)
+    if not body.upload_id and not (body.prompt and len(body.prompt.strip()) >= 3):
+        raise _err(400, "bad_request", "give a prompt, an upload_id, or both")
+    upload = None
     with tx() as s:
         _project(s, p, project_id)
+        if body.upload_id:
+            upload = _owned(s, p, Upload, body.upload_id, "upload")
+            if upload.project_id != project_id or upload.state != "ready":
+                raise _err(422, "upload_not_ready", f"upload is {upload.state}")
+            ingested, page_dir = dict(upload.pages), blobs.path(f"{upload.blob_prefix}/pages")
     b = settings.budgets
-    budget = Budget(input_tokens=b.input_tokens, output_tokens=b.output_tokens, deadline=time.time() + 120)
+    budget = Budget(input_tokens=b.input_tokens, output_tokens=b.output_tokens, deadline=time.time() + 180)
     t0 = time.time()
-    req = planner.extract_requirements(body.prompt, budget)
+    if upload is not None:
+        from ..drawings.extract import extract, to_requirements
+
+        req = to_requirements(extract(ingested, page_dir, budget, body.prompt))
+    else:
+        req = planner.extract_requirements(body.prompt, budget)
     req["_usage"] = {"input_tokens": budget.used_input, "output_tokens": budget.used_output, "ms": round((time.time() - t0) * 1000)}
     with tx() as s:
         for c in budget.calls:
             s.add(UsageEvent(tenant_id=p.tenant_id, job_id=None, kind="llm", input_tokens=c["input_tokens"],
                              output_tokens=c["output_tokens"], detail=c))
-        spec = Specification(tenant_id=p.tenant_id, project_id=project_id, prompt=body.prompt, parsed=req, status=req["status"])
+        spec = Specification(tenant_id=p.tenant_id, project_id=project_id, prompt=body.prompt or "", parsed=req,
+                             status=req["status"], upload_id=body.upload_id)
         s.add(spec)
         s.flush()
         _audit(s, p, f"specification:{spec.id}", "create", {"status": spec.status})
@@ -218,7 +311,22 @@ def patch_specification(spec_id: str, body: SpecPatch, p: Principal = Depends(pr
         spec = _owned(s, p, Specification, spec_id, "specification")
         if spec.revision != body.revision:
             raise _err(409, "stale_revision", f"specification is at revision {spec.revision}", current_revision=spec.revision)
-        req = planner.answer_clarifications(dict(spec.parsed), body.answers, body.resolved_conflicts)
+        parsed = dict(spec.parsed)
+        if parsed.get("source") == "drawing":
+            from ..drawings.extract import confirm
+
+            if body.resolved_conflicts:
+                parsed["conflicts"] = []
+            if body.confirm_drawing:
+                req = confirm(parsed, body.answers)
+            else:  # answering a question without confirming the sheet keeps it under review
+                drawing, source = parsed.pop("drawing"), parsed.pop("source")
+                req = planner.answer_clarifications(parsed, body.answers, body.resolved_conflicts)
+                req["drawing"], req["source"] = drawing, source
+                if req["status"] == "ready":
+                    req["status"], req["status_reason"] = "needs_review", "confirm the values read from the drawing"
+        else:
+            req = planner.answer_clarifications(parsed, body.answers, body.resolved_conflicts)
         spec.parsed, spec.status, spec.revision = req, req["status"], spec.revision + 1
         _audit(s, p, f"specification:{spec.id}", "answer", {"answers": list(body.answers)})
         return _spec_out(spec)

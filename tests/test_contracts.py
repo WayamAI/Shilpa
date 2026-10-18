@@ -189,3 +189,18 @@ def test_requirements_check_ignores_private_keys():  # regression: repair paths 
     check_requirements({**BLUEPRINT_PLATE, "_change_summary": "fixed"}, {"units": "mm", "dimensions": []})
     absent = {"name": "centre_bore_diameter", "value": 0, "unit": "mm", "kind": "length", "source": "user"}
     check_requirements(BLUEPRINT_PLATE, {"units": "mm", "dimensions": [absent]})  # regression: G2 L010 "no centre bore"
+
+
+def test_requirements_chamfer_angle_is_implicit():  # regression: drawing S05 "1 X 45°"
+    import copy
+
+    from shilpa.agent.planner import check_requirements
+
+    r = copy.deepcopy(BLUEPRINT_PLATE)
+    r["parameters"]["c"] = 1
+    r["features"].append({"id": "edge", "op": "chamfer", "body_ref": "mount_holes", "distance_ref": "c",
+                          "edges": {"direction": "perpendicular_z", "location": "top", "curve": "line", "boundary": "outer", "expected_count": 4}})
+    angle = {"name": "chamfer_angle", "value": 45, "unit": "deg", "kind": "angle", "source": "drawing"}
+    check_requirements(r, {"units": "mm", "dimensions": [angle]})
+    with pytest.raises(ShilpaError):
+        check_requirements(BLUEPRINT_PLATE, {"units": "mm", "dimensions": [angle]})  # no chamfer: 45 deg is unexplained

@@ -50,6 +50,7 @@ Shilpa IR 1.0 rules (engineering CAD, millimetres internally, Z up):
 - Never invent a critical engineering dimension. Non-critical assumptions (e.g. a small edge break) must be
   listed in assumptions with a reason and the parameter source set to "assumed".
 - Only use the operations above. If the part needs anything else, do not approximate it with a different shape.
+- Do not model shop notes such as "break sharp edges" or "deburr"; model only dimensioned features.
 """.strip()
 
 
@@ -281,6 +282,7 @@ def check_requirements(recipe: dict, requirements: dict) -> None:
             used |= new
             frontier |= new
     values = [(q.kind, q.value) for k, q in compiled.params.items() if k in used]
+    has_chamfer = any(cf.op == "chamfer" for cf in compiled.features)
     # A stated value may also be met by an expression, e.g. overall height = thickness + hub_length.
     from ..contracts.compile import field_kind
 
@@ -295,10 +297,12 @@ def check_requirements(recipe: dict, requirements: dict) -> None:
     default_unit = requirements.get("units") or "mm"
     missing = []
     for d in requirements.get("dimensions", []):
-        if d.get("value") is None or d.get("kind") not in ("length", "angle") or d.get("source") != "user":
+        if d.get("value") is None or d.get("kind") not in ("length", "angle") or d.get("source") not in ("user", "drawing"):
             continue
         if d["kind"] == "length" and d["value"] == 0:
             continue  # "no centre bore" is recorded as 0: an absent feature, not a dimension to build
+        if d["kind"] == "angle" and has_chamfer and abs(d["value"] * ANGLE_TO_DEG.get(d.get("unit") or "deg", 1.0) - 45) < 1e-6:
+            continue  # IR chamfers are 45 degrees by definition ("1 X 45°")
         if d["kind"] == "length":
             want = d["value"] * LENGTH_TO_MM.get(d.get("unit") or default_unit, 1.0)
         else:
