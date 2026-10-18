@@ -101,6 +101,8 @@ def handle_plan(msg: dict) -> None:
             # The user-facing summary describes the edit, not later internal repairs.
             first_summary = first_summary or recipe.get("_change_summary")
             recipe = planner.check_recipe(recipe)
+            if snapshot["spec"] and snapshot["kind"] == "generate":
+                planner.check_requirements(recipe, snapshot["spec"])
             break
         except ShilpaError as exc:
             # A plan that fails static checks, or malformed model output, is retried within

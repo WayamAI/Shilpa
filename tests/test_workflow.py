@@ -144,3 +144,24 @@ def test_queued_cancellation(client, project):  # T042
 def test_unauthenticated(client):  # T054
     assert client.get("/v1/projects").status_code == 401
     assert client.get("/v1/projects", headers={"Authorization": "Bearer nope"}).status_code == 401
+
+
+@pytest.mark.skipif(not __import__("shilpa.adapters.freecad_adapter", fromlist=["available"]).available(), reason="FreeCAD not installed")
+def test_freecad_export_derivative(client, project):  # B031 / T070 via the product flow
+    r = client.post(f"/v1/projects/{project}/jobs", json={"recipe": BLUEPRINT_PLATE}, headers=DEV).json()
+    job = pump(client, r["id"])
+    vid = job["result_version_id"]
+    e = client.post(f"/v1/versions/{vid}/exports", json={"format": "FCSTD"}, headers=DEV)
+    assert e.status_code == 202, e.text
+    export_job = pump(client, e.json()["job"]["id"])
+    assert export_job["state"] == "succeeded", export_job["error"]
+    assert export_job["result_version_id"] == vid  # attached to the same immutable version
+    v = client.get(f"/v1/versions/{vid}", headers=DEV).json()
+    fc = next(a for a in v["artifacts"] if a["format"] == "FCSTD")
+    d = client.get(f"/v1/artifacts/{fc['id']}/download", headers=DEV)
+    assert d.status_code == 200 and d.content[:2] == b"PK"  # FCStd is a zip container
+    # Second request reuses the verified artifact instead of rebuilding.
+    again = client.post(f"/v1/versions/{vid}/exports", json={"format": "FCSTD"}, headers=DEV).json()
+    assert again["artifact_id"] == fc["id"] and again["job"] is None
+    with tx() as s:
+        assert s.query(ModelVersion).filter(ModelVersion.model_id == v["model_id"]).count() == 1

@@ -38,7 +38,7 @@ WORKER_ID = f"{socket.gethostname()}-{os.getpid()}-{uuid.uuid4().hex[:6]}"
 SAFE_ENV_KEYS = ("SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "PATH", "TEMP", "TMP", "PATHEXT", "COMSPEC", "NUMBER_OF_PROCESSORS",
                  "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "LOCALAPPDATA", "APPDATA", "LANG")
 
-PUBLISHED_FILES = {"STEP": "model.step", "STL": "model.stl", "STL_UNITS": "model.stl.units.json", "GLB": "preview.glb",
+PUBLISHED_FILES = {"FCSTD": "model.FCStd", "STEP": "model.step", "STL": "model.stl", "STL_UNITS": "model.stl.units.json", "GLB": "preview.glb",
                    "RECIPE": "recipe.json", "VALIDATION": "validation.json", "FEATURES": "features.json"}
 
 
@@ -162,8 +162,27 @@ def finish(job_id: str, attempt_no: int, recipe: dict, result: dict, cpu_s: floa
         publish(s, job, attempt_no, recipe, result, staging_key, common)
 
 
+def publish_export(s, job: Job, attempt_no: int, result: dict, staging_key: str, common: dict) -> None:
+    """Attach a verified export derivative to an existing immutable version."""
+    v = s.get(ModelVersion, job.input["export_of"])
+    fmt = job.input["format"]
+    name = {"FCSTD": "model.FCStd"}[fmt]
+    if s.scalars(select(Artifact).where(Artifact.version_id == v.id, Artifact.format == fmt)).first() is None:
+        key = f"{blobs.version_prefix(job.tenant_id, job.project_id, v.id)}/{name}"
+        blobs.copy(f"{staging_key}/{name}", key)
+        sha = {a["format"]: a for a in result.get("artifacts", [])}
+        s.add(Artifact(tenant_id=job.tenant_id, version_id=v.id, format=fmt, blob_key=key,
+                       sha256=sha.get(fmt, {}).get("sha256") or "", bytes=blobs.path(key).stat().st_size))
+    checks = [c for c in (result.get("validation") or {}).get("checks", []) if c["name"].startswith("freecad")]
+    transition(s, job, "succeeded", result_version_id=v.id, **common,
+               event_data={"version_id": v.id, "format": fmt, "attempt": attempt_no, "checks": len(checks)})
+
+
 def publish(s, job: Job, attempt_no: int, recipe: dict, result: dict, staging_key: str, common: dict) -> None:
     """Atomic publication of an immutable version and its artifact manifest."""
+    if job.kind == "export":
+        publish_export(s, job, attempt_no, result, staging_key, common)
+        return
     model = s.get(Model, job.model_id) if job.model_id else None
     if model is None:
         model = Model(tenant_id=job.tenant_id, project_id=job.project_id, name=recipe.get("name") or "Untitled part")

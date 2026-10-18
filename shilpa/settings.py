@@ -41,7 +41,7 @@ class Settings:
     aoai_deployment: str = os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
     aoai_timeout_s: float = float(os.getenv("AZURE_OPENAI_TIMEOUT_S", 90))
     # Worker
-    worker_timeout_s: int = _int("SHILPA_WORKER_TIMEOUT_S", 120)
+    worker_timeout_s: int = _int("SHILPA_WORKER_TIMEOUT_S", 300)
     lock_duration_s: int = _int("SHILPA_LOCK_DURATION_S", 60)
     max_delivery_count: int = _int("SHILPA_MAX_DELIVERY_COUNT", 5)
     budgets: Budgets = field(default_factory=Budgets)

@@ -103,6 +103,8 @@ export const api = {
     req<Job>("POST", `/v1/models/${modelId}/edits`, { base_version_id, parameters }, { "Idempotency-Key": key() }),
   editInstruction: (modelId: string, base_version_id: string, instruction: string) =>
     req<Job>("POST", `/v1/models/${modelId}/edits`, { base_version_id, instruction }, { "Idempotency-Key": key() }),
+  exportVersion: (versionId: string, format: "FCSTD") =>
+    req<{ artifact_id: string | null; job: Job | null }>("POST", `/v1/versions/${versionId}/exports`, { format }),
   restore: (modelId: string, base_version_id: string, restore_version_id: string) =>
     req<Job>("POST", `/v1/models/${modelId}/edits`, { base_version_id, restore_version_id }, { "Idempotency-Key": key() }),
 };

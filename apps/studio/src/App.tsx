@@ -262,7 +262,19 @@ function Workspace({ projectId, me, health, onBack }: { projectId: string; me: M
               }}
             />
           ) : (
-            <ExportPanel version={version} />
+            <ExportPanel
+              version={version}
+              canExport={me.can_write && !activeJob}
+              onExport={async () => {
+                try {
+                  const r = await api.exportVersion(version.id, "FCSTD");
+                  if (r.job) trackJob(r.job);
+                  else setVersion(await api.version(version.id));
+                } catch (e) {
+                  say({ kind: "system", text: errText(e), tone: "error" });
+                }
+              }}
+            />
           )}
         </div>
       </aside>
@@ -442,8 +454,9 @@ function VersionsPanel({ versions, current, canRestore, onOpen, onRestore }: { v
   );
 }
 
-function ExportPanel({ version }: { version: Version }) {
-  const labels: Record<string, string> = { STEP: "STEP (exchange solid)", STL: "STL (mesh, mm)", GLB: "GLB (preview)", RECIPE: "Shilpa recipe (JSON)", VALIDATION: "Validation report (JSON)", STL_UNITS: "STL units sidecar" };
+function ExportPanel({ version, canExport, onExport }: { version: Version; canExport: boolean; onExport: () => void }) {
+  const hasFcstd = version.artifacts.some((a) => a.format === "FCSTD");
+  const labels: Record<string, string> = { FCSTD: "FreeCAD (.FCStd, native parametric)", STEP: "STEP (exchange solid)", STL: "STL (mesh, mm)", GLB: "GLB (preview)", RECIPE: "Shilpa recipe (JSON)", VALIDATION: "Validation report (JSON)", STL_UNITS: "STL units sidecar" };
   return (
     <div>
       <p className="small">Source: v{version.number} · engine {version.engine.build123d} / OCP {version.engine.ocp}</p>
@@ -455,6 +468,12 @@ function ExportPanel({ version }: { version: Version }) {
           </li>
         ))}
       </ul>
+      {!hasFcstd && (
+        <div className="small">
+          <button disabled={!canExport} onClick={onExport}>Create FreeCAD file (.FCStd)</button>
+          <p className="muted">Builds native Sketcher and PartDesign features driven by a Params spreadsheet, then checks they match this version.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -643,7 +662,7 @@ const EVENT_TEXT: Record<string, (d: Record<string, unknown>) => string> = {
   "state.executing": (d) => `Building attempt ${d.attempt}${d.mode === "repair" ? " (repaired plan)" : ""}`,
   "attempt.started": () => "Geometry worker running",
   "attempt.failed": (d) => `Attempt ${d.attempt} failed: ${(d.error as { message?: string })?.message ?? "error"} — repairing`,
-  "state.succeeded": (d) => `Published version ${d.number}`,
+  "state.succeeded": (d) => (d.format ? `${d.format} file created and verified` : `Published version ${d.number}`),
   "state.failed": (d) => `Failed: ${(d.error as { message?: string })?.message ?? "unknown error"}`,
   "state.cancelled": () => "Cancelled",
   "cancel.requested": () => "Cancellation requested",

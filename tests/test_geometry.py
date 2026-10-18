@@ -117,14 +117,15 @@ def test_hole_detection_counts_unique_axes(tmp_path):
     assert hole_groups(meas) == {6.0: 4}
 
 
-def test_boolean_cut_cannot_notch_through_a_wall(tmp_path):  # regression: G2 L051
+@pytest.mark.parametrize("cutter_length,direction", [("thickness * 2", "symmetric"), ("thickness", "positive_z")])
+def test_boolean_cut_cannot_notch_through_a_wall(tmp_path, cutter_length, direction):  # regression: G2 L051 (both runs)
     r = copy.deepcopy(BLUEPRINT_PLATE)
     r["parameters"].update(width=50, height=50, thickness=5, r=10, d=8, e=5)
     r["features"] = [
         {"id": "outline", "op": "centered_rectangle", "width_ref": "width", "height_ref": "height", "corner_radius_ref": "r"},
         {"id": "plate", "op": "extrude", "profile_ref": "outline", "distance_ref": "thickness"},
         {"id": "hole_profile", "op": "circle", "diameter_ref": "d", "center_x_ref": "width / 2 - e", "center_y_ref": "height / 2 - e"},
-        {"id": "cutter", "op": "extrude", "profile_ref": "hole_profile", "distance_ref": "thickness * 2", "direction": "symmetric"},
+        {"id": "cutter", "op": "extrude", "profile_ref": "hole_profile", "distance_ref": cutter_length, "direction": direction},
         {"id": "cut", "op": "boolean", "operation": "cut", "target_ref": "plate", "tool_ref": "cutter"},
     ]
     res = execute(r, tmp_path)

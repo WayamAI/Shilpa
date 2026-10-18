@@ -7,3 +7,4 @@ evals/out/
 apps/studio/node_modules/
 apps/studio/dist/
 .pytest_cache/
+tools/

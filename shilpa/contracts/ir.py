@@ -283,5 +283,5 @@ class Recipe(_Strict):
     features: list[Feature] = Field(min_length=1, max_length=50)
     output: FeatureId | None = None
     assertions: Assertions = Field(default_factory=Assertions)
-    exports: list[Literal["STEP", "STL", "GLB"]] = Field(default_factory=lambda: ["STEP", "STL", "GLB"])
+    exports: list[Literal["STEP", "STL", "GLB", "FCSTD"]] = Field(default_factory=lambda: ["STEP", "STL", "GLB"])
     assumptions: list[Assumption] = Field(default_factory=list)

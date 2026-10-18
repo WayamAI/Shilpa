@@ -18,6 +18,8 @@ This repository runs **entirely on your machine**. The only cloud dependency is 
 | §10 Job state machine: CAS transitions, outbox, peek-lock queue with DLQ, leases, cancellation, single publication | `shilpa/jobs.py`, `shilpa/queue.py`, `shilpa/coordinator.py`, `shilpa/workers/` |
 | §15 REST API `/v1` with SSE progress, idempotency keys, 409 on stale edits | `shilpa/api/` |
 | §14 Studio: projects, conversation with clarification, 3D viewer, parameters, validation, versions, export | `apps/studio/` |
+| G2 language evaluation: 60 tasks with fixed outcomes and analytic oracles, isolated end-to-end runner | `evals/run_language.py` |
+| §7 FreeCAD adapter: native Sketcher/PartDesign features driven by a `Params` spreadsheet, FCStd export derivative, edit round trip | `shilpa/adapters/freecad_adapter.py` |
 
 ## Local stand-ins for Azure services
 
@@ -50,7 +52,16 @@ uv run python evals/make_corpus.py      # regenerate the 30 golden fixtures (alr
 uv run python evals/run_corpus.py       # gate G1: build + validate all 30, writes evals/out/
 uv run pytest                           # contract, geometry and workflow tests
 uv run python -m shilpa.dev             # API :8000 + coordinator + CAD worker + studio :5173
+uv run python evals/run_language.py     # gate G2: 60 language tasks through the live planner
+uv run python evals/run_freecad.py      # 30 native FreeCAD builds + 10 FCStd edit round trips
 ```
+
+### FreeCAD (optional, for native .FCStd export)
+
+Extract the official portable build into `tools/freecad/` (gitignored), verifying its SHA-256:
+`FreeCAD_1.1.4-Windows-x86_64-py311.7z` from github.com/FreeCAD/FreeCAD/releases/tag/1.1.4.
+Or point `SHILPA_FREECAD_CMD` at an existing `FreeCADCmd.exe`. Without FreeCAD, the FCStd
+export is reported as unavailable and everything else works.
 
 Open http://localhost:5173. Without Azure OpenAI configured you can still run the golden
 examples and do parameter edits, version restore and exports; language input and

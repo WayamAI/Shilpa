@@ -163,3 +163,29 @@ def test_clarification_policy():  # T022 T023 T024 T026
     assert apply_clarification_policy(_req(task_class="visual_asset"))["status"] == "unsupported"
     null_critical = _req(dimensions=[{"name": "thickness", "value": None, "unit": None, "kind": "length", "critical": True, "source": "user", "evidence": None}])
     assert apply_clarification_policy(null_critical)["status"] == "needs_clarification"
+
+
+def test_requirements_coverage_catches_dropped_feature():  # regression: gpt-5-mini omitted a requested bore
+    from shilpa.agent.planner import check_requirements
+
+    req = {"units": "mm", "dimensions": [
+        {"name": "width", "value": 80, "unit": "mm", "kind": "length", "source": "user"},
+        {"name": "hole_diameter", "value": 6, "unit": "mm", "kind": "length", "source": "user"},
+        {"name": "bore", "value": 20, "unit": "mm", "kind": "length", "source": "user"},
+        {"name": "hole_count", "value": 4, "unit": None, "kind": "count", "source": "user"},
+    ]}
+    with pytest.raises(ShilpaError) as ei:
+        check_requirements(BLUEPRINT_PLATE, req)
+    assert ei.value.code == ErrorCode.REQUIREMENT_NOT_MET and "bore" in ei.value.info.message
+    req["dimensions"].pop(2)
+    check_requirements(BLUEPRINT_PLATE, req)  # every stated length is used
+    inch = {"units": "in", "dimensions": [{"name": "w", "value": 80 / 25.4, "unit": "in", "kind": "length", "source": "user"}]}
+    check_requirements(BLUEPRINT_PLATE, inch)  # matched after unit normalisation
+
+
+def test_requirements_check_ignores_private_keys():  # regression: repair paths carry _change_summary
+    from shilpa.agent.planner import check_requirements
+
+    check_requirements({**BLUEPRINT_PLATE, "_change_summary": "fixed"}, {"units": "mm", "dimensions": []})
+    absent = {"name": "centre_bore_diameter", "value": 0, "unit": "mm", "kind": "length", "source": "user"}
+    check_requirements(BLUEPRINT_PLATE, {"units": "mm", "dimensions": [absent]})  # regression: G2 L010 "no centre bore"

@@ -14,7 +14,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from ..adapters import CAPABILITIES
-from ..contracts.compile import compile_recipe
+from ..contracts.compile import ANGLE_TO_DEG, LENGTH_TO_MM, compile_recipe
 from ..contracts.errors import ErrorCode, ShilpaError
 from .llm import Budget, call_structured, strict_schema
 from .schemas import PlanOutput, Requirements, from_recipe, to_recipe
@@ -109,8 +109,15 @@ Operations Shilpa can build:
 
 
 def extract_requirements(prompt: str, budget: Budget) -> dict:
-    data = call_structured(system=INTAKE_SYSTEM, user=prompt, schema_name="requirements", schema=_schema("requirements"),
-                           budget=budget, max_output_tokens=2500, purpose="intake")
+    for attempt in (1, 2):
+        try:
+            data = call_structured(system=INTAKE_SYSTEM, user=prompt, schema_name="requirements", schema=_schema("requirements"),
+                                   budget=budget, max_output_tokens=2500, purpose="intake")
+            break
+        except ShilpaError as exc:
+            # One retry for a slow model call, inside the same budget; other errors are final.
+            if exc.code != ErrorCode.MODEL_TIMEOUT or attempt == 2:
+                raise
     try:
         req = Requirements.model_validate(data).model_dump()
     except ValidationError as exc:
@@ -245,3 +252,67 @@ def apply_parameter_edit(recipe: dict, changes: dict[str, float]) -> dict:
         else:
             out["parameters"][name] = float(value)
     return out
+
+
+def check_requirements(recipe: dict, requirements: dict) -> None:
+    """Deterministic coverage check: every stated length and angle must drive the geometry.
+
+    The planner may rename parameters, so values are matched after unit normalisation. A
+    stated value that no feature uses means the plan dropped part of the request (for
+    example a centre bore); that is repairable, and never published.
+    """
+    compiled = compile_recipe({k: v for k, v in recipe.items() if not k.startswith("_")}, CAPABILITIES)
+    used: set[str] = set()
+    for cf in compiled.features:
+        for k, v in cf.spec:
+            if k.endswith("_ref") and isinstance(v, str):
+                used |= _names_in(v)
+            elif k == "sections":
+                for sec in v:
+                    used |= _names_in(sec.diameter_ref) | _names_in(sec.length_ref)
+    # Derived parameters carry the names they depend on.
+    raw = compiled.recipe.parameters
+    frontier = set(used)
+    while frontier:
+        name = frontier.pop()
+        p = raw.get(name)
+        if p is not None and not isinstance(p, (int, float)) and p.expr:
+            new = _names_in(p.expr) - used
+            used |= new
+            frontier |= new
+    values = [(q.kind, q.value) for k, q in compiled.params.items() if k in used]
+    # A stated value may also be met by an expression, e.g. overall height = thickness + hub_length.
+    from ..contracts.compile import field_kind
+
+    for cf in compiled.features:
+        for k, v in cf.values.items():
+            kind = field_kind(k.split(".")[-1])
+            values.append((kind, v))
+            if kind == "length" and ("diameter" in k):
+                values.append((kind, v / 2))  # a stated radius
+    for v in compiled.assertion_values.get("bbox", []):
+        values.append(("length", v))
+    default_unit = requirements.get("units") or "mm"
+    missing = []
+    for d in requirements.get("dimensions", []):
+        if d.get("value") is None or d.get("kind") not in ("length", "angle") or d.get("source") != "user":
+            continue
+        if d["kind"] == "length" and d["value"] == 0:
+            continue  # "no centre bore" is recorded as 0: an absent feature, not a dimension to build
+        if d["kind"] == "length":
+            want = d["value"] * LENGTH_TO_MM.get(d.get("unit") or default_unit, 1.0)
+        else:
+            want = d["value"] * ANGLE_TO_DEG.get(d.get("unit") or "deg", 1.0)
+        if not any(kind == d["kind"] and abs(v - want) <= 1e-6 * max(1.0, abs(want)) for kind, v in values):
+            missing.append(f"{d['name']} = {d['value']:g} {d.get('unit') or (default_unit if d['kind'] == 'length' else 'deg')}")
+    if missing:
+        raise ShilpaError(ErrorCode.REQUIREMENT_NOT_MET,
+                          "the plan does not use these stated values: " + "; ".join(missing)
+                          + ". Add each as a parameter that drives the matching feature.",
+                          details={"unused": missing})
+
+
+def _names_in(text: str | None) -> set[str]:
+    from ..contracts import expr as _expr
+
+    return _expr.names(text) if text else set()

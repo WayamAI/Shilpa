@@ -86,6 +86,8 @@ def build(recipe, cancel_check=None) -> BuildResult:
         vol = out.volume if isinstance(out, bd.Part) else None
         if isinstance(out, bd.Part):
             _check_solid(out, cf.id)
+            bb = out.bounding_box()
+            detail = {**detail, "bbox": {"min": [bb.min.X, bb.min.Y, bb.min.Z], "max": [bb.max.X, bb.max.Y, bb.max.Z]}}
         results.append(FeatureResult(cf.id, cf.op, "ok", (time.perf_counter() - t0) * 1000, vol, detail))
     shape = objects[compiled.output_id]
     return BuildResult(shape, compiled, results)
@@ -319,6 +321,12 @@ def op_pocket(cf, objects):
     return out, {"removed_volume": body.volume - out.volume}
 
 
+def _boxes_touch(a, b, tol: float = 1e-6) -> bool:
+    # Explicit test: BoundBox.overlaps does not mean "intersects" (it missed G2 L051).
+    return (a.min.X <= b.max.X + tol and b.min.X <= a.max.X + tol and a.min.Y <= b.max.Y + tol
+            and b.min.Y <= a.max.Y + tol and a.min.Z <= b.max.Z + tol and b.min.Z <= a.max.Z + tol)
+
+
 def _require_cut_inside_walls(target, tool, fid: str) -> None:
     """A generic cut may not break through the target's side walls.
 
@@ -328,7 +336,7 @@ def _require_cut_inside_walls(target, tool, fid: str) -> None:
     for face in target.faces():
         if abs(face.normal_at().Z) > 1 - 1e-6:
             continue  # top and bottom faces are where holes and pockets enter and exit
-        touched = (tool & face).area if tool.bounding_box().overlaps(face.bounding_box(), 1e-6) else 0.0
+        touched = (tool & face).area if _boxes_touch(tool.bounding_box(), face.bounding_box()) else 0.0
         if touched > 1e-6:
             raise ShilpaError(
                 ErrorCode.PRECONDITION_FAILED,

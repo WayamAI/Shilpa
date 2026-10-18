@@ -28,6 +28,7 @@ class ErrorCode(str, Enum):
     KERNEL_FAILURE = "kernel_failure"
     # Post-build checks
     VALIDATION_FAILED = "validation_failed"
+    REQUIREMENT_NOT_MET = "requirement_not_met"
     EXPORT_FAILED = "export_failed"
     # Workflow
     BUDGET_EXHAUSTED = "budget_exhausted"
@@ -48,6 +49,7 @@ REPAIRABLE = {
     ErrorCode.INVALID_SCHEMA,
     ErrorCode.UNKNOWN_REFERENCE,
     ErrorCode.UNSUPPORTED_OPERATION,
+    ErrorCode.REQUIREMENT_NOT_MET,
 }
 
 

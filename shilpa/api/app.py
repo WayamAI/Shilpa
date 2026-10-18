@@ -454,9 +454,34 @@ def create_edit(model_id: str, body: EditIn, p: Principal = Depends(principal), 
     return out
 
 
+class ExportIn(BaseModel):
+    format: str = Field(pattern="^FCSTD$")
+
+
+@app.post("/v1/versions/{version_id}/exports", status_code=202)
+def create_export(version_id: str, body: ExportIn, p: Principal = Depends(principal)):
+    """Create an export derivative of an immutable version; reuses an existing verified artifact."""
+    require_write(p)
+    from ..adapters import freecad_adapter
+
+    with tx() as s:
+        v = _owned(s, p, ModelVersion, version_id, "version")
+        existing = s.scalars(select(Artifact).where(Artifact.version_id == v.id, Artifact.format == body.format)).first()
+        if existing:
+            return {"artifact_id": existing.id, "job": None}
+        if not freecad_adapter.available():
+            raise _err(503, "export_unavailable", "FreeCAD is not installed on this server")
+        m = s.get(Model, v.model_id)
+        recipe = dict(v.recipe)
+        recipe["exports"] = sorted(set(recipe.get("exports", [])) | {body.format})
+        job, _ = _create_job(s, p, project_id=m.project_id, kind="export", key=f"export:{v.id}:{body.format}",
+                             input={"recipe": recipe, "export_of": v.id, "format": body.format}, model_id=m.id, base_version_id=v.id)
+        return {"artifact_id": None, "job": _job_out(job)}
+
+
 # ---------------------------------------------------------------- artifacts and usage
 
-MEDIA = {"STEP": ("model/step", "step"), "STL": ("model/stl", "stl"), "GLB": ("model/gltf-binary", "glb"),
+MEDIA = {"FCSTD": ("application/octet-stream", "FCStd"), "STEP": ("model/step", "step"), "STL": ("model/stl", "stl"), "GLB": ("model/gltf-binary", "glb"),
          "RECIPE": ("application/json", "json"), "VALIDATION": ("application/json", "json"),
          "STL_UNITS": ("application/json", "json"), "FEATURES": ("application/json", "json")}
 
@@ -470,7 +495,7 @@ def download(artifact_id: str, p: Principal = Depends(principal)):
         path = blobs.path(a.blob_key)
         media, ext = MEDIA.get(a.format, ("application/octet-stream", "bin"))
         safe_name = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in (m.name or "model"))[:60]
-        fname = f"{safe_name}_v{v.number}.{ext}" if a.format in ("STEP", "STL", "GLB") else f"{safe_name}_v{v.number}_{a.format.lower()}.{ext}"
+        fname = f"{safe_name}_v{v.number}.{ext}" if a.format in ("STEP", "STL", "GLB", "FCSTD") else f"{safe_name}_v{v.number}_{a.format.lower()}.{ext}"
     if not path.exists():
         raise _err(404, "not_found", "artifact bytes missing")
     return FileResponse(path, media_type=media, filename=fname)

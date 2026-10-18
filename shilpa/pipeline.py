@@ -114,11 +114,17 @@ def execute(recipe, out_dir: Path, oracle: dict | None = None, cancel_check=None
             report.checks += geometry.validate_glb(out_dir / "preview.glb", size)
         report.passed = all(c.passed for c in report.checks)
     timings["validate"] = (time.perf_counter() - t0) * 1000
+
+    if report.passed and "FCSTD" in recipe_obj.exports:
+        t0 = time.perf_counter()
+        report.checks += _freecad_checks(built, feats, out_dir, report.measurement)
+        report.passed = all(c.passed for c in report.checks)
+        timings["freecad"] = (time.perf_counter() - t0) * 1000
     validation = report.to_dict()
     (out_dir / "validation.json").write_text(json.dumps(validation, indent=2), encoding="utf-8")
     (out_dir / "features.json").write_text(json.dumps(feats, indent=2, default=str), encoding="utf-8")
 
-    for fmt, name in (("STEP", "model.step"), ("STL", "model.stl"), ("STL_UNITS", "model.stl.units.json"), ("GLB", "preview.glb"), ("RECIPE", "recipe.json"), ("VALIDATION", "validation.json")):
+    for fmt, name in (("FCSTD", "model.FCStd"), ("STEP", "model.step"), ("STL", "model.stl"), ("STL_UNITS", "model.stl.units.json"), ("GLB", "preview.glb"), ("RECIPE", "recipe.json"), ("VALIDATION", "validation.json")):
         p = out_dir / name
         if p.exists():
             artifacts.append(Artifact(fmt, str(p), sha256(p), p.stat().st_size))
@@ -128,3 +134,25 @@ def execute(recipe, out_dir: Path, oracle: dict | None = None, cancel_check=None
         failed = [c.name for c in report.checks if not c.passed]
         error = ShilpaError(ErrorCode.VALIDATION_FAILED, "validation failed: " + ", ".join(failed), details={"failed": failed}).info
     return ExecutionResult(report.passed, error, feats, validation, artifacts, engine, timings, params, conversions)
+
+
+def _freecad_checks(built, feats: list[dict], out_dir: Path, ref: geometry.Measurement) -> list[geometry.Check]:
+    """Native FreeCAD document: build, then validate its own STEP and compare with the build123d solid."""
+    from .adapters import freecad_adapter
+
+    try:
+        res = freecad_adapter.build_fcstd(built.compiled, feats, out_dir)
+    except ShilpaError as exc:
+        return [geometry.Check("freecad_build", False, note=exc.info.message)]
+    if not res.get("ok"):
+        err = res.get("error") or {}
+        return [geometry.Check("freecad_build", False, note=f"{err.get('feature_id') or ''} {err.get('message', '')}".strip())]
+    checks = [geometry.Check("freecad_build", True, note=f"FreeCAD {res.get('freecad')} in {res.get('ms')} ms")]
+    fc = geometry.validate(out_dir / "freecad.step", built.compiled.assertion_values, built_volume=built.shape.volume)
+    for c in fc.checks:
+        c.name = "freecad_" + c.name
+    checks += fc.checks
+    if fc.measurement is not None:
+        ok = all(abs(a - b) <= geometry.DIM_TOL for a, b in zip(fc.measurement.bbox_size, ref.bbox_size))
+        checks.append(geometry.Check("freecad_matches_build123d_bbox", ok, list(ref.bbox_size), list(fc.measurement.bbox_size), geometry.DIM_TOL))
+    return checks
