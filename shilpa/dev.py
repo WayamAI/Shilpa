@@ -1,4 +1,4 @@
-"""Start the whole local stack: API, coordinator, CAD worker and (optionally) the studio.
+"""Start the whole local stack: API, coordinator, CAD workers and (optionally) the Next.js studio.
 
 Run:  uv run python -m shilpa.dev            # backend + studio dev server
       uv run python -m shilpa.dev --no-studio
@@ -37,11 +37,11 @@ def main() -> None:
     if not args.no_studio:
         npm = shutil.which("npm")
         if npm:
-            procs.append(("studio", subprocess.Popen([npm, "run", "dev"], cwd=ROOT / "apps" / "studio", shell=False)))
+            procs.append(("studio", subprocess.Popen([npm, "run", "dev"], cwd=ROOT / "apps" / "web", shell=False)))
         else:
             print("npm not found; studio not started")
 
-    print(f"\nShilpa local stack: API http://127.0.0.1:{args.port}  studio http://localhost:5173")
+    print(f"\nShilpa local stack: API http://127.0.0.1:{args.port}  studio http://localhost:3100")
     print(f"Azure OpenAI planner: {'configured' if settings.llm_configured else 'NOT configured (set .env)'}\n")
     try:
         while True:

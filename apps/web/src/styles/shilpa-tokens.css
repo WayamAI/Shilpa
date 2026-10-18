@@ -1,0 +1,30 @@
+/* =============================================================
+   SHILPA SEMANTIC TOKENS (Tier 2 extension of tokens.css)
+
+   Chronos has no 3D or drawing surfaces. These follow the same rule:
+   semantic names, values taken only from the Tier 1 reference palette.
+   ============================================================= */
+
+:root {
+  --viewer-background: var(--ref-gray-50);
+  --viewer-material: var(--ref-gray-300);
+  --viewer-edge: var(--ref-gray-800);
+  --viewer-grid-cell: var(--ref-gray-200);
+  --viewer-grid-section: var(--ref-gray-400);
+  --viewer-axis-x: var(--ref-red-500);
+  --viewer-axis-y: var(--ref-green-500);
+  --viewer-axis-z: var(--ref-blue-500);
+  /* Brand accent: the Wayam orange from the Chronos color lock, for marks only. */
+  --brand-accent: var(--ref-orange-500);
+}
+
+[data-theme="dark"] {
+  --viewer-background: var(--ref-gray-900);
+  --viewer-material: var(--ref-gray-500);
+  --viewer-edge: var(--ref-gray-950);
+  --viewer-grid-cell: var(--ref-gray-825);
+  --viewer-grid-section: var(--ref-gray-700);
+  --viewer-axis-x: var(--ref-red-400);
+  --viewer-axis-y: var(--ref-green-400);
+  --viewer-axis-z: var(--ref-blue-400);
+}

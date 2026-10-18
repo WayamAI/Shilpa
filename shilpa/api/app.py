@@ -54,7 +54,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Shilpa API", version="0.1.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3100", "http://127.0.0.1:3100"],
                    allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 
 
@@ -105,7 +105,11 @@ def _owned(s, p: Principal, cls, obj_id: str, what: str):
 
 @app.get("/v1/health")
 def health():
+    from ..adapters import freecad_adapter
+
     return {"ok": True, "llm_configured": settings.llm_configured, "auth_mode": settings.auth_mode,
+            "llm_deployment": settings.aoai_deployment or None,
+            "freecad_available": freecad_adapter.available(),
             "adapters": {k: sorted(v["operations"]) for k, v in CAPABILITY_MATRIX.items()}}
 
 

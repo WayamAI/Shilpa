@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Shilpa mark: Wayam orange tile (#FF7B1C, rim #FFB365, recess #C1460F) carrying an isometric solid. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFB365"/>
+      <stop offset="0.45" stop-color="#FF7B1C"/>
+      <stop offset="1" stop-color="#C1460F"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="url(#tile)"/>
+  <g fill="none" stroke="#FFFFFF" stroke-linejoin="round" stroke-linecap="round">
+    <!-- outer silhouette of a cube seen from above -->
+    <path d="M32 13 L49 22.5 L49 41.5 L32 51 L15 41.5 L15 22.5 Z" stroke-width="3.6"/>
+    <!-- inner edges meeting at the near corner -->
+    <path d="M15 22.5 L32 32 L49 22.5 M32 32 L32 51" stroke-width="3.6"/>
+  </g>
+  <!-- the top face carries the light -->
+  <path d="M32 13 L49 22.5 L32 32 L15 22.5 Z" fill="#FFFFFF" fill-opacity="0.28"/>
+</svg>
