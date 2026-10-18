@@ -530,7 +530,8 @@ def _require_cut_inside_walls(target, tool, fid: str) -> None:
         if touched > 1e-6:
             raise ShilpaError(
                 ErrorCode.PRECONDITION_FAILED,
-                "cut breaks through a side wall of the target body; check hole positions and edge clearance",
+                "cut breaks through a side wall of the target body; check hole positions and edge clearance, "
+                "and drill openings through a side wall with a hole op on that face (x_min, x_max, y_min, y_max)",
                 feature_id=fid,
                 details={"breached_area": touched},
             )

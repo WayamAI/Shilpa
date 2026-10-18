@@ -243,6 +243,10 @@ class _HoleSeries(_Strict):
     carry the thread as metadata (no modelled thread). Depths are measured from the entry face.
     """
 
+    # id and op lead every schema (subclasses narrow op in place): strict-mode decoding commits to a
+    # union member from the leading keys, so they must name the operation first.
+    id: FeatureId
+    op: str
     body_ref: FeatureId
     diameter_ref: Ref | None = None  # required unless standard_size supplies it
     mode: HoleMode = "through_all"

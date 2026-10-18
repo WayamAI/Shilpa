@@ -111,6 +111,33 @@ def test_plan_roundtrip_strips_nested_nulls():
     assert all(None not in s.values() for f in back["features"] for s in f.get("segments", []))
 
 
+def test_plan_members_lead_with_id_and_op():  # regression: gpt-5.5 picked helix / linear_pattern when holes led with body_ref
+    s = strict_schema(PlanOutput.model_json_schema())
+    for name, d in s["$defs"].items():
+        if "op" in d.get("properties", {}):
+            assert list(d["properties"])[:2] == ["id", "op"], name
+
+
+def test_plan_nulls_mean_defaults():  # regression: strict mode returned clockwise / left_handed as null
+    from shilpa.agent.planner import _normalize_plan
+
+    plan = from_recipe(fixture("N11")["recipe"])
+    plan.update(change_summary=None)
+    plan["features"][1]["left_handed"] = None
+    plan["features"][0]["inner_diameter_ref"] = ""
+    PlanOutput.model_validate(_normalize_plan(plan))
+
+
+def test_requirements_coverage_counts_bend_angles_and_screw_sizes():
+    from shilpa.agent.planner import check_requirements
+
+    dims = [{"name": "bend_angle", "value": 90, "unit": "deg", "kind": "angle", "source": "user"},
+            {"name": "bend_radius", "value": 40, "unit": "mm", "kind": "length", "source": "user"}]
+    check_requirements(fixture("N02")["recipe"], {"units": "mm", "dimensions": dims})  # the tangent arc sweeps 90 deg
+    check_requirements(fixture("N06")["recipe"], {"units": "mm", "dimensions": [
+        {"name": "screw", "value": 5, "unit": "mm", "kind": "length", "source": "user"}]})  # "M5" is met by standard_size
+
+
 # ---------------------------------------------------------------- static checks
 
 
