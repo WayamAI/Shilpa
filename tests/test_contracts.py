@@ -204,3 +204,33 @@ def test_requirements_chamfer_angle_is_implicit():  # regression: drawing S05 "1
     check_requirements(r, {"units": "mm", "dimensions": [angle]})
     with pytest.raises(ShilpaError):
         check_requirements(BLUEPRINT_PLATE, {"units": "mm", "dimensions": [angle]})  # no chamfer: 45 deg is unexplained
+
+
+def test_relational_conflicts():  # regression: hard design X12 (hub larger than flange)
+    def dim(n, v):
+        return {"name": n, "value": v, "unit": "mm", "kind": "length", "critical": True, "source": "user", "evidence": None}
+
+    bad = apply_clarification_policy(_req(family="flange", dimensions=[dim("outer_diameter", 80), dim("hub_diameter", 100), dim("bore_diameter", 30)]))
+    assert bad["status"] == "needs_clarification" and any("hub_diameter" in c["description"] for c in bad["conflicts"])
+    ok = apply_clarification_policy(_req(family="flange", dimensions=[dim("outer_diameter", 120), dim("hub_diameter", 60), dim("bore_diameter", 35), dim("bolt_circle_diameter", 90)]))
+    assert ok["status"] == "ready" and not ok["conflicts"]
+
+
+def test_plan_normalisation_and_error_explanation():  # regression: repair output rejected with an unhelpful union error
+    from pydantic import ValidationError
+
+    from shilpa.agent.planner import _explain_plan_error, _normalize_plan
+
+    plan = from_recipe(BLUEPRINT_PLATE)
+    plan["features"][0]["center_x_ref"] = ""  # strict mode cannot forbid empty strings
+    plan.update(change_summary=None, name="t")
+    PlanOutput.model_validate(_normalize_plan(plan))
+    bad = from_recipe(BLUEPRINT_PLATE)
+    bad.update(change_summary=None, name="t")
+    bad["features"].append({"id": "r", "op": "fillet", "body_ref": "mount_holes", "radius_ref": "thickness",
+                            "edges": {"direction": "parallel_z", "location": "any", "curve": "any", "boundary": "outer",
+                                      "diameter_ref": None, "expected_count": 0}})
+    with pytest.raises(ValidationError) as ei:
+        PlanOutput.model_validate(bad)
+    msg = _explain_plan_error(ei.value, bad)
+    assert "fillet" in msg and "expected_count" in msg

@@ -140,7 +140,9 @@ class _Lowerer:
             elif cf.op in ("fillet", "chamfer"):
                 self.require_tip(fid, f.body_ref)
                 size = self.q(f.radius_ref if cf.op == "fillet" else f.distance_ref)
-                self.ops.append({"id": fid, "pd": cf.op.capitalize(), "size": size, "selector": f.edges.model_dump()})
+                sel = f.edges.model_dump()
+                sel["diameter_value"] = cf.values.get("edges.diameter")
+                self.ops.append({"id": fid, "pd": cf.op.capitalize(), "size": size, "selector": sel})
                 self.advance(fid)
         if self.pending:
             self.unsupported(f"standalone bodies {sorted(self.pending)} are never merged into the part", next(iter(self.pending)))

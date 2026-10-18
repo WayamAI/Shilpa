@@ -160,3 +160,42 @@ def test_large_round_part_mesh_checks(tmp_path):  # regression: 180 mm flange fa
     r["assertions"].pop("holes", None)
     res = execute(r, tmp_path)
     assert res.ok, [c for c in res.validation["checks"] if not c["passed"]]
+
+
+def test_diameter_selector_isolates_hub_junction(tmp_path):  # regression: hard design X03
+    import math as _m
+
+    pi = _m.pi
+    r = {"units": "mm", "parameters": {"od": 160, "t": 14, "hub_d": 80, "hub_h": 30, "bore": 50, "bolt": 11, "pcd": 125,
+                                       "n": {"value": 8, "kind": "count"}, "fil": 3, "ch": 2},
+         "features": [
+             {"id": "disc_p", "op": "circle", "diameter_ref": "od"},
+             {"id": "disc", "op": "extrude", "profile_ref": "disc_p", "distance_ref": "t"},
+             {"id": "bolts", "op": "polar_hole_pattern", "body_ref": "disc", "diameter_ref": "bolt", "count_ref": "n", "pitch_diameter_ref": "pcd"},
+             {"id": "hub_p", "op": "circle", "diameter_ref": "hub_d"},
+             {"id": "hub", "op": "extrude", "profile_ref": "hub_p", "distance_ref": "hub_h", "offset_ref": "t"},
+             {"id": "joined", "op": "boolean", "operation": "union", "target_ref": "bolts", "tool_ref": "hub"},
+             {"id": "junction", "op": "fillet", "body_ref": "joined", "radius_ref": "fil",
+              "edges": {"curve": "circle", "location": "between", "diameter_ref": "hub_d", "expected_count": 1}},
+             {"id": "hub_edge", "op": "chamfer", "body_ref": "junction", "distance_ref": "ch",
+              "edges": {"curve": "circle", "location": "top", "diameter_ref": "hub_d", "expected_count": 1}},
+             {"id": "bore_cut", "op": "hole", "body_ref": "hub_edge", "diameter_ref": "bore"}]}
+    c = lambda d: pi * d * d / 4  # noqa: E731
+    fillet = 2 * pi * (40 + 3 * (10 - 3 * pi) / (12 - 3 * pi)) * 9 * (1 - pi / 4)
+    chamfer = 2 * pi * (40 - 2 / 3) * 2
+    want = c(160) * 14 + c(80) * 30 - c(50) * 44 - 8 * c(11) * 14 + fillet - chamfer
+    res = execute(r, tmp_path, oracle={"bbox": [160, 160, 44], "volume": want})
+    assert res.ok, [ch for ch in res.validation["checks"] if not ch["passed"]] if res.validation else res.error
+
+
+def test_dangling_body_rejected():  # regression: hard design X10 silently dropped a part
+    from shilpa.contracts.compile import compile_recipe
+    from shilpa.contracts.errors import ShilpaError
+
+    r = copy.deepcopy(BLUEPRINT_PLATE)
+    r["parameters"]["d"] = 20
+    r["features"] += [{"id": "washer_p", "op": "circle", "diameter_ref": "d", "center_x_ref": "width * 2"},
+                      {"id": "washer", "op": "extrude", "profile_ref": "washer_p", "distance_ref": "thickness"}]
+    with pytest.raises(ShilpaError) as ei:
+        compile_recipe(r)
+    assert "never become part of the output" in ei.value.info.message

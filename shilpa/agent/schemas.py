@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -123,7 +125,11 @@ def to_recipe(plan: dict) -> dict:
 
 
 def from_recipe(recipe: dict) -> dict:
-    """Inverse of to_recipe, used to show the planner the current state for edits and repairs."""
+    """Inverse of to_recipe, used to show the planner the current state for edits and repairs.
+
+    Returns an independent copy: callers may modify it without touching the recipe.
+    """
+    recipe = copy.deepcopy(recipe)
     params = []
     for name, v in recipe["parameters"].items():
         if isinstance(v, dict):

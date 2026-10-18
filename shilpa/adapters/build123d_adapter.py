@@ -362,7 +362,7 @@ def op_boolean(cf, objects):
     return out, {}
 
 
-def select_edges(part: bd.Part, sel: EdgeSelector) -> list:
+def select_edges(part: bd.Part, sel: EdgeSelector, diameter: float | None = None) -> list:
     bb = _bbox(part)
     zt, zb = bb.max.Z, bb.min.Z
     out = []
@@ -372,6 +372,8 @@ def select_edges(part: bd.Part, sel: EdgeSelector) -> list:
         if sel.curve == "line" and gt_name != "LINE":
             continue
         if sel.curve == "circle" and gt_name != "CIRCLE":
+            continue
+        if diameter is not None and (gt_name != "CIRCLE" or abs(2 * e.radius - diameter) > 1e-6):
             continue
         p0, p1, mid = e.position_at(0), e.position_at(1), e.position_at(0.5)
         if sel.direction == "parallel_z":
@@ -401,8 +403,8 @@ def select_edges(part: bd.Part, sel: EdgeSelector) -> list:
     return out
 
 
-def _resolve_selector(part, sel: EdgeSelector, fid: str):
-    edges = select_edges(part, sel)
+def _resolve_selector(part, sel: EdgeSelector, fid: str, diameter: float | None = None):
+    edges = select_edges(part, sel, diameter)
     if not edges:
         raise ShilpaError(ErrorCode.SELECTOR_EMPTY, f"edge selector matched no edges: {sel.model_dump()}", feature_id=fid, field="edges")
     if len(edges) != sel.expected_count:
@@ -418,7 +420,7 @@ def _resolve_selector(part, sel: EdgeSelector, fid: str):
 
 def op_fillet(cf, objects):
     body = _as_part(objects[cf.spec.body_ref])
-    edges = _resolve_selector(body, cf.spec.edges, cf.id)
+    edges = _resolve_selector(body, cf.spec.edges, cf.id, cf.values.get("edges.diameter"))
     r = cf.values["radius_ref"]
     try:
         out = _as_part(body.fillet(r, edges))
@@ -435,7 +437,7 @@ def op_fillet(cf, objects):
 
 def op_chamfer(cf, objects):
     body = _as_part(objects[cf.spec.body_ref])
-    edges = _resolve_selector(body, cf.spec.edges, cf.id)
+    edges = _resolve_selector(body, cf.spec.edges, cf.id, cf.values.get("edges.diameter"))
     d = cf.values["distance_ref"]
     try:
         out = _as_part(body.chamfer(d, None, edges))

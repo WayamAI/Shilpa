@@ -24,7 +24,7 @@ class Budgets:
     cad_executions: int = _int("SHILPA_BUDGET_CAD_EXECUTIONS", 3)
     repair_calls: int = _int("SHILPA_BUDGET_REPAIR_CALLS", 2)
     input_tokens: int = _int("SHILPA_BUDGET_INPUT_TOKENS", 60_000)
-    output_tokens: int = _int("SHILPA_BUDGET_OUTPUT_TOKENS", 12_000)
+    output_tokens: int = _int("SHILPA_BUDGET_OUTPUT_TOKENS", 24_000)
     elapsed_s: int = _int("SHILPA_BUDGET_ELAPSED_S", 15 * 60)
 
 

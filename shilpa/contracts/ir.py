@@ -198,6 +198,7 @@ class EdgeSelector(_Strict):
     location: Literal["top", "bottom", "between", "any"] = "any"
     curve: Literal["line", "circle", "any"] = "any"
     boundary: Literal["outer", "inner", "any"] = "any"
+    diameter_ref: Ref | None = None  # only circular edges of this diameter (e.g. the hub's Ø80 junction)
     expected_count: int = Field(ge=1, le=500)
 
 

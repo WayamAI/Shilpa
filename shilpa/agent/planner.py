@@ -8,6 +8,7 @@ clarification policy below is code, not prompt text (blueprint section 9).
 from __future__ import annotations
 
 import json
+import logging
 from functools import lru_cache
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from ..contracts.errors import ErrorCode, ShilpaError
 from .llm import Budget, call_structured, strict_schema
 from .schemas import PlanOutput, Requirements, from_recipe, to_recipe
 
+log = logging.getLogger("shilpa.planner")
 CORPUS = Path(__file__).resolve().parents[2] / "evals" / "corpus"
 EXAMPLE_IDS = ("P01", "F03", "B03", "E02", "H03")
 
@@ -44,7 +46,9 @@ Shilpa IR 1.0 rules (engineering CAD, millimetres internally, Z up):
 - boolean: union | cut | intersect of target_ref and tool_ref bodies (union bodies must touch).
 - fillet / chamfer: body_ref, radius_ref or distance_ref, and a semantic edge selector
   {direction: parallel_z|perpendicular_z|any, location: top|bottom|between|any, curve: line|circle|any,
-   boundary: outer|inner|any, expected_count}. "outer" means the edge lies on the body's bounding box.
+   boundary: outer|inner|any, diameter_ref, expected_count}. "outer" means the edge lies on the body's bounding box.
+  diameter_ref keeps only circular edges of that diameter: use it to pick one circle among several at the same height
+  (for example the hub-to-disc junction "hub_diameter" while bolt holes and the bore also have circles there).
   expected_count must equal the number of edges you intend to treat, or the build fails.
 - The last body feature is the output. Set expected_bbox_refs to refs for overall X, Y, Z size when you can.
 - Never invent a critical engineering dimension. Non-critical assumptions (e.g. a small edge break) must be
@@ -97,6 +101,9 @@ Apply these standard engineering conventions instead of asking, and list each on
 - An L bracket's vertical leg stands at the back edge of the base, full width; "height" is the overall height.
 - Stepped shafts are listed from the bottom up; a box is open at the top with the stated wall and floor thickness.
 - Chamfers are 45 degrees with the stated leg size; "rounded corners" on a plate mean its vertical edges.
+Shilpa makes one connected part per request. If the request asks for two or more separate parts, set task_class
+"unsupported" and say they should be requested one at a time.
+
 If any requested feature cannot be built with the operations listed below (for example engraved text or logos,
 threads, gear teeth, springs, spheres, freeform or organic surfaces), set task_class "unsupported", name the feature
 in unsupported_reason, and do not ask questions about it.
@@ -126,8 +133,38 @@ def extract_requirements(prompt: str, budget: Budget) -> dict:
     return apply_clarification_policy(req)
 
 
+def _dim(req: dict, *keys: str, exclude: tuple[str, ...] = ()) -> tuple[str, float] | None:
+    for d in req.get("dimensions", []):
+        n = d["name"].lower()
+        if d.get("value") and d.get("kind") == "length" and any(k in n for k in keys) and not any(x in n for x in exclude):
+            return d["name"], float(d["value"])
+    return None
+
+
+def relational_conflicts(req: dict) -> list[str]:
+    """Geometric relations every supported family must satisfy, checked in code (shared by text and drawing intake)."""
+    out = []
+    od = _dim(req, "outer_diameter", "outside_diameter", "flange_diameter", "disc_diameter", exclude=("hub", "boss"))
+    hub = _dim(req, "hub_diameter")
+    bore = _dim(req, "bore", "inner_diameter", "inside_diameter")
+    pcd = _dim(req, "pitch", "pcd", "bolt_circle")
+    if od and hub and hub[1] >= od[1]:
+        out.append(f"{hub[0]} {hub[1]:g} is not smaller than {od[0]} {od[1]:g}")
+    if od and bore and bore[1] >= od[1]:
+        out.append(f"{bore[0]} {bore[1]:g} is not smaller than {od[0]} {od[1]:g}")
+    if hub and bore and bore[1] >= hub[1]:
+        out.append(f"{bore[0]} {bore[1]:g} is not smaller than {hub[0]} {hub[1]:g}")
+    if od and pcd and "diameter" in pcd[0] and pcd[1] >= od[1]:
+        out.append(f"{pcd[0]} {pcd[1]:g} is not inside {od[0]} {od[1]:g}")
+    return out
+
+
 def apply_clarification_policy(req: dict) -> dict:
     """Deterministic decision on whether generation may start (blueprint section 9, T022-T026)."""
+    known = {c["description"] for c in req.get("conflicts", [])}
+    for msg in relational_conflicts(req):
+        if msg not in known:
+            req.setdefault("conflicts", []).append({"description": msg, "fields": []})
     if req["task_class"] != "engineering_cad":
         req["status"] = "unsupported"
         req["status_reason"] = req.get("unsupported_reason") or f"{req['task_class']} is not available in this release"
@@ -190,14 +227,44 @@ def _plan_call(user: str, budget: Budget, purpose: str, feedback: str | None = N
     if feedback:
         user += f"\n\nYour previous answer was rejected: {feedback}\nReturn a corrected answer."
     data = call_structured(system=system, user=user, schema_name="recipe_plan", schema=_schema("plan"),
-                           budget=budget, max_output_tokens=4000, purpose=purpose)
+                           budget=budget, max_output_tokens=8000, purpose=purpose)
+    data = _normalize_plan(data)
     try:
         plan = PlanOutput.model_validate(data).model_dump()
     except ValidationError as exc:
-        raise ShilpaError(ErrorCode.INVALID_SCHEMA, f"planner output does not match the plan schema: {exc.errors()[0]['msg']}")
+        msg = _explain_plan_error(exc, data)
+        log.warning("planner output rejected: %s", msg)
+        raise ShilpaError(ErrorCode.INVALID_SCHEMA, f"planner output does not match the plan schema: {msg}")
     recipe = to_recipe(plan)
     recipe["_change_summary"] = plan.get("change_summary")
     return recipe
+
+
+def _normalize_plan(data: dict) -> dict:
+    """Deterministic clean-up of constraints strict mode cannot express (empty optional refs become null)."""
+    def walk(node):
+        if isinstance(node, dict):
+            return {k: (None if k.endswith("_ref") and isinstance(v, str) and not v.strip() else walk(v)) for k, v in node.items()}
+        if isinstance(node, list):
+            return [walk(v) for v in node]
+        return node
+
+    return walk(data)
+
+
+def _explain_plan_error(exc: ValidationError, data: dict) -> str:
+    """Pick the error from the union member that matches the feature's own op, not the first member tried."""
+    feats = data.get("features") or []
+    for err in exc.errors():
+        loc = err["loc"]
+        if len(loc) >= 3 and loc[0] == "features" and isinstance(loc[1], int) and loc[1] < len(feats):
+            op = (feats[loc[1]] or {}).get("op")
+            member = str(loc[2]).lower()
+            if op and op.replace("_", "") in member.replace("_", ""):
+                field = ".".join(str(x) for x in loc[3:]) or "feature"
+                return f"feature {loc[1]} ({op}) field {field}: {err['msg']} (got {str(err.get('input'))[:80]!r})"
+    first = exc.errors()[0]
+    return f"{'.'.join(str(x) for x in first['loc'])}: {first['msg']}"
 
 
 def check_recipe(recipe: dict) -> dict:

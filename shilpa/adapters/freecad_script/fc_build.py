@@ -172,6 +172,9 @@ def select_edges(shape, sel):
             continue
         if sel.get("curve") == "circle" and not is_circle:
             continue
+        dia = sel.get("diameter_value")
+        if dia is not None and (not is_circle or abs(2 * e.Curve.Radius - dia) > 1e-6):
+            continue
         p0, p1 = e.valueAt(e.FirstParameter), e.valueAt(e.LastParameter)
         mid = e.valueAt((e.FirstParameter + e.LastParameter) / 2)
         d = sel.get("direction", "any")

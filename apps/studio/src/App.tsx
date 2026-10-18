@@ -494,7 +494,9 @@ function Conversation(props: {
     api.examples().then(setExamples).catch(() => {});
   }, []);
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Scroll only the chat list: scrollIntoView also scrolls the window, which shifted the whole page sideways.
+    const list = endRef.current?.parentElement;
+    if (list) list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   }, [chat, jobs]);
 
   const llm = !!health?.llm_configured;

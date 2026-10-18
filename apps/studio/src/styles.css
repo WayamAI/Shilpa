@@ -157,3 +157,6 @@ h3 { font-size: 13px; margin: 18px 0 6px; text-transform: uppercase; letter-spac
 .composer .row { flex-wrap: wrap; }
 .composer .row > * { min-width: 0; }
 .composer select { flex: 1 1 140px; max-width: 100%; }
+/* Long unbroken text (error details, file names) must wrap inside chat messages, never widen the page. */
+html, body { overflow-x: hidden; }
+.msg, .msg * { overflow-wrap: anywhere; }

@@ -232,6 +232,9 @@ def compile_recipe(recipe: Recipe | dict | str, capabilities: set[str] | None = 
             raise ShilpaError(ErrorCode.INVALID_SCHEMA, "blind holes need depth_ref", feature_id=f.id, field="depth_ref")
 
         values = {k: _eval_ref(v, params, f.id, k) for k, v in _ref_fields(f).items()}
+        edges = getattr(f, "edges", None)
+        if edges is not None and edges.diameter_ref:
+            values["edges.diameter"] = _eval_ref(edges.diameter_ref, params, f.id, "diameter_ref")
         if f.op == "stepped_shaft":
             for i, s in enumerate(f.sections):
                 values[f"sections.{i}.diameter"] = _eval_ref(s.diameter_ref, params, f.id, "diameter_ref")
@@ -245,6 +248,20 @@ def compile_recipe(recipe: Recipe | dict | str, capabilities: set[str] | None = 
     output_id = recipe.output or bodies[-1]
     if seen.get(output_id) != "body":
         raise ShilpaError(ErrorCode.UNKNOWN_REFERENCE, f"output {output_id!r} is not a body feature", field="output")
+    # Every body must contribute to the output; otherwise part of the request is silently dropped.
+    inputs = {c.id: [getattr(c.spec, r) for r in ("body_ref", "target_ref", "tool_ref") if getattr(c.spec, r, None)]
+              for c in compiled if seen[c.id] == "body"}
+    reached, stack = set(), [output_id]
+    while stack:
+        cur = stack.pop()
+        if cur not in reached:
+            reached.add(cur)
+            stack.extend(inputs.get(cur, []))
+    dangling = [b for b in bodies if b not in reached]
+    if dangling:
+        raise ShilpaError(ErrorCode.INVALID_SCHEMA,
+                          f"bodies {dangling} are built but never become part of the output {output_id!r}; "
+                          "Shilpa makes one connected part per request", field="features", details={"dangling": dangling})
 
     a = recipe.assertions
     av: dict[str, Any] = {"solid_count": a.solid_count, "valid_brep": a.valid_brep}
