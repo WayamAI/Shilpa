@@ -207,7 +207,9 @@ export function SheetChecks({ viewer }: { viewer: Viewer }) {
                   : (c.note ?? fmtValue(c.actual))}
               </span>
             </span>
-            <StatusBadge tone={c.passed ? "success" : "error"}>{c.passed ? "pass" : "fail"}</StatusBadge>
+            <span className="shrink-0">
+              <StatusBadge tone={c.passed ? "success" : "error"}>{c.passed ? "pass" : "fail"}</StatusBadge>
+            </span>
           </li>
         );
       })}

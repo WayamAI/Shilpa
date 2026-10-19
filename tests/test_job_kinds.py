@@ -198,23 +198,42 @@ def test_product_job_without_templates(client, project, monkeypatch):
     assert "not installed" in r.json()["message"]
 
 
-def test_product_job_with_a_runner(client, project, monkeypatch, tmp_path):
-    """Once shilpa.product.run_product exists, a product job publishes its assembly like an assembly job."""
-    def fake_run_product(spec_or_request, out_dir):
-        build = build_assembly(GOLDEN["slider_rail"]["spec"])
-        return {"ok": True, "request": spec_or_request, "build": build,
-                "report": {"checks": [{"name": "frame_fit", "passed": True, "note": "fits"}]}}
-
-    monkeypatch.setattr(kinds, "product_runner", lambda: fake_run_product)
-    r = client.post(f"/v1/projects/{project}/products", json={"request": "slider product"}, headers=DEV)
+def test_product_job_offline_bike(client, project):
+    """A real bicycle from the product template, offline parser only (no AI), through the job queue."""
+    if kinds.product_runner() is None:
+        pytest.skip("product templates not installed")
+    starters = {s["id"]: s for s in client.get("/v1/starters", headers=DEV).json()["products"]}
+    assert {"road_m", "wide_tyres"} <= set(starters)
+    r = client.post(f"/v1/projects/{project}/products", json={"request": starters["road_m"]["request"], "starter": "road_m"}, headers=DEV)
     assert r.status_code == 202, r.text
-    # The geometry runs in a subprocess that cannot see the monkeypatch, so execute in-process here.
-    res = kinds.execute_product({"request": "slider product"}, tmp_path)
-    assert res["ok"] and res["validation"]["passed"]
-    viewer = json.loads((tmp_path / "viewer.json").read_text())
-    assert viewer["kind"] == "product" and any(c["name"] == "product[frame_fit]" for c in viewer["checks"])
-    assert (tmp_path / "product.json").exists() and (tmp_path / "assembly.step").exists()
-    client.post(f"/v1/jobs/{r.json()['id']}/cancel", headers=DEV)
+    job = pump(client, r.json()["id"])
+    assert job["state"] == "succeeded", job["error"]
+
+    v = client.get(f"/v1/versions/{job['result_version_id']}", headers=DEV).json()
+    assert v["kind"] == "product" and v["validation_passed"]
+    formats = {a["format"] for a in v["artifacts"]}
+    assert {"STEP", "BOM_CSV", "PRODUCT_BOM_CSV", "MESHES", "VIEWER", "RENDER_SIDE", "RENDER_ISO", "ASSEMBLY_SPEC", "PRODUCT"} <= formats
+    viewer = v["viewer"]
+    assert viewer["product"]["status"] == "passed" and viewer["product"]["router"]["iterations"]
+    ids = {i["id"] for i in viewer["instances"]}
+    assert {"frame", "fork", "front_tyre", "rear_tyre"} <= ids
+    tyre = next(c for c in viewer["checks"] if c["name"] == "tyre_clearance[front_tyre~fork]")
+    assert tyre["passed"] and {"front_tyre", "fork"} <= set(tyre["instances"])
+    assert any(c["name"].startswith("sweep[") for c in viewer["checks"])
+    assert {j["name"] for j in viewer["joints"]} >= {"steering"}
+    assert artifact(client, v, "RENDER_SIDE").content[1:4] == b"PNG"
+    model = next(m for m in client.get(f"/v1/projects/{project}", headers=DEV).json()["models"] if m["id"] == v["model_id"])
+    assert model["kind"] == "product" and model["name"].startswith("bicycle_road_m")
+
+
+
+def test_product_job_explains_unsupported_requests(client, project):
+    if kinds.product_runner() is None:
+        pytest.skip("product templates not installed")
+    r = client.post(f"/v1/projects/{project}/products", json={"request": "design a drone"}, headers=DEV)
+    job = pump(client, r.json()["id"])
+    assert job["state"] == "failed" and job["error"]["code"] == "unsupported_operation"
+    assert job["error"]["message"]
 
 
 def test_execute_product_reports_missing_templates(tmp_path, monkeypatch):

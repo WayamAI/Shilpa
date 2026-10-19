@@ -71,6 +71,12 @@ export function Conversation({
       }
       // Route first (rule-based, no model call): only single parts go to the part planner.
       const route = await api.route(t);
+      if (route.kind === "product" && health?.products_available) {
+        // Product templates read requests with a rule-based parser: no AI call, even with the planner on.
+        say({ kind: "system", text: "This reads as a product. Running the bicycle template with its offline parser (about 30 s)." });
+        trackJob(await api.runProduct(projectId, { request: t }));
+        return;
+      }
       if (route.kind !== "part" || !llm) {
         say({ kind: "system", text: routeMessage(route, llm), tone: route.supported ? undefined : "error" });
         return;
@@ -115,6 +121,17 @@ export function Conversation({
 
   async function runStarter(value: string) {
     const [kind, id] = value.split(":");
+    if (kind === "product") {
+      const pr = starters?.products?.find((x) => x.id === id);
+      if (!pr) return;
+      say({ kind: "user", text: `Reference product ${pr.title}: ${pr.description}` });
+      try {
+        trackJob(await api.runProduct(projectId, { request: pr.request, spec: pr.spec, starter: pr.id }));
+      } catch (e) {
+        say({ kind: "system", text: errText(e), tone: "error" });
+      }
+      return;
+    }
     const list = kind === "assembly" ? starters?.assemblies : starters?.sheet_metal;
     const st = list?.find((x) => x.id === id);
     if (!st) return;
@@ -143,7 +160,10 @@ export function Conversation({
                   Describe a plate, bracket, spacer, shaft, flange or open enclosure with its dimensions, or upload a drawing. Shilpa asks
                   for anything critical that is missing.
                 </p>
-                <p>Assemblies and sheet-metal parts start from the reference starters below: every check runs without the AI planner.</p>
+                <p>
+                  Assemblies, sheet-metal parts and products start from the reference starters below, and a bike request such as “medium road
+                  bike for a 178 cm rider, 700c” runs the bicycle template: none of it needs the AI planner.
+                </p>
                 {plannerDisabled ? (
                   <p className="rounded-lg border border-muted bg-raised px-3 py-2 text-secondary" data-testid="planner-disabled">
                     The AI planner is disabled on this server (SHILPA_LLM=off). Requests are routed and explained but not planned.
@@ -239,13 +259,13 @@ export function Conversation({
                 </Select>
                 {starters && (starters.assemblies.length || starters.sheet_metal.length) ? (
                   <Select
-                    aria-label="Start from a reference assembly or sheet-metal part"
+                    aria-label="Start from a reference assembly, sheet-metal part or product"
                     value=""
                     disabled={busy}
                     onChange={(e) => runStarter(e.target.value)}
                     className="h-8 w-full max-w-full min-w-0 rounded-full border border-muted bg-action text-label-sm text-tertiary outline-none focus-visible:ring-2 focus-visible:ring-active"
                   >
-                    <option value="">Assemblies and sheet metal…</option>
+                    <option value="">{starters.products?.length ? "Assemblies, sheet metal, products…" : "Assemblies and sheet metal…"}</option>
                     <optgroup label="Reference assemblies">
                       {starters.assemblies.map((x) => (
                         <option key={x.id} value={`assembly:${x.id}`}>
@@ -262,6 +282,16 @@ export function Conversation({
                         </option>
                       ))}
                     </optgroup>
+                    {starters.products?.length ? (
+                      <optgroup label="Reference products">
+                        {starters.products.map((x) => (
+                          <option key={x.id} value={`product:${x.id}`}>
+                            {x.title}
+                            {x.expected.status === "repaired" ? " (router repairs it)" : ""}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
                   </Select>
                 ) : null}
               </>
@@ -448,6 +478,7 @@ const EVENT_TEXT: Record<string, (d: Record<string, unknown>) => string> = {
   "state.failed": (d) => `Failed: ${(d.error as { message?: string })?.message ?? "unknown error"}`,
   "state.cancelled": () => "Cancelled",
   "cancel.requested": () => "Cancellation requested",
+  progress: (d) => String(d.message ?? ""),
 };
 
 const JOB_LABEL: Record<string, string> = {
@@ -475,7 +506,7 @@ function routeMessage(route: Route, llm: boolean): string {
     part: llm ? "" : " Start from a reference part instead, then edit its parameters.",
     sheet_metal: " Language planning for sheet metal is not wired yet: start from a sheet-metal example and build from its spec.",
     assembly: " Language planning for assemblies is not wired yet: start from a reference assembly to see placement and every check.",
-    product: " Product templates run from a structured request; the bicycle template appears here once it is installed.",
+    product: " The bicycle template is not installed on this server yet.",
   };
   return `${what}${disabled}${next[route.kind] ?? ""}`;
 }

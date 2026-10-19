@@ -85,6 +85,24 @@ def _renew_loop(r: queue.Received, job_id: str, stop: threading.Event, cancel_fl
                 cancel_flag.touch()
 
 
+def _progress_loop(job_id: str, attempt_no: int, log: Path, stop: threading.Event) -> None:
+    """Relay the geometry process's progress lines (product jobs) as ``progress`` job events."""
+    seen = 0
+    while True:
+        done = stop.wait(1.0)
+        try:
+            lines = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+        except OSError:
+            lines = []
+        if len(lines) > seen:
+            with tx() as s:
+                for line in lines[seen:]:
+                    transition_event(s, job_id, "progress", {"attempt": attempt_no, "message": line[:500]})
+            seen = len(lines)
+        if done:
+            return
+
+
 def run_geometry(recipe: dict, out_dir: Path, cancel_flag: Path, kind: str | None = None,
                  options: dict | None = None) -> tuple[dict, float]:
     """Run one attempt in the restricted subprocess. ``kind`` selects a non-part executor (assembly, ...)."""
@@ -134,11 +152,14 @@ def handle_cad(r: queue.Received) -> None:
     stop = threading.Event()
     renewer = threading.Thread(target=_renew_loop, args=(r, job_id, stop, cancel_flag), daemon=True)
     renewer.start()
+    reporter = threading.Thread(target=_progress_loop, args=(job_id, attempt_no, out_dir / kinds.PROGRESS_FILE, stop), daemon=True)
+    reporter.start()
     try:
         result, cpu_s = run_geometry(recipe, out_dir, cancel_flag, kind, options)
     finally:
         stop.set()
         renewer.join(timeout=5)
+        reporter.join(timeout=5)
     finish(job_id, attempt_no, recipe, result, cpu_s, staging_key)
 
 
@@ -216,7 +237,7 @@ def publish(s, job: Job, attempt_no: int, recipe: dict, result: dict, staging_ke
     if model is None:
         default = {"assembly": "Untitled assembly", "sheet_metal": "Untitled sheet-metal part", "product": "Untitled product"}
         model = Model(tenant_id=job.tenant_id, project_id=job.project_id, kind=kind or "part",
-                      name=(job.input or {}).get("name") or recipe.get("name") or default.get(kind, "Untitled part"))
+                      name=(job.input or {}).get("name") or result.get("name") or recipe.get("name") or default.get(kind, "Untitled part"))
         s.add(model)
         s.flush()
     elif job.base_version_id and model.head_version_id != job.base_version_id:

@@ -91,3 +91,23 @@ def sheet_metal_starters() -> list[dict]:
     import copy
 
     return [{**copy.deepcopy(x), "kind": "sheet_metal"} for x in SHEET_METAL]
+
+
+# Reference products: offline template requests (no AI). One spec starter makes the router work.
+PRODUCTS = [
+    {"id": "road_m", "title": "Road bike, medium", "description": "Medium road bike for a 178 cm rider, 700c wheels.",
+     "request": "medium road bike for 178 cm rider, 700c", "expected": {"status": "passed"}},
+    {"id": "gravel_s", "title": "Gravel bike, small", "description": "650b gravel bike for a small rider with 45 mm tyres.",
+     "request": "650b gravel bike small rider 45 mm tyres", "expected": {"status": "passed"}},
+    {"id": "road_xxl", "title": "Road bike for a 2 m rider", "description": "Frame size from the rider height table (XXL).",
+     "request": "bike for a 2 m rider", "expected": {"status": "passed"}},
+    {"id": "wide_tyres", "title": "Road frame with 50 mm tyres",
+     "description": "Tyres wider than the frame was designed for: the clearance checks fail and the router repairs the design.",
+     "spec": {"frame_size": "M", "tyre_width_mm": 50}, "expected": {"status": "repaired"}},
+]
+
+
+def product_starters() -> list[dict]:
+    import copy
+
+    return [{**copy.deepcopy(x), "kind": "product"} for x in PRODUCTS]

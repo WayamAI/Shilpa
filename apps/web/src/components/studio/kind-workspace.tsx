@@ -10,6 +10,7 @@ import type { Version } from "@/lib/api";
 import { BomTable, ChecksPanel, JointsPanel, KindExportPanel, PartsTree } from "./assembly-panels";
 import type { Highlight } from "./assembly-viewer";
 import { VersionsPanel } from "./part-panels";
+import { RendersPanel, RouterPanel } from "./product-panels";
 import { BendTable, FlatPatternView, SheetChecks } from "./sheet-metal-panels";
 
 // three.js needs the browser: load the viewer on the client only.
@@ -18,7 +19,7 @@ const AssemblyViewer = dynamic(() => import("@/components/studio/assembly-viewer
   loading: () => <div className="viewer-surface h-full min-h-[320px] w-full" />,
 });
 
-type AsmTab = "parts" | "bom" | "checks" | "joints" | "files";
+type AsmTab = "parts" | "bom" | "checks" | "joints" | "router" | "files";
 type SheetTab = "bends" | "checks" | "versions" | "export";
 
 type Props = {
@@ -51,6 +52,18 @@ function AssemblyWorkspace({ version, versions, canWrite, busy, freecadAvailable
   const [joints, setJoints] = useState<Record<string, number>>({});
   const meshes = version.artifacts.find((a) => a.format === "MESHES")?.id ?? null;
   const isHead = versions[0]?.id === version.id;
+  const product = version.kind === "product" ? (viewer?.product ?? null) : null;
+  // Products swap the Joints tab for the router log; their joints sit under the parts tree.
+  const tabs: { id: AsmTab; label: string }[] = [
+    { id: "parts", label: "Parts" },
+    { id: "bom", label: "BOM" },
+    { id: "checks", label: "Checks" },
+    product ? { id: "router", label: "Router" } : { id: "joints", label: "Joints" },
+    { id: "files", label: "Files" },
+  ];
+  const jointsPanel = viewer ? (
+    <JointsPanel viewer={viewer} values={joints} onChange={(name, v) => setJoints((j) => ({ ...j, [name]: v }))} />
+  ) : null;
 
   const select = (id: string | null) => {
     setSelected(id);
@@ -72,26 +85,35 @@ function AssemblyWorkspace({ version, versions, canWrite, busy, freecadAvailable
                 label="Assembly details"
                 value={tab}
                 onChange={setTab}
-                tabs={[
-                  { id: "parts", label: "Parts" },
-                  { id: "bom", label: "BOM" },
-                  { id: "checks", label: "Checks" },
-                  { id: "joints", label: "Joints" },
-                  { id: "files", label: "Files" },
-                ]}
+                tabs={tabs}
               />
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               {tab === "parts" ? (
-                <PartsTree viewer={viewer} selected={selected} hovered={hovered} onHover={setHovered} onSelect={select} />
+                <>
+                  <PartsTree viewer={viewer} selected={selected} hovered={hovered} onHover={setHovered} onSelect={select} />
+                  {product && viewer.joints.length ? (
+                    <>
+                      <h3 className="mt-5 mb-2 text-caption tracking-[0.08em] text-quaternary uppercase">Joints</h3>
+                      {jointsPanel}
+                    </>
+                  ) : null}
+                </>
+              ) : tab === "router" && product ? (
+                <RouterPanel product={product} />
               ) : tab === "bom" ? (
                 <BomTable viewer={viewer} onSelect={select} />
               ) : tab === "checks" ? (
                 <ChecksPanel viewer={viewer} highlight={highlight} onHighlight={setHighlight} />
               ) : tab === "joints" ? (
-                <JointsPanel viewer={viewer} values={joints} onChange={(name, v) => setJoints((j) => ({ ...j, [name]: v }))} />
+                jointsPanel
               ) : (
                 <>
+                  {product ? (
+                    <div className="mb-6">
+                      <RendersPanel version={version} product={product} />
+                    </div>
+                  ) : null}
                   <KindExportPanel version={version} canExport={canWrite && !busy} freecadAvailable={freecadAvailable} onExportFcstd={onExportFcstd} />
                   <div className="mt-6">
                     <VersionsPanel versions={versions} current={version.id} canRestore={canWrite && !busy} onOpen={onOpenVersion} onRestore={onRestore} />

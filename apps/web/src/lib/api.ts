@@ -67,8 +67,26 @@ export type ViewerJoint = {
 };
 export type ViewerCheck = {
   name: string; group: string; passed: boolean; requested: unknown; actual: unknown; tolerance: unknown; note: string | null; instances: string[];
+  severity?: "error" | "warning"; unit?: string | null; level?: string | null; responsible?: string[];
 };
-export type BomLine = { part_number: string; quantity: number; source: string; instances: string[]; name: string | null; volume_mm3: number | null; generator: string | null };
+export type BomLine = {
+  part_number: string; quantity: number; source: string; instances: string[]; name?: string | null; volume_mm3: number | null; generator: string | null;
+  procurement?: string | null; description?: string | null; standard?: string | null; designation?: string | null; mass_g?: number | null;
+};
+export type SkeletonParam = { value: unknown; unit: string | null; source: string; note: string | null };
+export type RouterChange = { iteration: number; param: string; old: unknown; new: unknown; level: string; check: string; reason: string; responsible?: string | null };
+export type RouterIteration = {
+  iteration: number; passed: boolean; failed: string[]; warnings: string[]; seconds: number;
+  actions: { param: string; new: unknown; level: string; check: string; reason: string }[];
+  unresolved: { check: string; level: string | null; reason: string }[];
+};
+export type ProductInfo = {
+  status: "passed" | "repaired" | "unresolved" | string; message: string | null; request: string | null; template: string | null;
+  router: { status: string; iterations: RouterIteration[]; history: RouterChange[]; unresolved: { check: string; level: string | null; reason: string }[];
+    suggestions: { check: string; actual: unknown; suggestion: string }[]; seconds: number } | null;
+  timings_s: Record<string, number> | null; skeleton: Record<string, SkeletonParam> | null; derived: Record<string, unknown> | null;
+  summary: Record<string, string> | null; warnings: string[] | null; failed: string[] | null;
+};
 export type BendRow = { id: string; parent: string; angle: number; direction: string; radius: number; k: number; allowance: number; width: number; setback: number };
 export type FlatPattern = {
   loops: { outer: boolean; points: [number, number][] }[];
@@ -82,12 +100,13 @@ export type Viewer = {
   checks: ViewerCheck[]; bom: BomLine[]; dof: { computed?: number; intended?: number | null; by_mate?: Record<string, number> };
   issues: { code: string; message: string; where: string[]; severity: string }[];
   bbox: [number[], number[]] | null; size: number[] | null;
-  flat?: FlatPattern; bend_table?: BendRow[];
+  flat?: FlatPattern; bend_table?: BendRow[]; product?: ProductInfo;
   meta?: { material: string; thickness: number; flat_size: [number, number]; outer_size: number[]; mass_kg: number | null; volume: number; flat_area: number };
 };
 export type MeshSet = { units: string; parts: Record<string, { positions: string; indices: string; vertices: number; triangles: number }> };
 export type Starter = { id: string; kind: "assembly" | "sheet_metal"; title: string; description: string; expected: Record<string, unknown>; spec: Record<string, unknown> };
-export type Starters = { assemblies: Starter[]; sheet_metal: Starter[]; products_available: boolean };
+export type ProductStarter = { id: string; kind: "product"; title: string; description: string; request?: string; spec?: Record<string, unknown>; expected: Record<string, unknown> };
+export type Starters = { assemblies: Starter[]; sheet_metal: Starter[]; products?: ProductStarter[]; products_available: boolean };
 export type Route = {
   kind: "part" | "sheet_metal" | "assembly" | "product" | "unsupported"; confidence: number; supported: boolean; method: string;
   reason: string; note: string | null; planner: PlannerStatus;
@@ -179,8 +198,8 @@ export const api = {
     req<Job>("POST", `/v1/projects/${projectId}/assemblies`, { spec, starter: starter ?? null }, { "Idempotency-Key": key() }),
   runSheetMetal: (projectId: string, spec: Record<string, unknown>, starter?: string) =>
     req<Job>("POST", `/v1/projects/${projectId}/sheet-metal`, { spec, starter: starter ?? null }, { "Idempotency-Key": key() }),
-  runProduct: (projectId: string, request: string) =>
-    req<Job>("POST", `/v1/projects/${projectId}/products`, { request }, { "Idempotency-Key": key() }),
+  runProduct: (projectId: string, input: { request?: string; spec?: Record<string, unknown>; starter?: string }) =>
+    req<Job>("POST", `/v1/projects/${projectId}/products`, input, { "Idempotency-Key": key() }),
   exportVersion: (versionId: string, format: "FCSTD") =>
     req<{ artifact_id: string | null; job: Job | null }>("POST", `/v1/versions/${versionId}/exports`, { format }),
 };

@@ -127,10 +127,11 @@ def health():
 def starters(p: Principal = Depends(principal)):
     """Reference assemblies (the golden set) and sheet-metal examples; none needs the planner."""
     from ..workers.kinds import product_runner
-    from .starters import assembly_starters, sheet_metal_starters
+    from .starters import assembly_starters, product_starters, sheet_metal_starters
 
+    available = product_runner() is not None
     return {"assemblies": assembly_starters(), "sheet_metal": sheet_metal_starters(),
-            "products_available": product_runner() is not None}
+            "products": product_starters() if available else [], "products_available": available}
 
 
 class RouteIn(BaseModel):
@@ -463,6 +464,7 @@ class ProductJobIn(BaseModel):
     request: str | None = Field(default=None, max_length=8000)
     spec: dict[str, Any] | None = None
     name: str | None = Field(default=None, max_length=200)
+    starter: str | None = Field(default=None, max_length=64)
     idempotency_key: str | None = None
 
 
@@ -532,7 +534,8 @@ def create_product_job(project_id: str, body: ProductJobIn, p: Principal = Depen
     _spec_error("product", body.spec or {})
     payload = {"spec": body.spec} if body.spec is not None else {"request": body.request}
     return _kind_job(p, project_id, "product", payload, idempotency_key or body.idempotency_key or uuid.uuid4().hex,
-                     name=body.name, summary="Product from a template")
+                     name=body.name, summary=f"Started from the {body.starter.replace('_', ' ')} reference product"
+                     if body.starter else f"Product from the request: {body.request}" if body.request else "Product from a spec")
 
 
 @app.get("/v1/jobs/{job_id}")
@@ -736,9 +739,12 @@ def create_export(version_id: str, body: ExportIn, p: Principal = Depends(princi
             raise _err(503, "export_unavailable", "FreeCAD is not installed on this server")
         if kind in ("assembly", "product"):
             # Rebuild the same spec with the FreeCAD Assembly export; the artifact attaches to this version.
-            spec = v.recipe if kind == "assembly" else json.loads(blobs.path(next(
-                a.blob_key for a in s.scalars(select(Artifact).where(Artifact.version_id == v.id, Artifact.format == "RECIPE"))
-            )).read_text(encoding="utf-8"))
+            spec = v.recipe
+            if kind == "product":  # the derived AssemblySpec the product template placed
+                art = s.scalars(select(Artifact).where(Artifact.version_id == v.id, Artifact.format == "ASSEMBLY_SPEC")).first()
+                if art is None:
+                    raise _err(422, "unsupported_operation", "this product version has no assembly spec to export")
+                spec = json.loads(blobs.path(art.blob_key).read_text(encoding="utf-8"))
             job, _ = _create_job(s, p, project_id=m.project_id, kind="export", key=f"export:{v.id}:{body.format}",
                                  input={"exec": "assembly", "spec": spec, "freecad": True, "export_of": v.id, "format": body.format},
                                  model_id=m.id, base_version_id=v.id)
@@ -757,7 +763,9 @@ MEDIA = {"FCSTD": ("application/octet-stream", "FCStd"), "STEP": ("model/step", 
          "STL_UNITS": ("application/json", "json"), "FEATURES": ("application/json", "json"),
          "DXF": ("image/vnd.dxf", "dxf"), "BOM_CSV": ("text/csv", "csv"), "BOM_JSON": ("application/json", "json"),
          "PLACEMENTS": ("application/json", "json"), "MESHES": ("application/json", "json"),
-         "VIEWER": ("application/json", "json"), "PRODUCT": ("application/json", "json")}
+         "VIEWER": ("application/json", "json"), "PRODUCT": ("application/json", "json"),
+         "PRODUCT_BOM_CSV": ("text/csv", "csv"), "PRODUCT_BOM_JSON": ("application/json", "json"),
+         "ASSEMBLY_SPEC": ("application/json", "json"), "RENDER_SIDE": ("image/png", "png"), "RENDER_ISO": ("image/png", "png")}
 NAMED_FORMATS = ("STEP", "STL", "GLB", "FCSTD")
 
 
@@ -770,7 +778,8 @@ def download(artifact_id: str, p: Principal = Depends(principal)):
         path = blobs.path(a.blob_key)
         media, ext = MEDIA.get(a.format, ("application/octet-stream", "bin"))
         safe_name = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in (m.name or "model"))[:60]
-        suffix = {"BOM_CSV": "bom", "BOM_JSON": "bom", "DXF": "flat"}.get(a.format, a.format.lower())
+        suffix = {"BOM_CSV": "bom", "BOM_JSON": "bom", "DXF": "flat", "PRODUCT_BOM_CSV": "product_bom", "PRODUCT_BOM_JSON": "product_bom",
+                  "RENDER_SIDE": "side", "RENDER_ISO": "iso"}.get(a.format, a.format.lower())
         fname = f"{safe_name}_v{v.number}.{ext}" if a.format in NAMED_FORMATS else f"{safe_name}_v{v.number}_{suffix}.{ext}"
     if not path.exists():
         raise _err(404, "not_found", "artifact bytes missing")

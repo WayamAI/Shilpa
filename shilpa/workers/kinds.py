@@ -107,7 +107,19 @@ def mesh_of(shape, tolerance: float | None = None) -> dict:
     bb = shape.bounding_box()
     diag = math.sqrt(bb.size.X ** 2 + bb.size.Y ** 2 + bb.size.Z ** 2) or 1.0
     tol = tolerance or min(0.5, max(0.01, diag * 6e-4))
-    verts, tris = shape.tessellate(tol, MESH_ANGULAR)
+    try:
+        verts, tris = shape.tessellate(tol, MESH_ANGULAR)
+    except Exception:
+        # A face OCCT cannot triangulate (degenerate sliver) must not lose the whole part: mesh face by face.
+        verts, tris = [], []
+        for face in shape.faces():
+            try:
+                fv, ft = face.tessellate(tol, MESH_ANGULAR)
+            except Exception:
+                continue
+            base = len(verts)
+            verts += fv
+            tris += [(a + base, b + base, c + base) for a, b, c in ft]
     pos = np.array([(v.X, v.Y, v.Z) for v in verts], dtype=np.float32).reshape(-1)
     idx = np.array(tris, dtype=np.uint32).reshape(-1)
     return {"positions": base64.b64encode(pos.tobytes()).decode("ascii"),
@@ -474,81 +486,157 @@ def execute_sheet_metal(spec: dict, out_dir: Path, options: dict | None = None, 
             "engine": _engine(), "timings_ms": timings, "parameters": {}, "conversions": []}
 
 
+
 # ---------------------------------------------------------------- product
 
-PRODUCT_FILES = {**ASSEMBLY_FILES, "PRODUCT": "product.json"}
+PRODUCT_FILES = {"STEP": "bicycle.step", "FCSTD": "assembly.FCStd", "BOM_CSV": "bom.csv", "BOM_JSON": "bom.json",
+                 "PRODUCT_BOM_CSV": "product_bom.csv", "PRODUCT_BOM_JSON": "product_bom.json", "MESHES": "meshes.json",
+                 "VIEWER": "viewer.json", "VALIDATION": "validation.json", "RECIPE": "product_spec.json",
+                 "ASSEMBLY_SPEC": "spec.json", "PRODUCT": "report.json", "RENDER_SIDE": "render_side.png",
+                 "RENDER_ISO": "render_iso.png"}
 NOT_INSTALLED = "product templates not installed: this server has no shilpa.product.run_product yet"
+PROGRESS_FILE = "progress.log"  # one line per step; the CAD worker turns new lines into job events
 
 
 def product_runner():
     """``shilpa.product.run_product`` when the product templates are installed, else None."""
     try:
-        from ..product import run_product  # type: ignore[attr-defined]
+        from ..product import run_product
     except Exception:
         return None
     return run_product
 
 
-def _field(obj: Any, *names: str):
-    for n in names:
-        if isinstance(obj, dict) and n in obj:
-            return obj[n]
-        if not isinstance(obj, dict) and hasattr(obj, n):
-            return getattr(obj, n)
-    return None
+def progress(out_dir: Path, message: str) -> None:
+    with open(Path(out_dir) / PROGRESS_FILE, "a", encoding="utf-8") as fh:
+        fh.write(message.replace("\n", " ") + "\n")
+
+
+def _product_instances(build, c: dict) -> list[str]:
+    """Instances a product check names: bracketed ids (``tyre_clearance[front_tyre~fork]``) and its responsible members."""
+    known = {i.id for i in build.spec.instances}
+    tokens = list(c.get("responsible") or [])
+    name = c.get("name", "")
+    if "[" in name and name.endswith("]"):
+        tokens += [t.split(".")[0] for t in name[name.find("[") + 1:-1].replace("~", "+").split("+")]
+    pair = (c.get("detail") or {}).get("pair")
+    if isinstance(pair, str):
+        tokens += [t.split(".")[0] for t in pair.split("+")]
+    out: list[str] = []
+    for t in tokens:
+        if t in known and t not in out:
+            out.append(t)
+    return out
 
 
 def execute_product(payload: dict, out_dir: Path, options: dict | None = None, cancel_check=None) -> dict:
-    """Call ``run_product(spec_or_request, out_dir)`` and publish what it built.
+    """Run a product template with ``run_product`` (offline planner only) and publish it like an assembly.
 
-    The product module is expected to return its result (an object or dict). When that
-    result carries the placed ``AssemblyBuild`` (``build`` / ``assembly_build``), the same
-    exchange and viewer files as an assembly job are written from it, and product-level
-    checks (``report.checks`` / ``checks``) join the assembly checks. Whatever else it
-    returns is kept as ``product.json``.
+    ``run_product`` returns plain JSON (status, spec with the derived AssemblySpec, placements,
+    BOM, product checks, router log, exports, renders). The assembly is rebuilt from
+    ``spec.assembly`` only to tessellate the parts and derive joint frames for the viewer.
+    ``unsupported`` / ``rejected`` requests fail the job with the template's explanation;
+    ``unresolved`` products are published with their failing checks.
     """
     run_product = product_runner()
     if run_product is None:
         return _fail(ErrorCode.UNSUPPORTED_OPERATION, NOT_INSTALLED)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    _import_sources()
+    options = options or {}
     arg = payload.get("spec") if payload.get("spec") is not None else payload.get("request")
     timings: dict[str, float] = {}
+    progress(out_dir, "Reading the request with the offline template parser (no AI)")
     t0 = time.perf_counter()
     try:
-        res = run_product(arg, out_dir)
+        res = run_product(arg, out_dir, planner="offline", freecad=bool(options.get("freecad")), renders=True,
+                          log=lambda m: progress(out_dir, f"Router: {m}"))
     except ShilpaError as exc:
         return _fail(exc.code, exc.info.message, timings)
     except Exception as exc:
         return _fail(ErrorCode.KERNEL_FAILURE, f"product build failed: {type(exc).__name__}: {exc}", timings)
     timings["product"] = (time.perf_counter() - t0) * 1000
-    summary = res.to_dict() if hasattr(res, "to_dict") else res
-    _write_json(out_dir / "product.json", summary if isinstance(summary, (dict, list)) else {"result": summary})
+    status = res.get("status")
+    if status in ("unsupported", "rejected") or not res.get("spec"):
+        return _fail(ErrorCode.UNSUPPORTED_OPERATION, res.get("message") or f"product request {status}", timings,
+                     status=status, planner=res.get("planner"))
+    if cancel_check and cancel_check():
+        return _fail(ErrorCode.CANCELLED, "cancelled", timings)
 
-    build = _field(res, "build", "assembly_build")
-    if build is None and _field(res, "assembly") is not None:
-        from ..assembly.build import build_assembly
+    progress(out_dir, f"{res.get('product')}: {status}; meshing parts for the viewer")
+    from ..assembly.build import build_assembly
+    from ..contracts.assembly import part_number
 
-        build = build_assembly(_field(res, "assembly"))
-    if build is None:
-        ok = bool(_field(res, "ok", "passed") if _field(res, "ok", "passed") is not None else True)
-        return {"ok": ok, "error": None, "features": [], "validation": {"passed": ok, "checks": []},
-                "artifacts": _artifacts(out_dir, PRODUCT_FILES), "engine": _engine(), "timings_ms": timings,
-                "parameters": {}, "conversions": []}
-    product_checks = []
-    report = _field(res, "report", "product_report")
-    for c in (_field(report, "checks") if report is not None else _field(res, "checks")) or []:
-        name = _field(c, "name") or "product_check"
-        product_checks.append({"name": f"product[{name}]" if not str(name).startswith("product") else str(name),
-                               "passed": bool(_field(c, "passed")), "actual": _field(c, "actual"),
-                               "note": _field(c, "note", "message", "reason")})
-    result = write_assembly(build, out_dir, freecad=bool((options or {}).get("freecad")), kind="product",
-                            extra_viewer={"product": summary if isinstance(summary, dict) else None},
-                            extra_checks=product_checks, timings=timings)
-    if result.get("ok"):
-        result["artifacts"] = _artifacts(out_dir, PRODUCT_FILES)
-    return result
+    t0 = time.perf_counter()
+    build = build_assembly(res["spec"]["assembly"])
+    for iid, m in (res.get("placements") or {}).items():  # the solved placements win
+        if iid in build.matrices:
+            build.matrices[iid] = np.array(m, dtype=float)
+    meshes: dict[str, dict] = {}
+    for inst in build.spec.instances:
+        if inst.id in build.parts:
+            key = mesh_key(build.spec, inst.id)
+            if key not in meshes:
+                meshes[key] = mesh_of(build.parts[inst.id].solid)
+    _write_json(out_dir / "meshes.json", {"units": "mm", "up": "Z", "frame": "part", "parts": meshes})
+    timings["mesh"] = (time.perf_counter() - t0) * 1000
+
+    checks_blob = res.get("checks") or {}
+    checks: list[dict] = []
+    for c in checks_blob.get("checks", []):
+        if c.get("name") == "assembly":
+            continue  # the assembly report is listed check by check below
+        checks.append({"name": c["name"], "group": c.get("category") or "product", "passed": bool(c.get("passed")),
+                       "severity": c.get("severity", "error"), "requested": c.get("target"), "actual": c.get("actual"),
+                       "tolerance": None, "unit": c.get("unit"), "level": c.get("level"), "note": c.get("note"),
+                       "responsible": c.get("responsible") or [], "instances": _product_instances(build, c)})
+    asm = checks_blob.get("assembly") or {}
+    for c in asm.get("checks", []):
+        checks.append({"name": c["name"], "group": f"assembly_{_check_group(c['name'])}", "passed": bool(c.get("passed")),
+                       "severity": "error", "requested": c.get("requested"), "actual": c.get("actual"),
+                       "tolerance": c.get("tolerance"), "note": c.get("note"),
+                       "instances": check_instances(build, c["name"], c.get("actual"), c.get("note"))})
+    passed = bool(res.get("passed"))
+    instances = []
+    for inst in build.spec.instances:
+        part = build.parts.get(inst.id)
+        root = build.spec.root_of(inst.id)
+        T = build.matrices.get(inst.id)
+        color = inst.color or (build.spec.instance(inst.copy_of).color if inst.copy_of else None) or root.color
+        instances.append({"id": inst.id, "part_number": part_number(build.spec, inst.id), "name": part.name if part else None,
+                          "source": root.source, "color": color_hex(color), "mesh": mesh_key(build.spec, inst.id) if part else None,
+                          "matrix": [[round(float(v), 9) for v in row] for row in T] if T is not None else None,
+                          "placed": T is not None, "grounded": inst.grounded, "quantity": inst.quantity, "copy_of": inst.copy_of,
+                          "error": build.errors[inst.id].message if inst.id in build.errors else None})
+    lo, hi = np.full(3, np.inf), np.full(3, -np.inf)
+    for iid in build.matrices:
+        bb = build.world_solid(iid).bounding_box()
+        lo = np.minimum(lo, [bb.min.X, bb.min.Y, bb.min.Z])
+        hi = np.maximum(hi, [bb.max.X, bb.max.Y, bb.max.Z])
+    size = (hi - lo).tolist() if np.isfinite(lo).all() else None
+    spec = res["spec"]
+    viewer = {"kind": "product", "name": res.get("product"), "passed": passed, "instances": instances,
+              "joints": joint_frames(build),
+              "mates": [{"name": m.name, "type": m.type, "a": m.inst_a, "b": m.inst_b, "intent": m.intent,
+                         "in_tree": any(m is t for t, _ in build.order)} for m in build.spec.mates],
+              "checks": checks, "bom": res.get("bom") or [], "dof": asm.get("dof") or {},
+              "issues": [{"code": i.code, "message": i.message, "where": i.where, "severity": i.severity} for i in build.issues],
+              "bbox": [lo.tolist(), hi.tolist()] if size else None, "size": [round(v, 2) for v in size] if size else None,
+              "product": {"status": status, "message": res.get("message"), "request": res.get("request"),
+                          "template": res.get("template"), "router": res.get("router"), "timings_s": res.get("timings_s"),
+                          "skeleton": spec.get("skeleton"), "derived": spec.get("derived"), "targets": spec.get("targets"),
+                          "summary": checks_blob.get("summary"), "warnings": checks_blob.get("warnings"),
+                          "failed": checks_blob.get("failed"), "freecad": res.get("freecad")}}
+    validation = {"passed": passed, "status": status,
+                  "checks": [{k: c.get(k) for k in ("name", "passed", "requested", "actual", "tolerance", "note", "severity")}
+                             for c in checks]}
+    _write_json(out_dir / "viewer.json", viewer)
+    _write_json(out_dir / "validation.json", validation)
+    _write_json(out_dir / "spec.json", build.spec.model_dump(mode="json", exclude_none=True))
+    progress(out_dir, "Publishing the product version")
+    return {"ok": True, "error": None, "features": [], "validation": validation, "name": res.get("product"),
+            "artifacts": _artifacts(out_dir, PRODUCT_FILES), "engine": _engine(), "timings_ms": timings,
+            "parameters": {}, "conversions": []}
 
 
 EXECUTORS = {"assembly": execute_assembly, "sheet_metal": execute_sheet_metal, "product": execute_product}

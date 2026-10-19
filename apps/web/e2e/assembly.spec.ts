@@ -28,7 +28,7 @@ async function lastJobSucceeds(page: Page, timeout = 120_000) {
 }
 
 async function startFrom(page: Page, value: string) {
-  await page.getByLabel("Start from a reference assembly or sheet-metal part").selectOption(value);
+  await page.getByLabel("Start from a reference assembly, sheet-metal part or product").selectOption(value);
   await lastJobSucceeds(page);
 }
 

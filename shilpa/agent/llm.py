@@ -6,8 +6,9 @@ typed ShilpaErrors so the workflow persists a clear result instead of an empty
 success. SDK retries are disabled so retries are not multiplied across layers.
 
 Kill switch: with ``SHILPA_LLM=off`` (the default when ``AZURE_OPENAI_ENDPOINT`` is
-empty) every call raises ``PlannerDisabled`` before any client is created, so no
-request can reach a paid API. Tests install a fake client with ``use_client``;
+empty) every call raises ``PlannerDisabled`` before any real client is created (the
+check sits in ``_client``, ahead of the SDK import), so no request can reach a paid
+API. Tests install a fake client with ``use_client`` (or by patching ``_client``);
 a fake never leaves the process, so it is allowed while the switch is off.
 """
 
@@ -31,7 +32,8 @@ _UNSUPPORTED_KEYWORDS = {
 }
 
 
-PLANNER_DISABLED_MESSAGE = ("The AI planner is disabled on this server (SHILPA_LLM=off), so requests in plain language "
+PLANNER_DISABLED_MESSAGE = ("The AI planner is disabled on this server (SHILPA_LLM=off; Azure OpenAI is not configured "
+                            "or is switched off), so requests in plain language "
                             "cannot be planned. Start from a reference part, assembly or sheet-metal example instead, "
                             "or edit parameters directly.")
 
@@ -171,7 +173,7 @@ def call_structured(
     purpose: str = "",
     timeout_s: float | None = None,
 ) -> dict:
-    ensure_enabled()
+    # The kill switch is enforced in ``_client``: no real client exists while SHILPA_LLM=off.
     budget.check()
     import openai
 

@@ -84,9 +84,26 @@ const GROUP_LABEL: Record<string, string> = {
   product: "Product",
 };
 
+const PRODUCT_GROUP: Record<string, string> = {
+  static: "Skeleton rules",
+  ground: "Ground contact",
+  motion: "Motion",
+  fit: "Rider fit",
+  drivetrain: "Drivetrain",
+  standards: "Standards",
+};
+
 export function groupLabel(group: string): string {
-  return GROUP_LABEL[group] ?? group.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+  if (group.startsWith("assembly_")) return `Assembly · ${groupLabel(group.slice(9))}`;
+  return PRODUCT_GROUP[group] ?? GROUP_LABEL[group] ?? group.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 }
+
+/** A failed warning-severity check (toe overlap, standover) is advice, not a failure. */
+export function isWarning(c: ViewerCheck): boolean {
+  return !c.passed && c.severity === "warning";
+}
+
+const ASSEMBLY_PREFIXES = new Set(["interference", "clearance", "contact", "sweep", "part_built"]);
 
 /** "interference[block+plate]" -> "block + plate"; "contact[plate.top~block.foot]" -> "plate.top ~ block.foot". */
 export function checkTitle(c: ViewerCheck): string {
@@ -103,7 +120,8 @@ export function checkTitle(c: ViewerCheck): string {
     };
     return whole[c.name] ?? c.name.replace(/_/g, " ");
   }
-  return m[2].replace(/\+/g, " + ").replace(/~/g, " ~ ");
+  const inside = m[2].replace(/\+/g, " + ").replace(/~/g, " ~ ");
+  return ASSEMBLY_PREFIXES.has(m[1]) ? inside : `${m[1].replace(/_/g, " ")} · ${inside}`;
 }
 
 export function fmtValue(v: unknown): string {
@@ -128,6 +146,14 @@ export function checkDetail(c: ViewerCheck): string {
   if (c.name.startsWith("clearance[")) {
     const [lo, hi] = (c.requested as [number, number | null]) ?? [0, null];
     return `distance ${fmtValue(c.actual)} mm, wanted ≥ ${lo}${hi !== null && hi !== undefined ? ` and ≤ ${hi}` : ""} mm`;
+  }
+  if (c.unit !== undefined && c.group && !c.group.startsWith("assembly_")) {
+    // Product checks: measured value against the template target, then the template's note.
+    const unit = c.unit ? ` ${c.unit}` : "";
+    const head = c.actual !== null && c.actual !== undefined && typeof c.actual !== "object"
+      ? `${fmtValue(c.actual)}${unit}${c.requested !== null && c.requested !== undefined && typeof c.requested !== "object" ? `, target ${fmtValue(c.requested)}${unit}` : ""}`
+      : "";
+    return [head, c.note].filter(Boolean).join(" · ");
   }
   if (c.name === "dof") return `computed ${fmtValue(c.actual)}, intended ${fmtValue(c.requested)}`;
   if (c.name === "interference" || c.name === "all_placed") {
