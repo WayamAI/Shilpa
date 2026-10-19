@@ -21,7 +21,11 @@ Port kinds and what each must satisfy:
   candidate of that diameter within ``tol`` must exist; the check reports
   every coaxial diameter found.
 * ``point``: a reference location with no surface of its own (clamp centres,
-  marks). The origin lies on or inside the solid within ``tol``.
+  marks). The origin lies on or inside the solid within ``tol``. A centre
+  that sits between two features by construction (a saddle's rail clamp
+  centre midway between its rails) declares ``contract["straddle"] = s``
+  (mm): instead of the origin, the points ``s`` either side of it along the
+  port's y axis (``z`` cross ``x``) must each lie on or inside the solid.
 
 Kind inference, first rule that fires wins:
 
@@ -239,13 +243,24 @@ def _axis_check(solid, port: Port, tol: float, ang_tol: float) -> Check:
     return Check(name, ok, requested, actual, tolerance, note)
 
 
+def _inside_or_distance(solid, p: bd.Vector, tol: float) -> float:
+    solids = solid.solids() if hasattr(solid, "solids") else [solid]
+    return 0.0 if any(s.is_inside(p, tol) for s in solids) else solid.distance_to(p)
+
+
 def _point_check(solid, port: Port, tol: float) -> Check:
     o = _vec(port.origin)
-    solids = solid.solids() if hasattr(solid, "solids") else [solid]
-    if any(s.is_inside(o, tol) for s in solids):
-        dist = 0.0
-    else:
-        dist = solid.distance_to(o)
+    span = port.contract.get("straddle")
+    if isinstance(span, (int, float)) and not isinstance(span, bool) and span > 0:
+        # A centre between two features (rail clamp centre between the rails): the points ``span`` either
+        # side of the origin along the port's y axis (z cross x) must each lie on or inside the solid.
+        y = _vec(port.z).cross(_vec(port.x)).normalized()
+        ends = [_inside_or_distance(solid, o + y * (s * span), tol) for s in (1, -1)]
+        dist = max(ends)
+        return Check(f"port_{port.name}_point", dist <= tol, [_r(c, 3) for c in port.origin],
+                     {"straddle_distances": [_r(e) for e in ends]}, tol,
+                     f"points {span:g} mm either side of the origin along y must lie on or inside the solid")
+    dist = _inside_or_distance(solid, o, tol)
     return Check(f"port_{port.name}_point", dist <= tol, [_r(c, 3) for c in port.origin],
                  {"distance_to_solid": _r(dist)}, tol, "origin must lie on or inside the solid")
 

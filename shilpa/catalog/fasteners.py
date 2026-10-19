@@ -6,9 +6,12 @@
 * ISO 4032 hex nut and ISO 7089 plain washer: bearing face ``face_a`` at z = 0
   (normal -Z) and ``face_b`` on top (normal +Z), plus ``thread_axis``/``bore_axis``.
 
-Threads are modelled as plain cylinders at the nominal major diameter
-(bd_warehouse ``simple=True``); helical threads cost seconds per part and add
-nothing to fit checks. bd_warehouse tabulates ISO 7089 washer thickness at the
+Threads are modelled as plain cylinders at the nominal major diameter, as in
+normal CAD practice; helical threads cost seconds per part and add nothing to
+fit checks. bd_warehouse ``simple=True`` models the screw shank at the thread
+minor diameter (M6: 4.917), so the screw's shank is replaced by a nominal
+cylinder; the nut's simple bore is already at the major diameter, so a screw
+in a nut touches it without overlapping. bd_warehouse tabulates ISO 7089 washer thickness at the
 maximum h (e.g. M6: 1.8 mm; the nominal is 1.6 mm), so washers are up to
 0.2-0.5 mm thick on the conservative side.
 """
@@ -17,6 +20,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+import build123d as bd
 from bd_warehouse.fastener import HexNut, PlainWasher, SocketHeadCapScrew
 from pydantic import Field, model_validator
 
@@ -73,9 +77,12 @@ def socket_head_cap_screw(p: ScrewParams) -> BuiltPart:
         "head_top": port("head_top", (0, 0, head_h), (0, 0, 1), label="top of head (counterbore depth)",
                          head_h=head_h, head_d=head_d),
     }
+    # Shank at the nominal (major) diameter over the full length; it swallows bd_warehouse's minor-diameter shank.
+    shank = bd.Solid.make_cylinder(d / 2, p.length, bd.Plane.XY.offset(-p.length))
+    solid = _solid(_solid(s).fuse(shank).clean())
     return BuiltPart(
         name=f"iso4762_{p.size.lower()}x{p.length:g}",
-        solid=_solid(s),
+        solid=solid,
         ports=ports,
         source="catalog",
         meta={"standard": "ISO 4762", "size": p.size, "designation": f"ISO 4762 {p.size}x{p.length:g}",
