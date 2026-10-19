@@ -93,11 +93,24 @@ class FrameGeometry(BaseModel):
     ss_end_od: float = 12.0
     cs: tuple[float, float] = (22.0, 0.8)
     cs_end_od: float = 12.0
+    # Bent chainstays (chainring and tyre clearance): each ``(back, out)`` adds a bend node ``back`` mm
+    # behind the BB centre and ``out`` mm from the frame plane (height on the straight BB-to-dropout
+    # line), splitting each chainstay into straight members. Empty keeps straight stays.
+    cs_bend: list[tuple[float, float]] = Field(default_factory=list, max_length=4)
+    # Ovalised chainstay section (lateral width, vertical height, wall) for the pieces ahead of the last
+    # bend, where the stay squeezes between chainring and tyre. None keeps them round ``cs``.
+    cs_rect: tuple[float, float, float] | None = None
+    # Bent seat stays (tyre clearance under the seat cluster): ``(along, out)`` puts a bend node ``along``
+    # mm from the dropout end on the straight stay line, ``out`` mm from the frame plane. None keeps them straight.
+    ss_bend: tuple[float, float] | None = None
     head_tube_od: float = 50.0
     bb_shell_od: float = 40.0
     bb_shell_bore: float = 34.8  # BSA 1.370" thread major diameter (approximate bore)
     dropout_od: float = 30.0
     dropout_thickness: float = 12.0
+    # Stays end this far outboard of the dropout-boss centre, so they meet the boss outside the hub's
+    # end caps instead of converging on the axle line (0 keeps the original layout).
+    stay_end_outset: float = Field(0.0, ge=0)
 
     @model_validator(mode="after")
     def _sane(self):
@@ -144,7 +157,8 @@ def frame_nodes(g: FrameGeometry) -> tuple[dict[str, Vec3], dict[str, float]]:
     old, _ = REAR_AXLES[g.rear_axle]
     y_do = old / 2 + g.dropout_thickness / 2  # dropout boss centre, just outside the hub
     ss_spread = max(0.0, g.st[0] / 2 - g.ss[0] / 2 - 0.5)
-    cs_spread = g.bb_shell_width / 2 - g.cs[0] / 2 - 3.0
+    cs_width = g.cs_rect[0] if g.cs_rect and g.cs_bend else g.cs[0]
+    cs_spread = g.bb_shell_width / 2 - cs_width / 2 - 3.0
 
     nodes = {
         "bb": bb,
@@ -164,6 +178,33 @@ def frame_nodes(g: FrameGeometry) -> tuple[dict[str, Vec3], dict[str, float]]:
         "dropout_l": (rear_axle[0], y_do, rear_axle[2]),
         "dropout_r": (rear_axle[0], -y_do, rear_axle[2]),
     }
+    if g.stay_end_outset > 0:
+        for side, sign in (("l", 1.0), ("r", -1.0)):
+            nodes[f"stay_end_{side}"] = (rear_axle[0], sign * (y_do + g.stay_end_outset), rear_axle[2])
+    for side, sign in (("l", 1.0), ("r", -1.0)):
+        a, b = nodes[f"cs_bb_{side}"], nodes[_stay_end(g, side)]
+        prev = a
+        n = len(g.cs_bend)
+        for k, (back, out) in enumerate(g.cs_bend):
+            bend = (-back, sign * out, a[2] + back / -b[0] * (b[2] - a[2]))
+            nodes[f"cs_bend{k}_{side}"] = bend
+            # A piece followed by a round one runs a little past the bend so the round end disc lands inside
+            # it (a closed mitre rather than two discs touching along a line). Two box sections meet square:
+            # an overrun would slice a sliver off the next box.
+            ext = 0.0 if g.cs_rect and k < n - 1 else g.cs[0] / 2
+            d = (bend[0] - prev[0], bend[1] - prev[1], bend[2] - prev[2])
+            nodes[f"cs_bend{k}_{side}_x"] = _add(bend, d, ext / math.sqrt(sum(c * c for c in d)))
+            prev = bend
+    if g.ss_bend is not None:
+        along, out = g.ss_bend
+        for side, sign in (("l", 1.0), ("r", -1.0)):
+            top, end = nodes[f"ss_top_{side}"], nodes[_stay_end(g, side)]
+            d = (top[0] - end[0], top[1] - end[1], top[2] - end[2])
+            t = along / math.sqrt(sum(c * c for c in d))
+            bend = (end[0] + t * d[0], sign * out, end[2] + t * d[2])
+            # The two pieces meet square at the bend: an overrun stub here (as on the chainstays) makes
+            # OCCT's fuse of the whole frame fail for these shallow kinks.
+            nodes[f"ss_bend_{side}"] = bend
     wheel_r = g.wheel_bsd / 2 + g.tyre_width
     derived = {
         "wheelbase": front_axle[0] - rear_axle[0],
@@ -175,6 +216,43 @@ def frame_nodes(g: FrameGeometry) -> tuple[dict[str, Vec3], dict[str, float]]:
         "wheel_radius": wheel_r,
     }
     return nodes, derived
+
+
+def _stay_end(g: FrameGeometry, side: str) -> str:
+    return f"stay_end_{side}" if g.stay_end_outset > 0 else f"dropout_{side}"
+
+
+def _seatstays(g: FrameGeometry, tube) -> list[dict]:
+    m = g.material
+    if g.ss_bend is None:
+        return [{"id": f"seatstay_{s}", "start_node": f"ss_top_{s}", "end_node": _stay_end(g, s), "profile": tube(g.ss, g.ss_end_od),
+                 "priority": 0, "material": m} for s in ("l", "r")]
+    out = []
+    for s in ("l", "r"):
+        out.append({"id": f"seatstay_{s}", "start_node": f"ss_top_{s}", "end_node": f"ss_bend_{s}", "profile": tube(g.ss),
+                    "priority": 0, "material": m})
+        out.append({"id": f"seatstay_{s}_2", "start_node": f"ss_bend_{s}", "end_node": _stay_end(g, s),
+                    "profile": tube(g.ss, g.ss_end_od), "priority": 0, "material": m})
+    return out
+
+
+def _chainstays(g: FrameGeometry, tube) -> list[dict]:
+    m = g.material
+    out = []
+    n = len(g.cs_bend or [])
+    for s in ("l", "r"):
+        starts = [f"cs_bb_{s}"] + [f"cs_bend{k}_{s}" for k in range(n)]
+        ends = [f"cs_bend{k}_{s}_x" for k in range(n)] + [_stay_end(g, s)]
+        for k, (a, b) in enumerate(zip(starts, ends)):
+            if k == n:
+                prof = tube(g.cs, g.cs_end_od)
+            elif g.cs_rect:
+                prof = {"kind": "rect", "width": g.cs_rect[0], "height": g.cs_rect[1], "wall": g.cs_rect[2], "up": (0, 0, 1)}
+            else:
+                prof = tube(g.cs)
+            out.append({"id": f"chainstay_{s}" + (f"_{k + 1}" if k else ""), "start_node": a, "end_node": b,
+                        "profile": prof, "priority": 1, "material": m})
+    return out
 
 
 def frame_spec(g: FrameGeometry | None = None) -> WeldmentSpec:
@@ -194,10 +272,8 @@ def frame_spec(g: FrameGeometry | None = None) -> WeldmentSpec:
         {"id": "seat_tube", "start_node": "bb", "end_node": "st_top", "profile": tube(g.st), "priority": 3, "material": m},
         {"id": "down_tube", "start_node": "bb", "end_node": "dt_front", "profile": tube(g.dt), "priority": 2, "material": m},
         {"id": "top_tube", "start_node": "tt_front", "end_node": "tt_rear", "profile": tube(g.tt), "priority": 1, "material": m},
-        {"id": "chainstay_l", "start_node": "cs_bb_l", "end_node": "dropout_l", "profile": tube(g.cs, g.cs_end_od), "priority": 1, "material": m},
-        {"id": "chainstay_r", "start_node": "cs_bb_r", "end_node": "dropout_r", "profile": tube(g.cs, g.cs_end_od), "priority": 1, "material": m},
-        {"id": "seatstay_l", "start_node": "ss_top_l", "end_node": "dropout_l", "profile": tube(g.ss, g.ss_end_od), "priority": 0, "material": m},
-        {"id": "seatstay_r", "start_node": "ss_top_r", "end_node": "dropout_r", "profile": tube(g.ss, g.ss_end_od), "priority": 0, "material": m},
+        *_chainstays(g, tube),
+        *_seatstays(g, tube),
     ]
     shells = [
         {"id": "head_tube", "start_node": "ht_bottom", "end_node": "ht_top", "od": g.head_tube_od, "bore": cup, "material": m},
@@ -261,6 +337,7 @@ class ForkGeometry(BaseModel):
     crown_wall: float = 2.5
     dropout_od: float = 26.0
     dropout_thickness: float = 14.0
+    blade_end_outset: float = Field(0.0, ge=0)  # like FrameGeometry.stay_end_outset
     material: str = "chromoly"
 
 
@@ -283,6 +360,11 @@ def fork_spec(g: ForkGeometry | None = None) -> WeldmentSpec:
         "dropout_l": (g.offset, y_do, -g.a2c),
         "dropout_r": (g.offset, -y_do, -g.a2c),
     }
+    end = {"l": "dropout_l", "r": "dropout_r"}
+    if g.blade_end_outset > 0:
+        for side, sign in (("l", 1.0), ("r", -1.0)):
+            end[side] = f"blade_end_{side}"
+            nodes[end[side]] = (g.offset, sign * (y_do + g.blade_end_outset), -g.a2c)
     blade = {"od": g.blade_od, "wall": g.blade_wall, "od_start": g.blade_od, "od_end": g.blade_end_od}
     m = g.material
     members = [
@@ -290,8 +372,8 @@ def fork_spec(g: ForkGeometry | None = None) -> WeldmentSpec:
          "profile": {"kind": "rect", "width": g.crown_depth, "height": g.crown_height, "wall": g.crown_wall, "up": (0, 0, 1)}},
         {"id": "steerer", "start_node": "crown_c", "end_node": "steerer_top", "priority": 1, "material": m,
          "profile": {"od": g.steerer[0], "wall": g.steerer[1]}},
-        {"id": "blade_l", "start_node": "blade_top_l", "end_node": "dropout_l", "profile": blade, "material": m},
-        {"id": "blade_r", "start_node": "blade_top_r", "end_node": "dropout_r", "profile": blade, "material": m},
+        {"id": "blade_l", "start_node": "blade_top_l", "end_node": end["l"], "profile": blade, "material": m},
+        {"id": "blade_r", "start_node": "blade_top_r", "end_node": end["r"], "profile": blade, "material": m},
     ]
     shells = [
         {"id": f"dropout_boss_{side}", "node": f"dropout_{side}", "axis": (0.0, 1.0, 0.0), "length": g.dropout_thickness,

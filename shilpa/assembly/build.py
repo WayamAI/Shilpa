@@ -4,7 +4,8 @@ Part sources turn an instance's reference into a ``BuiltPart`` (solid plus ports
 part-local coordinates). Sources are pluggable: ``register_source(kind, fn)`` with
 ``fn(ref) -> BuiltPart`` where ``ref`` is the instance's ``RecipeRef`` or
 ``GeneratorRef``. The ``recipe`` source ships here and runs the trusted build123d
-adapter; catalog, weldment and sheet-metal modules register their own.
+adapter; ``sources.py`` supplies catalog, weldment and sheet-metal fallbacks used
+when nothing is registered for those kinds.
 
 Placement is deterministic and closed-form, breadth-first from the ground with the
 transform convention in ``contracts/assembly.py``. Like build123d's ``connect_to``
@@ -38,7 +39,10 @@ def register_source(kind: str, fn: SourceFn, *, replace: bool = False) -> None:
 
 
 def sources() -> set[str]:
-    return set(_SOURCES)
+    """Kinds that can be built: registered sources plus the built-in catalog / weldment / sheet-metal fallbacks."""
+    from .sources import BUILTIN
+
+    return set(_SOURCES) | set(BUILTIN)
 
 
 def _recipe_source(ref: RecipeRef) -> BuiltPart:
@@ -194,6 +198,10 @@ def _resolve_part(spec: AssemblySpec, inst: Instance, cache: dict[str, BuiltPart
         part = _mirror_part(_resolve_part(spec, spec.instance(inst.mirror_of.instance), cache), inst.mirror_of.plane)
     else:
         fn = _SOURCES.get(inst.source)
+        if fn is None:
+            from .sources import BUILTIN  # catalog / weldment / sheet-metal fallbacks, loaded on first use
+
+            fn = BUILTIN.get(inst.source)
         if fn is None:
             raise ShilpaError(ErrorCode.UNSUPPORTED_OPERATION, f"no part source registered for {inst.source!r}; have {sorted(_SOURCES)}")
         part = fn(inst.ref)
