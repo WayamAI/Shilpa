@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, NumberInput, Textarea } from "@/components/ui/controls";
 import { Select, StatusBadge, StatusDot, type StatusTone } from "@/components/ui/primitives";
 import { useSession } from "@/context/session-context";
-import { api, errText, uploadDrawing, type Example, type Job, type JobEvent, type Spec, type Version } from "@/lib/api";
+import { api, errText, uploadDrawing, type Example, type Job, type JobEvent, type Route, type Spec, type Starters, type Version } from "@/lib/api";
 
 import { DrawingReview } from "./drawing-review";
 
@@ -41,13 +41,16 @@ export function Conversation({
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [examples, setExamples] = useState<Example[]>([]);
+  const [starters, setStarters] = useState<Starters | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const llm = !!health?.llm_configured;
+  const plannerDisabled = health?.planner === "disabled";
   const canWrite = !!me?.can_write;
 
   useEffect(() => {
     api.examples().then(setExamples).catch(() => {});
+    api.starters().then(setStarters).catch(() => {});
   }, []);
   useEffect(() => {
     // Scroll the list itself; scrollIntoView would also scroll the page.
@@ -62,8 +65,23 @@ export function Conversation({
     say({ kind: "user", text: t });
     setText("");
     try {
-      if (editTarget) trackJob(await api.editInstruction(editTarget.model_id, editTarget.id, t));
-      else say({ kind: "spec", spec: await api.createSpec(projectId, t) });
+      if (editTarget) {
+        trackJob(await api.editInstruction(editTarget.model_id, editTarget.id, t));
+        return;
+      }
+      // Route first (rule-based, no model call): only single parts go to the part planner.
+      const route = await api.route(t);
+      if (route.kind === "product" && health?.products_available) {
+        // Product templates read requests with a rule-based parser: no AI call, even with the planner on.
+        say({ kind: "system", text: "This reads as a product. Running the bicycle template with its offline parser (about 30 s)." });
+        trackJob(await api.runProduct(projectId, { request: t }));
+        return;
+      }
+      if (route.kind !== "part" || !llm) {
+        say({ kind: "system", text: routeMessage(route, llm), tone: route.supported ? undefined : "error" });
+        return;
+      }
+      say({ kind: "spec", spec: await api.createSpec(projectId, t) });
     } catch (e) {
       say({ kind: "system", text: errText(e), tone: "error" });
     } finally {
@@ -101,7 +119,32 @@ export function Conversation({
     }
   }
 
-  const disabled = !llm || sending || busy;
+  async function runStarter(value: string) {
+    const [kind, id] = value.split(":");
+    if (kind === "product") {
+      const pr = starters?.products?.find((x) => x.id === id);
+      if (!pr) return;
+      say({ kind: "user", text: `Reference product ${pr.title}: ${pr.description}` });
+      try {
+        trackJob(await api.runProduct(projectId, { request: pr.request, spec: pr.spec, starter: pr.id }));
+      } catch (e) {
+        say({ kind: "system", text: errText(e), tone: "error" });
+      }
+      return;
+    }
+    const list = kind === "assembly" ? starters?.assemblies : starters?.sheet_metal;
+    const st = list?.find((x) => x.id === id);
+    if (!st) return;
+    say({ kind: "user", text: `Reference ${kind === "assembly" ? "assembly" : "sheet-metal part"} ${st.title}: ${st.description}` });
+    try {
+      trackJob(kind === "assembly" ? await api.runAssembly(projectId, st.spec, st.id) : await api.runSheetMetal(projectId, st.spec, st.id));
+    } catch (e) {
+      say({ kind: "system", text: errText(e), tone: "error" });
+    }
+  }
+
+  // With the planner disabled, typing still works: requests are routed and explained, never sent to a model.
+  const disabled = (!llm && !plannerDisabled) || sending || busy;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -112,10 +155,21 @@ export function Conversation({
             {editTarget ? (
               <p>Describe a change — “make it 100 mm wide and keep the holes 10 mm from the edges” — or edit parameters on the left.</p>
             ) : (
-              <p>
-                Describe a plate, bracket, spacer, shaft, flange or open enclosure with its dimensions, or upload a drawing. Shilpa asks
-                for anything critical that is missing.
-              </p>
+              <>
+                <p>
+                  Describe a plate, bracket, spacer, shaft, flange or open enclosure with its dimensions, or upload a drawing. Shilpa asks
+                  for anything critical that is missing.
+                </p>
+                <p>
+                  Assemblies, sheet-metal parts and products start from the reference starters below, and a bike request such as “medium road
+                  bike for a 178 cm rider, 700c” runs the bicycle template: none of it needs the AI planner.
+                </p>
+                {plannerDisabled ? (
+                  <p className="rounded-lg border border-muted bg-raised px-3 py-2 text-secondary" data-testid="planner-disabled">
+                    The AI planner is disabled on this server (SHILPA_LLM=off). Requests are routed and explained but not planned.
+                  </p>
+                ) : null}
+              </>
             )}
           </div>
         ) : null}
@@ -150,7 +204,9 @@ export function Conversation({
           <Textarea
             aria-label={editTarget ? "Describe an edit" : "Describe a part"}
             placeholder={
-              !llm
+              plannerDisabled
+                ? "AI planner is disabled — describe a request to see how it is routed, or pick a starter"
+                : !llm
                 ? "Azure OpenAI is not configured — reference parts still work"
                 : editTarget
                   ? "Describe an edit…"
@@ -166,11 +222,11 @@ export function Conversation({
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Button variant="primary" size="sm" disabled={disabled || !text.trim()} onClick={send}>
               <SendHorizontal size={13} strokeWidth={1.75} aria-hidden />
-              {sending ? "Reading…" : "Send"}
+              {sending ? "Reading…" : plannerDisabled && !editTarget ? "Route" : "Send"}
             </Button>
             {!editTarget ? (
               <>
-                <Button size="sm" disabled={disabled} onClick={() => fileRef.current?.click()}>
+                <Button size="sm" disabled={disabled || !llm} onClick={() => fileRef.current?.click()}>
                   <FileUp size={13} strokeWidth={1.75} aria-hidden />
                   Upload drawing
                 </Button>
@@ -201,6 +257,43 @@ export function Conversation({
                     </option>
                   ))}
                 </Select>
+                {starters && (starters.assemblies.length || starters.sheet_metal.length) ? (
+                  <Select
+                    aria-label="Start from a reference assembly, sheet-metal part or product"
+                    value=""
+                    disabled={busy}
+                    onChange={(e) => runStarter(e.target.value)}
+                    className="h-8 w-full max-w-full min-w-0 rounded-full border border-muted bg-action text-label-sm text-tertiary outline-none focus-visible:ring-2 focus-visible:ring-active"
+                  >
+                    <option value="">{starters.products?.length ? "Assemblies, sheet metal, products…" : "Assemblies and sheet metal…"}</option>
+                    <optgroup label="Reference assemblies">
+                      {starters.assemblies.map((x) => (
+                        <option key={x.id} value={`assembly:${x.id}`}>
+                          {x.title}
+                          {(x.expected.fail as string[] | undefined)?.length ? " (fails a check)" : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Sheet metal">
+                      {starters.sheet_metal.map((x) => (
+                        <option key={x.id} value={`sheet_metal:${x.id}`}>
+                          {x.title}
+                          {x.expected.passed === false ? " (fails a rule)" : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                    {starters.products?.length ? (
+                      <optgroup label="Reference products">
+                        {starters.products.map((x) => (
+                          <option key={x.id} value={`product:${x.id}`}>
+                            {x.title}
+                            {x.expected.status === "repaired" ? " (router repairs it)" : ""}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
+                  </Select>
+                ) : null}
               </>
             ) : null}
             <span className="ml-auto hidden text-caption text-quaternary xl:inline">Ctrl+Enter to send</span>
@@ -375,14 +468,48 @@ function SpecCard({
 const EVENT_TEXT: Record<string, (d: Record<string, unknown>) => string> = {
   "state.queued": () => "Queued",
   "state.planning": () => "Planning the feature sequence",
-  "state.executing": (d) => `Building attempt ${d.attempt}${d.mode === "repair" ? " with a repaired plan" : ""}`,
+  "state.executing": (d) =>
+    d.mode === "direct"
+      ? `Building the ${String(d.kind).replace("_", "-")}${d.instances ? ` · ${d.instances} instances` : ""}`
+      : `Building attempt ${d.attempt}${d.mode === "repair" ? " with a repaired plan" : ""}`,
   "attempt.started": () => "Geometry worker running",
   "attempt.failed": (d) => `Attempt ${d.attempt} failed: ${(d.error as { message?: string })?.message ?? "error"} — repairing`,
   "state.succeeded": (d) => (d.format ? `${d.format} file created and verified` : `Published version ${d.number}`),
   "state.failed": (d) => `Failed: ${(d.error as { message?: string })?.message ?? "unknown error"}`,
   "state.cancelled": () => "Cancelled",
   "cancel.requested": () => "Cancellation requested",
+  progress: (d) => String(d.message ?? ""),
 };
+
+const JOB_LABEL: Record<string, string> = {
+  export: "Export",
+  edit: "Edit",
+  generate: "Generate",
+  assembly: "Assembly",
+  sheet_metal: "Sheet metal",
+  product: "Product",
+};
+
+const ROUTE_LABEL: Record<string, string> = {
+  part: "a single part",
+  sheet_metal: "a sheet-metal part",
+  assembly: "an assembly",
+  product: "a product",
+};
+
+/** What happens to a routed request, in plain words. */
+function routeMessage(route: Route, llm: boolean): string {
+  if (!route.supported) return `${route.reason} Shilpa builds mechanical parts, sheet metal, assemblies and template products.`;
+  const what = `This reads as ${ROUTE_LABEL[route.kind]}.`;
+  const disabled = route.planner === "disabled" ? " The AI planner is disabled (SHILPA_LLM=off), so it cannot be planned from text." : "";
+  const next: Record<string, string> = {
+    part: llm ? "" : " Start from a reference part instead, then edit its parameters.",
+    sheet_metal: " Language planning for sheet metal is not wired yet: start from a sheet-metal example and build from its spec.",
+    assembly: " Language planning for assemblies is not wired yet: start from a reference assembly to see placement and every check.",
+    product: " The bicycle template is not installed on this server yet.",
+  };
+  return `${what}${disabled}${next[route.kind] ?? ""}`;
+}
 
 function eventTone(type: string): StatusTone {
   if (type === "state.succeeded") return "success";
@@ -400,7 +527,7 @@ function JobCard({ entry }: { entry?: { job: Job; events: JobEvent[] } }) {
     <section className="rounded-lg border border-muted bg-container" aria-label="Job progress" data-testid="job-card" data-state={job.state}>
       <header className="flex items-center justify-between gap-3 border-b border-muted px-3.5 py-2">
         <span className="text-caption tracking-[0.08em] text-quaternary uppercase">
-          {job.kind === "export" ? "Export" : job.kind === "edit" ? "Edit" : "Generate"} · {job.id.slice(0, 8)}
+          {JOB_LABEL[job.kind] ?? "Generate"} · {job.id.slice(0, 8)}
         </span>
         <StatusBadge tone={tone}>{done ? job.state : "running"}</StatusBadge>
       </header>

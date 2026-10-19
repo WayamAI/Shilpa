@@ -109,6 +109,7 @@ class Model(Base):
     tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id"), index=True)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), index=True)
     name: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str | None] = mapped_column(String(32), nullable=True, default="part")  # part | assembly | sheet_metal | product
     head_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     head_revision: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
@@ -138,7 +139,7 @@ class Job(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id"), index=True)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), index=True)
-    kind: Mapped[str] = mapped_column(String(32))  # generate | edit
+    kind: Mapped[str] = mapped_column(String(32))  # generate | edit | export | assembly | sheet_metal | product
     specification_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     spec_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
     model_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
@@ -270,7 +271,7 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
 # Additive migrations (expand only): columns added after a table first shipped.
-_ADDED_COLUMNS = [("specifications", "upload_id", "VARCHAR(36)")]
+_ADDED_COLUMNS = [("specifications", "upload_id", "VARCHAR(36)"), ("models", "kind", "VARCHAR(32)")]
 
 
 def init_db() -> None:

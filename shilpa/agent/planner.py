@@ -19,6 +19,7 @@ from ..adapters import CAPABILITIES
 from ..contracts.compile import ANGLE_TO_DEG, FEATURE_REF_FIELDS, LENGTH_TO_MM, compile_recipe
 from ..contracts.errors import ErrorCode, ShilpaError
 from .llm import Budget, call_structured, strict_schema
+from .router import classify as classify_request  # noqa: F401  (routing: part | sheet_metal | assembly | product)
 from .schemas import PlanOutput, Requirements, from_recipe, to_recipe
 
 log = logging.getLogger("shilpa.planner")

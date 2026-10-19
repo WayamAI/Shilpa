@@ -21,8 +21,8 @@ from sqlalchemy.exc import IntegrityError
 from sse_starlette.sse import EventSourceResponse
 
 from ..adapters import CAPABILITY_MATRIX
-from ..agent import planner
-from ..agent.llm import Budget
+from ..agent import planner, router
+from ..agent.llm import Budget, PlannerDisabled, ensure_enabled
 from ..contracts.errors import ErrorCode, ShilpaError
 from ..db import (
     Artifact,
@@ -45,6 +45,7 @@ from ..settings import settings
 from ..storage import blobs
 from .auth import Principal, principal, require_write, seed_dev_identities
 
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
@@ -65,6 +66,11 @@ def _err(status: int, code: str, message: str, **extra) -> HTTPException:
 @app.exception_handler(ShilpaError)
 async def _shilpa_error(request: Request, exc: ShilpaError):
     status = 422
+    if isinstance(exc, PlannerDisabled):
+        body = exc.info.model_dump(mode="json")
+        body["code"] = "planner_disabled"
+        body["trace_id"] = request.headers.get("x-trace-id") or uuid.uuid4().hex
+        return JSONResponse(status_code=503, content=body)
     if exc.code in (ErrorCode.MODEL_TIMEOUT,):
         status = 504
     elif exc.code in (ErrorCode.INTERNAL,):
@@ -106,11 +112,47 @@ def _owned(s, p: Principal, cls, obj_id: str, what: str):
 @app.get("/v1/health")
 def health():
     from ..adapters import freecad_adapter
+    from ..workers.kinds import product_runner
 
     return {"ok": True, "llm_configured": settings.llm_configured, "auth_mode": settings.auth_mode,
-            "llm_deployment": settings.aoai_deployment or None,
+            "planner": settings.planner_status, "llm_enabled": settings.llm_enabled,
+            "llm_deployment": (settings.aoai_deployment or None) if settings.llm_enabled else None,
             "freecad_available": freecad_adapter.available(),
+            "products_available": product_runner() is not None,
+            "job_kinds": ["part", "assembly", "sheet_metal", "product"],
             "adapters": {k: sorted(v["operations"]) for k, v in CAPABILITY_MATRIX.items()}}
+
+
+@app.get("/v1/starters")
+def starters(p: Principal = Depends(principal)):
+    """Reference assemblies (the golden set) and sheet-metal examples; none needs the planner."""
+    from ..workers.kinds import product_runner
+    from .starters import assembly_starters, product_starters, sheet_metal_starters
+
+    available = product_runner() is not None
+    return {"assemblies": assembly_starters(), "sheet_metal": sheet_metal_starters(),
+            "products": product_starters() if available else [], "products_available": available}
+
+
+class RouteIn(BaseModel):
+    prompt: str = Field(min_length=1, max_length=8000)
+
+
+@app.post("/v1/route")
+def route_request(body: RouteIn, p: Principal = Depends(principal)):
+    """Classify a request as part | sheet_metal | assembly | product, or explain why it is unsupported.
+
+    Rule-based first; the model classifier is only used for unsure requests and only when the
+    planner is enabled (never with SHILPA_LLM=off)."""
+    b = settings.budgets
+    budget = Budget(input_tokens=min(b.input_tokens, 4000), output_tokens=min(b.output_tokens, 400), deadline=time.time() + 30)
+    r = router.classify(body.prompt, budget if settings.llm_configured else None)
+    if budget.calls:
+        with tx() as s:
+            for c in budget.calls:
+                s.add(UsageEvent(tenant_id=p.tenant_id, job_id=None, kind="llm", input_tokens=c["input_tokens"],
+                                 output_tokens=c["output_tokens"], detail=c))
+    return {**r.to_dict(), "planner": settings.planner_status}
 
 
 @app.get("/v1/examples")
@@ -272,6 +314,7 @@ def create_specification(project_id: str, body: SpecIn, p: Principal = Depends(p
     require_write(p)
     if not body.upload_id and not (body.prompt and len(body.prompt.strip()) >= 3):
         raise _err(400, "bad_request", "give a prompt, an upload_id, or both")
+    ensure_enabled()  # 503 planner_disabled with SHILPA_LLM=off: reading language and drawings needs the model
     upload = None
     with tx() as s:
         _project(s, p, project_id)
@@ -349,7 +392,7 @@ def _job_out(job: Job) -> dict:
     return {"id": job.id, "project_id": job.project_id, "kind": job.kind, "state": job.state, "state_revision": job.state_revision,
             "model_id": job.model_id, "base_version_id": job.base_version_id, "result_version_id": job.result_version_id,
             "error": job.error, "cancel_requested": job.cancel_requested, "budget_used": job.budget_used,
-            "input": {k: v for k, v in (job.input or {}).items() if k != "recipe"},
+            "input": {k: v for k, v in (job.input or {}).items() if k not in ("recipe", "spec")},
             "created_at": job.created_at.isoformat(), "updated_at": job.updated_at.isoformat()}
 
 
@@ -407,6 +450,92 @@ def create_job(project_id: str, body: JobIn, p: Principal = Depends(principal), 
         with tx() as s:
             out = _job_out(s.scalars(select(Job).where(Job.tenant_id == p.tenant_id, Job.idempotency_key == key)).one())
     return out
+
+
+class KindJobIn(BaseModel):
+    spec: dict[str, Any]
+    name: str | None = Field(default=None, max_length=200)
+    starter: str | None = Field(default=None, max_length=64)  # reference starter id, for the change summary
+    freecad: bool = False  # also write a native FreeCAD document (assemblies)
+    idempotency_key: str | None = None
+
+
+class ProductJobIn(BaseModel):
+    request: str | None = Field(default=None, max_length=8000)
+    spec: dict[str, Any] | None = None
+    name: str | None = Field(default=None, max_length=200)
+    starter: str | None = Field(default=None, max_length=64)
+    idempotency_key: str | None = None
+
+
+KIND_LABEL = {"assembly": "assembly", "sheet_metal": "sheet-metal part", "product": "product"}
+
+
+def _spec_error(kind: str, spec: dict) -> None:
+    """422 before any job exists when a spec does not parse (as recipes do, T007)."""
+    from ..coordinator import check_direct
+
+    err = check_direct(kind, spec)
+    if err:
+        status = 501 if kind == "product" and err["code"] == ErrorCode.UNSUPPORTED_OPERATION.value else 422
+        code = "product_templates_not_installed" if status == 501 else err["code"]
+        raise _err(status, code, err["message"])
+
+
+def _kind_job(p: Principal, project_id: str, kind: str, spec: Any, key: str, *, name: str | None = None,
+              freecad: bool = False, summary: str | None = None, extra: dict | None = None) -> dict:
+    def go():
+        with tx() as s:
+            _project(s, p, project_id)
+            inp = {"exec": kind, "spec": spec, "freecad": freecad, **(extra or {})}
+            if name:
+                inp["name"] = name
+            if summary:
+                inp["change_summary"] = summary
+            job, _ = _create_job(s, p, project_id=project_id, kind=kind, key=key, input=inp)
+            return _job_out(job)
+
+    out = _commit_job(go)
+    if out is None:
+        with tx() as s:
+            out = _job_out(s.scalars(select(Job).where(Job.tenant_id == p.tenant_id, Job.idempotency_key == key)).one())
+    return out
+
+
+@app.post("/v1/projects/{project_id}/assemblies", status_code=202)
+def create_assembly_job(project_id: str, body: KindJobIn, p: Principal = Depends(principal),
+                        idempotency_key: str | None = Header(default=None)):
+    """Build, place, check and export an AssemblySpec (STEP with names and colours, BOM, placements, viewer meshes)."""
+    require_write(p)
+    _spec_error("assembly", body.spec)
+    summary = f"Started from the {body.starter.replace('_', ' ')} reference assembly" if body.starter else "Assembly from a spec"
+    return _kind_job(p, project_id, "assembly", body.spec, idempotency_key or body.idempotency_key or uuid.uuid4().hex,
+                     name=body.name or body.spec.get("name"), freecad=body.freecad, summary=summary)
+
+
+@app.post("/v1/projects/{project_id}/sheet-metal", status_code=202)
+def create_sheet_metal_job(project_id: str, body: KindJobIn, p: Principal = Depends(principal),
+                           idempotency_key: str | None = Header(default=None)):
+    """Build a SheetMetalSpec: folded STEP, flat-pattern DXF, bend table and DFM checks."""
+    require_write(p)
+    _spec_error("sheet_metal", body.spec)
+    summary = f"Started from the {body.starter.replace('_', ' ')} sheet-metal example" if body.starter else "Sheet-metal part from a spec"
+    return _kind_job(p, project_id, "sheet_metal", body.spec, idempotency_key or body.idempotency_key or uuid.uuid4().hex,
+                     name=body.name or body.spec.get("name"), summary=summary)
+
+
+@app.post("/v1/projects/{project_id}/products", status_code=202)
+def create_product_job(project_id: str, body: ProductJobIn, p: Principal = Depends(principal),
+                       idempotency_key: str | None = Header(default=None)):
+    """Run a product template (``shilpa.product.run_product``). 501 until the product templates are installed."""
+    require_write(p)
+    if (body.request is None) == (body.spec is None):
+        raise _err(400, "bad_request", "give exactly one of request or spec")
+    _spec_error("product", body.spec or {})
+    payload = {"spec": body.spec} if body.spec is not None else {"request": body.request}
+    return _kind_job(p, project_id, "product", payload, idempotency_key or body.idempotency_key or uuid.uuid4().hex,
+                     name=body.name, summary=f"Started from the {body.starter.replace('_', ' ')} reference product"
+                     if body.starter else f"Product from the request: {body.request}" if body.request else "Product from a spec")
 
 
 @app.get("/v1/jobs/{job_id}")
@@ -472,7 +601,7 @@ async def job_events(job_id: str, request: Request, p: Principal = Depends(princ
 
 def _model_out(s, m: Model) -> dict:
     head = s.get(ModelVersion, m.head_version_id) if m.head_version_id else None
-    return {"id": m.id, "project_id": m.project_id, "name": m.name, "head_version_id": m.head_version_id,
+    return {"id": m.id, "project_id": m.project_id, "name": m.name, "kind": m.kind or "part", "head_version_id": m.head_version_id,
             "head_number": head.number if head else None, "created_at": m.created_at.isoformat()}
 
 
@@ -484,12 +613,19 @@ def _version_out(s, v: ModelVersion, full: bool = False) -> dict:
            "created_at": v.created_at.isoformat(),
            "artifacts": [{"id": a.id, "format": a.format, "bytes": a.bytes, "sha256": a.sha256} for a in arts],
            "parameters": v.recipe.get("parameters")}
+    m = s.get(Model, v.model_id)
+    out["kind"] = (m.kind if m else None) or "part"
+    if out["kind"] != "part":
+        out["parameters"] = {}
     if full:
         out["recipe"] = v.recipe
         out["validation"] = v.validation
         feats = next((a for a in arts if a.format == "FEATURES"), None)
         if feats:
             out["features"] = json.loads(blobs.path(feats.blob_key).read_text(encoding="utf-8"))
+        viewer = next((a for a in arts if a.format == "VIEWER"), None)
+        if viewer and blobs.exists(viewer.blob_key):
+            out["viewer"] = json.loads(blobs.path(viewer.blob_key).read_text(encoding="utf-8"))
     return out
 
 
@@ -542,11 +678,25 @@ def create_edit(model_id: str, body: EditIn, p: Principal = Depends(principal), 
                 raise _err(409, "stale_revision", "base_version_id is not the current head", head_version_id=m.head_version_id)
             base = _owned(s, p, ModelVersion, body.base_version_id, "version")
             inp: dict = {}
+            kind = m.kind or "part"
+            if kind != "part":
+                # Assemblies, sheet metal and products are edited through their spec; versions can be restored.
+                if not body.restore_version_id:
+                    raise _err(422, "unsupported_operation",
+                               f"parameter and conversational edits apply to single parts; this {KIND_LABEL.get(kind, kind)} "
+                               "is changed through its spec (restoring a version works)")
+                src = _owned(s, p, ModelVersion, body.restore_version_id, "version")
+                if src.model_id != m.id:
+                    raise _err(404, "not_found", "version not found")
+                inp = {"exec": kind, "spec": src.recipe, "restore_of": src.number}
+                job, _ = _create_job(s, p, project_id=m.project_id, kind="edit", key=key, input=inp, model_id=m.id, base_version_id=base.id)
+                return _job_out(job)
             if body.parameters:
                 recipe = planner.apply_parameter_edit(base.recipe, body.parameters)
                 planner.check_recipe(dict(recipe))  # reject invalid values before queueing
                 inp["parameters"] = body.parameters
             elif body.instruction:
+                ensure_enabled()  # 503 planner_disabled while SHILPA_LLM=off
                 if not settings.llm_configured:
                     raise _err(503, "llm_unavailable", "conversational edits need Azure OpenAI configured")
                 inp["instruction"] = body.instruction
@@ -581,9 +731,24 @@ def create_export(version_id: str, body: ExportIn, p: Principal = Depends(princi
         existing = s.scalars(select(Artifact).where(Artifact.version_id == v.id, Artifact.format == body.format)).first()
         if existing:
             return {"artifact_id": existing.id, "job": None}
+        m = s.get(Model, v.model_id)
+        kind = m.kind or "part"
+        if kind == "sheet_metal":
+            raise _err(422, "unsupported_operation", "native FreeCAD export is not available for sheet-metal parts yet; use STEP and DXF")
         if not freecad_adapter.available():
             raise _err(503, "export_unavailable", "FreeCAD is not installed on this server")
-        m = s.get(Model, v.model_id)
+        if kind in ("assembly", "product"):
+            # Rebuild the same spec with the FreeCAD Assembly export; the artifact attaches to this version.
+            spec = v.recipe
+            if kind == "product":  # the derived AssemblySpec the product template placed
+                art = s.scalars(select(Artifact).where(Artifact.version_id == v.id, Artifact.format == "ASSEMBLY_SPEC")).first()
+                if art is None:
+                    raise _err(422, "unsupported_operation", "this product version has no assembly spec to export")
+                spec = json.loads(blobs.path(art.blob_key).read_text(encoding="utf-8"))
+            job, _ = _create_job(s, p, project_id=m.project_id, kind="export", key=f"export:{v.id}:{body.format}",
+                                 input={"exec": "assembly", "spec": spec, "freecad": True, "export_of": v.id, "format": body.format},
+                                 model_id=m.id, base_version_id=v.id)
+            return {"artifact_id": None, "job": _job_out(job)}
         recipe = dict(v.recipe)
         recipe["exports"] = sorted(set(recipe.get("exports", [])) | {body.format})
         job, _ = _create_job(s, p, project_id=m.project_id, kind="export", key=f"export:{v.id}:{body.format}",
@@ -595,7 +760,13 @@ def create_export(version_id: str, body: ExportIn, p: Principal = Depends(princi
 
 MEDIA = {"FCSTD": ("application/octet-stream", "FCStd"), "STEP": ("model/step", "step"), "STL": ("model/stl", "stl"), "GLB": ("model/gltf-binary", "glb"),
          "RECIPE": ("application/json", "json"), "VALIDATION": ("application/json", "json"),
-         "STL_UNITS": ("application/json", "json"), "FEATURES": ("application/json", "json")}
+         "STL_UNITS": ("application/json", "json"), "FEATURES": ("application/json", "json"),
+         "DXF": ("image/vnd.dxf", "dxf"), "BOM_CSV": ("text/csv", "csv"), "BOM_JSON": ("application/json", "json"),
+         "PLACEMENTS": ("application/json", "json"), "MESHES": ("application/json", "json"),
+         "VIEWER": ("application/json", "json"), "PRODUCT": ("application/json", "json"),
+         "PRODUCT_BOM_CSV": ("text/csv", "csv"), "PRODUCT_BOM_JSON": ("application/json", "json"),
+         "ASSEMBLY_SPEC": ("application/json", "json"), "RENDER_SIDE": ("image/png", "png"), "RENDER_ISO": ("image/png", "png")}
+NAMED_FORMATS = ("STEP", "STL", "GLB", "FCSTD")
 
 
 @app.get("/v1/artifacts/{artifact_id}/download")
@@ -607,7 +778,9 @@ def download(artifact_id: str, p: Principal = Depends(principal)):
         path = blobs.path(a.blob_key)
         media, ext = MEDIA.get(a.format, ("application/octet-stream", "bin"))
         safe_name = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in (m.name or "model"))[:60]
-        fname = f"{safe_name}_v{v.number}.{ext}" if a.format in ("STEP", "STL", "GLB", "FCSTD") else f"{safe_name}_v{v.number}_{a.format.lower()}.{ext}"
+        suffix = {"BOM_CSV": "bom", "BOM_JSON": "bom", "DXF": "flat", "PRODUCT_BOM_CSV": "product_bom", "PRODUCT_BOM_JSON": "product_bom",
+                  "RENDER_SIDE": "side", "RENDER_ISO": "iso"}.get(a.format, a.format.lower())
+        fname = f"{safe_name}_v{v.number}.{ext}" if a.format in NAMED_FORMATS else f"{safe_name}_v{v.number}_{suffix}.{ext}"
     if not path.exists():
         raise _err(404, "not_found", "artifact bytes missing")
     return FileResponse(path, media_type=media, filename=fname)

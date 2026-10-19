@@ -20,11 +20,16 @@ def main() -> int:
     cancel_flag = Path(sys.argv[3]) if len(sys.argv) > 3 else None
     out_dir.mkdir(parents=True, exist_ok=True)
     try:
-        from shilpa.pipeline import execute
+        from shilpa.pipeline import execute, execute_kind
 
         recipe = json.loads(recipe_path.read_text(encoding="utf-8"))
-        res = execute(recipe, out_dir, cancel_check=(lambda: cancel_flag.exists()) if cancel_flag else None)
-        payload = res.to_dict()
+        cancel = (lambda: cancel_flag.exists()) if cancel_flag else None
+        if isinstance(recipe, dict) and "__exec__" in recipe:
+            # Assembly, sheet-metal and product kinds: {"__exec__": kind, "spec": ..., "options": ...}
+            payload = execute_kind(recipe["__exec__"], recipe.get("spec") or {}, out_dir, recipe.get("options"), cancel)
+            payload = json.loads(json.dumps(payload, default=str))
+        else:
+            payload = execute(recipe, out_dir, cancel_check=cancel).to_dict()
     except Exception as exc:  # last resort: report instead of dying silently
         from shilpa.contracts.errors import ErrorCode, ShilpaError
 

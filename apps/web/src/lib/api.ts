@@ -12,12 +12,19 @@ export type ErrorInfo = {
 };
 
 export type Me = { user_id: string; email: string; name: string; tenant_id: string; tenant_name: string; role: string; can_write: boolean };
-export type Health = { ok: boolean; llm_configured: boolean; auth_mode: string; llm_deployment: string | null; freecad_available: boolean; adapters: Record<string, string[]> };
+export type PlannerStatus = "online" | "disabled" | "not_configured";
+export type Health = {
+  ok: boolean; llm_configured: boolean; auth_mode: string; llm_deployment: string | null; freecad_available: boolean;
+  adapters: Record<string, string[]>; planner?: PlannerStatus; llm_enabled?: boolean; products_available?: boolean; job_kinds?: string[];
+};
 export type Usage = {
   by_kind: Record<string, { events: number; input_tokens: number; output_tokens: number; cpu_seconds: number }>;
   jobs: Record<string, number>;
 };
-export type ModelSummary = { id: string; project_id: string; name: string; head_version_id: string | null; head_number: number | null; created_at: string };
+export type ModelKind = "part" | "assembly" | "sheet_metal" | "product";
+export type ModelSummary = {
+  id: string; project_id: string; name: string; kind?: ModelKind; head_version_id: string | null; head_number: number | null; created_at: string;
+};
 export type Project = { id: string; name: string; created_at: string; model_count: number };
 export type Attempt = { number: number; status: string; error: ErrorInfo | null; worker: string | null };
 export type Job = {
@@ -44,7 +51,65 @@ export type Version = {
   id: string; model_id: string; number: number; parent_version_id: string | null; job_id: string; recipe_hash: string;
   engine: Record<string, string>; validation_state: string; validation_passed: boolean; change_summary: string | null;
   created_at: string; artifacts: ArtifactRef[]; parameters: Record<string, number | Param>;
-  recipe?: Recipe; validation?: Validation; features?: FeatureResult[];
+  recipe?: Recipe; validation?: Validation; features?: FeatureResult[]; kind?: ModelKind; viewer?: Viewer;
+};
+
+// --- assemblies, sheet metal, products ----------------------------------------------
+
+export type Matrix4 = number[][];
+export type ViewerInstance = {
+  id: string; part_number: string; name: string | null; source: string; color: string | null; mesh: string | null;
+  matrix: Matrix4 | null; placed: boolean; grounded: boolean; quantity: number; copy_of: string | null; error: string | null;
+};
+export type ViewerJoint = {
+  name: string; type: string; a: string; b: string; param: "angle" | "offset"; unit: "deg" | "mm"; value: number;
+  limits: [number, number]; has_limits: boolean; pitch: number | null; sign: number; frame: Matrix4; moving: string[];
+};
+export type ViewerCheck = {
+  name: string; group: string; passed: boolean; requested: unknown; actual: unknown; tolerance: unknown; note: string | null; instances: string[];
+  severity?: "error" | "warning"; unit?: string | null; level?: string | null; responsible?: string[];
+};
+export type BomLine = {
+  part_number: string; quantity: number; source: string; instances: string[]; name?: string | null; volume_mm3: number | null; generator: string | null;
+  procurement?: string | null; description?: string | null; standard?: string | null; designation?: string | null; mass_g?: number | null;
+};
+export type SkeletonParam = { value: unknown; unit: string | null; source: string; note: string | null };
+export type RouterChange = { iteration: number; param: string; old: unknown; new: unknown; level: string; check: string; reason: string; responsible?: string | null };
+export type RouterIteration = {
+  iteration: number; passed: boolean; failed: string[]; warnings: string[]; seconds: number;
+  actions: { param: string; new: unknown; level: string; check: string; reason: string }[];
+  unresolved: { check: string; level: string | null; reason: string }[];
+};
+export type ProductInfo = {
+  status: "passed" | "repaired" | "unresolved" | string; message: string | null; request: string | null; template: string | null;
+  router: { status: string; iterations: RouterIteration[]; history: RouterChange[]; unresolved: { check: string; level: string | null; reason: string }[];
+    suggestions: { check: string; actual: unknown; suggestion: string }[]; seconds: number } | null;
+  timings_s: Record<string, number> | null; skeleton: Record<string, SkeletonParam> | null; derived: Record<string, unknown> | null;
+  summary: Record<string, string> | null; warnings: string[] | null; failed: string[] | null;
+};
+export type BendRow = { id: string; parent: string; angle: number; direction: string; radius: number; k: number; allowance: number; width: number; setback: number };
+export type FlatPattern = {
+  loops: { outer: boolean; points: [number, number][] }[];
+  bends: { id: string; a: [number, number]; b: [number, number] }[];
+  extents: { id: string; lines: [[number, number], [number, number]][] }[];
+  bbox: [[number, number], [number, number]]; size: [number, number]; area: number;
+};
+export type Viewer = {
+  kind: "assembly" | "sheet_metal" | "product"; name: string | null; passed: boolean; instances: ViewerInstance[]; joints: ViewerJoint[];
+  mates: { name: string; type: string; a: string; b: string; intent: string | null; in_tree: boolean }[];
+  checks: ViewerCheck[]; bom: BomLine[]; dof: { computed?: number; intended?: number | null; by_mate?: Record<string, number> };
+  issues: { code: string; message: string; where: string[]; severity: string }[];
+  bbox: [number[], number[]] | null; size: number[] | null;
+  flat?: FlatPattern; bend_table?: BendRow[]; product?: ProductInfo;
+  meta?: { material: string; thickness: number; flat_size: [number, number]; outer_size: number[]; mass_kg: number | null; volume: number; flat_area: number };
+};
+export type MeshSet = { units: string; parts: Record<string, { positions: string; indices: string; vertices: number; triangles: number }> };
+export type Starter = { id: string; kind: "assembly" | "sheet_metal"; title: string; description: string; expected: Record<string, unknown>; spec: Record<string, unknown> };
+export type ProductStarter = { id: string; kind: "product"; title: string; description: string; request?: string; spec?: Record<string, unknown>; expected: Record<string, unknown> };
+export type Starters = { assemblies: Starter[]; sheet_metal: Starter[]; products?: ProductStarter[]; products_available: boolean };
+export type Route = {
+  kind: "part" | "sheet_metal" | "assembly" | "product" | "unsupported"; confidence: number; supported: boolean; method: string;
+  reason: string; note: string | null; planner: PlannerStatus;
 };
 
 export type Dimension = { name: string; value: number | null; unit: string | null; kind: string; critical: boolean; source: string; evidence: string | null };
@@ -127,6 +192,14 @@ export const api = {
     req<Job>("POST", `/v1/models/${modelId}/edits`, { base_version_id, instruction }, { "Idempotency-Key": key() }),
   restore: (modelId: string, base_version_id: string, restore_version_id: string) =>
     req<Job>("POST", `/v1/models/${modelId}/edits`, { base_version_id, restore_version_id }, { "Idempotency-Key": key() }),
+  starters: () => req<Starters>("GET", "/v1/starters"),
+  route: (prompt: string) => req<Route>("POST", "/v1/route", { prompt }),
+  runAssembly: (projectId: string, spec: Record<string, unknown>, starter?: string) =>
+    req<Job>("POST", `/v1/projects/${projectId}/assemblies`, { spec, starter: starter ?? null }, { "Idempotency-Key": key() }),
+  runSheetMetal: (projectId: string, spec: Record<string, unknown>, starter?: string) =>
+    req<Job>("POST", `/v1/projects/${projectId}/sheet-metal`, { spec, starter: starter ?? null }, { "Idempotency-Key": key() }),
+  runProduct: (projectId: string, input: { request?: string; spec?: Record<string, unknown>; starter?: string }) =>
+    req<Job>("POST", `/v1/projects/${projectId}/products`, input, { "Idempotency-Key": key() }),
   exportVersion: (versionId: string, format: "FCSTD") =>
     req<{ artifact_id: string | null; job: Job | null }>("POST", `/v1/versions/${versionId}/exports`, { format }),
 };

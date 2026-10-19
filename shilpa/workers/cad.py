@@ -28,18 +28,32 @@ from sqlalchemy import select, update
 from .. import queue
 from ..contracts.errors import ErrorCode, ShilpaError
 from ..contracts.hashing import recipe_hash
-from ..db import Artifact, Job, JobAttempt, Model, ModelVersion, UsageEvent, init_db, now, tx
+from ..db import (
+    Artifact,
+    Job,
+    JobAttempt,
+    Model,
+    ModelVersion,
+    UsageEvent,
+    init_db,
+    now,
+    tx,
+)
 from ..jobs import TERMINAL, StaleRevision, load, transition
 from ..settings import ROOT, settings
 from ..storage import blobs
+from . import kinds
 
 log = logging.getLogger("shilpa.worker")
 WORKER_ID = f"{socket.gethostname()}-{os.getpid()}-{uuid.uuid4().hex[:6]}"
 SAFE_ENV_KEYS = ("SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "PATH", "TEMP", "TMP", "PATHEXT", "COMSPEC", "NUMBER_OF_PROCESSORS",
-                 "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "LOCALAPPDATA", "APPDATA", "LANG")
+                 "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "LOCALAPPDATA", "APPDATA", "LANG",
+                 "SHILPA_FREECAD_CMD")  # a path to the FreeCAD binary, not a credential
 
 PUBLISHED_FILES = {"FCSTD": "model.FCStd", "STEP": "model.step", "STL": "model.stl", "STL_UNITS": "model.stl.units.json", "GLB": "preview.glb",
                    "RECIPE": "recipe.json", "VALIDATION": "validation.json", "FEATURES": "features.json"}
+# Assembly, sheet-metal and product jobs publish their own file sets.
+KIND_FILES = kinds.FILES
 
 
 def _scrubbed_env() -> dict:
@@ -71,10 +85,31 @@ def _renew_loop(r: queue.Received, job_id: str, stop: threading.Event, cancel_fl
                 cancel_flag.touch()
 
 
-def run_geometry(recipe: dict, out_dir: Path, cancel_flag: Path) -> tuple[dict, float]:
+def _progress_loop(job_id: str, attempt_no: int, log: Path, stop: threading.Event) -> None:
+    """Relay the geometry process's progress lines (product jobs) as ``progress`` job events."""
+    seen = 0
+    while True:
+        done = stop.wait(1.0)
+        try:
+            lines = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+        except OSError:
+            lines = []
+        if len(lines) > seen:
+            with tx() as s:
+                for line in lines[seen:]:
+                    transition_event(s, job_id, "progress", {"attempt": attempt_no, "message": line[:500]})
+            seen = len(lines)
+        if done:
+            return
+
+
+def run_geometry(recipe: dict, out_dir: Path, cancel_flag: Path, kind: str | None = None,
+                 options: dict | None = None) -> tuple[dict, float]:
+    """Run one attempt in the restricted subprocess. ``kind`` selects a non-part executor (assembly, ...)."""
     out_dir.mkdir(parents=True, exist_ok=True)
     rpath = out_dir / "input_recipe.json"
-    rpath.write_text(json.dumps(recipe), encoding="utf-8")
+    payload = {"__exec__": kind, "spec": recipe, "options": options or {}} if kind else recipe
+    rpath.write_text(json.dumps(payload), encoding="utf-8")
     t0 = time.perf_counter()
     try:
         subprocess.run([sys.executable, "-E", "-s", "-m", "shilpa.workers.geometry_exec", str(rpath), str(out_dir), str(cancel_flag)],
@@ -102,6 +137,8 @@ def handle_cad(r: queue.Received) -> None:
         if attempt is None or attempt.status in ("ok", "failed"):
             return  # duplicate delivery of finished work
         recipe, tenant, project = dict(job.recipe), job.tenant_id, job.project_id
+        kind = (job.input or {}).get("exec") if (job.input or {}).get("exec") in KIND_FILES else None
+        options = {"freecad": bool((job.input or {}).get("freecad"))}
     if not _claim_lease(job_id):
         raise RuntimeError("job lease held by another worker")
     with tx() as s:
@@ -115,11 +152,14 @@ def handle_cad(r: queue.Received) -> None:
     stop = threading.Event()
     renewer = threading.Thread(target=_renew_loop, args=(r, job_id, stop, cancel_flag), daemon=True)
     renewer.start()
+    reporter = threading.Thread(target=_progress_loop, args=(job_id, attempt_no, out_dir / kinds.PROGRESS_FILE, stop), daemon=True)
+    reporter.start()
     try:
-        result, cpu_s = run_geometry(recipe, out_dir, cancel_flag)
+        result, cpu_s = run_geometry(recipe, out_dir, cancel_flag, kind, options)
     finally:
         stop.set()
         renewer.join(timeout=5)
+        reporter.join(timeout=5)
     finish(job_id, attempt_no, recipe, result, cpu_s, staging_key)
 
 
@@ -149,7 +189,8 @@ def finish(job_id: str, attempt_no: int, recipe: dict, result: dict, cpu_s: floa
 
         if not ok:
             used = dict(job.budget_used or {})
-            can_repair = (error or {}).get("retryable") and used.get("repair_calls", 0) < settings.budgets.repair_calls \
+            direct = (job.input or {}).get("exec") in KIND_FILES  # a typed spec, no planner to repair it
+            can_repair = not direct and (error or {}).get("retryable") and used.get("repair_calls", 0) < settings.budgets.repair_calls \
                 and used.get("cad_executions", 0) < settings.budgets.cad_executions
             if can_repair:
                 transition(s, job, "planning", **common, event="attempt.failed",
@@ -166,7 +207,15 @@ def publish_export(s, job: Job, attempt_no: int, result: dict, staging_key: str,
     """Attach a verified export derivative to an existing immutable version."""
     v = s.get(ModelVersion, job.input["export_of"])
     fmt = job.input["format"]
-    name = {"FCSTD": "model.FCStd"}[fmt]
+    kind = job.input.get("exec")
+    name = KIND_FILES[kind][fmt] if kind in KIND_FILES else {"FCSTD": "model.FCStd"}[fmt]
+    if not blobs.exists(f"{staging_key}/{name}"):
+        checks = [c for c in (result.get("validation") or {}).get("checks", []) if c["name"].startswith("freecad")]
+        notes = "; ".join(c.get("note") or c["name"] for c in checks if not c["passed"]) \
+            or "; ".join((result.get("validation") or {}).get("notes", [])) or "the export produced no file"
+        err = ShilpaError(ErrorCode.EXPORT_FAILED, f"{fmt} export failed: {notes}").info.model_dump(mode="json")
+        transition(s, job, "failed", error=err, **common, event_data={"attempt": attempt_no, "error": err})
+        return
     if s.scalars(select(Artifact).where(Artifact.version_id == v.id, Artifact.format == fmt)).first() is None:
         key = f"{blobs.version_prefix(job.tenant_id, job.project_id, v.id)}/{name}"
         blobs.copy(f"{staging_key}/{name}", key)
@@ -183,9 +232,12 @@ def publish(s, job: Job, attempt_no: int, recipe: dict, result: dict, staging_ke
     if job.kind == "export":
         publish_export(s, job, attempt_no, result, staging_key, common)
         return
+    kind = (job.input or {}).get("exec") if (job.input or {}).get("exec") in KIND_FILES else None
     model = s.get(Model, job.model_id) if job.model_id else None
     if model is None:
-        model = Model(tenant_id=job.tenant_id, project_id=job.project_id, name=recipe.get("name") or "Untitled part")
+        default = {"assembly": "Untitled assembly", "sheet_metal": "Untitled sheet-metal part", "product": "Untitled product"}
+        model = Model(tenant_id=job.tenant_id, project_id=job.project_id, kind=kind or "part",
+                      name=(job.input or {}).get("name") or result.get("name") or recipe.get("name") or default.get(kind, "Untitled part"))
         s.add(model)
         s.flush()
     elif job.base_version_id and model.head_version_id != job.base_version_id:
@@ -198,7 +250,7 @@ def publish(s, job: Job, attempt_no: int, recipe: dict, result: dict, staging_ke
     number = (s.scalar(select(ModelVersion.number).where(ModelVersion.model_id == model.id).order_by(ModelVersion.number.desc()).limit(1)) or 0) + 1
     vprefix = blobs.version_prefix(job.tenant_id, job.project_id, version_id)
     copied = []
-    for fmt, name in PUBLISHED_FILES.items():
+    for fmt, name in (KIND_FILES[kind] if kind else PUBLISHED_FILES).items():
         src = f"{staging_key}/{name}"
         if blobs.exists(src):
             blobs.copy(src, f"{vprefix}/{name}")
@@ -207,7 +259,8 @@ def publish(s, job: Job, attempt_no: int, recipe: dict, result: dict, staging_ke
     validation = result.get("validation") or {}
     s.add(ModelVersion(id=version_id, tenant_id=job.tenant_id, model_id=model.id, number=number,
                        parent_version_id=job.base_version_id, job_id=job.id, recipe=recipe, recipe_hash=recipe_hash(recipe),
-                       engine=result.get("engine") or {}, validation=validation, validation_state="geometry_validated",
+                       engine=result.get("engine") or {}, validation=validation,
+                       validation_state="geometry_validated" if validation.get("passed", True) else "checks_failed",
                        change_summary=(job.input or {}).get("change_summary") or _auto_summary(job)))
     s.flush()  # version row before its artifact rows (same transaction)
     for fmt, name in copied:

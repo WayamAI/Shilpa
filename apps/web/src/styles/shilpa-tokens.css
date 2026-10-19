@@ -14,6 +14,13 @@
   --viewer-axis-x: var(--ref-red-500);
   --viewer-axis-y: var(--ref-green-500);
   --viewer-axis-z: var(--ref-blue-500);
+  /* Assembly and sheet-metal views: selection, hover, failed-check highlight, bend lines. */
+  --viewer-select: var(--ref-blue-500);
+  --viewer-hover: var(--ref-blue-300);
+  --viewer-clash: var(--ref-red-500);
+  --viewer-pass: var(--ref-green-500);
+  --viewer-bend: var(--ref-blue-600);
+  --viewer-flat-fill: var(--ref-gray-200);
   /* Brand accent: the Wayam orange from the Chronos color lock, for marks only. */
   --brand-accent: var(--ref-orange-500);
 }
@@ -27,4 +34,10 @@
   --viewer-axis-x: var(--ref-red-400);
   --viewer-axis-y: var(--ref-green-400);
   --viewer-axis-z: var(--ref-blue-400);
+  --viewer-select: var(--ref-blue-400);
+  --viewer-hover: var(--ref-blue-200);
+  --viewer-clash: var(--ref-red-400);
+  --viewer-pass: var(--ref-green-400);
+  --viewer-bend: var(--ref-blue-300);
+  --viewer-flat-fill: var(--ref-gray-800);
 }
