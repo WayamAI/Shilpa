@@ -21,8 +21,10 @@ def overlap(a, b) -> float:
 
 
 def test_families_and_counts():
-    names = [g["name"] for g in list_generators()]
-    assert sum(n.startswith(NEW) for n in names) == 33
+    from shilpa.catalog import _REGISTRY
+
+    mine = [n for n, g in _REGISTRY.items() if g.build.__module__ == "shilpa.catalog.warehouse"]
+    assert len(mine) == 33 and all(n.startswith(NEW) for n in mine)
     fams = {g["family"] for g in browse()["generators"]}
     assert {"Screws", "Nuts", "Washers", "Bearings", "Seals, circlips and keys"} <= fams and "Other" not in fams
 

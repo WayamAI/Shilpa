@@ -22,6 +22,10 @@ part-type words):
   flange``, ``1/2" type K copper tube``), sprockets (``#40 sprocket 20T``),
   worm drives (``worm wheel m2 z30``), OpenBuilds parts (``NEMA 17``, ``Tr8
   lead screw 400 mm``, ``gantry plate``, ``8 mm lock collar``).
+* Motion parts (``GT2 20T pulley 5mm bore``, ``GT2 belt 6mm x 400``, ``MGN12H
+  block``, ``HGR20 rail 1000``, ``SFU1605 x 500``, ``SFU1605 nut``, ``LM8UU``,
+  ``8 mm linear shaft 300``, ``UCP204``, ``DIN 705 20``, ``dowel 6 x 20``,
+  ``compression spring 1 x 10 x 30``).
 
 Each match is validated against the generator's parameter model (nothing is
 built) and comes back as ``{generator, params, label, matched, score}``, best
@@ -476,7 +480,7 @@ OPENBUILDS_WORDS = [
     (r"eccentric\s*spacer", "openbuilds.eccentric_spacer", {}, "eccentric spacer"),
     (r"(?:anti[-\s]?backlash|lead\s*screw)\s*nut", "openbuilds.anti_backlash_nut_block", {}, "anti-backlash nut block"),
     (r"flex(?:ible)?\s*coupl", "openbuilds.flexible_coupler", {}, "flexible coupler"),
-    (r"lock\s*collar|shaft\s*collar", "openbuilds.lock_collar", {}, "lock collar"),
+    (r"lock\s*collar", "openbuilds.lock_collar", {}, "lock collar"),
     (r"xtreme", "openbuilds.xtreme_v_wheel", {}, "Xtreme solid V-wheel"),
     (r"shim", "openbuilds.shim_washer", {}, "shim washer"),
 ]
@@ -511,8 +515,129 @@ def _openbuilds(text: str) -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- belts, linear motion, collars, pins, springs
+
+def _length_in(text: str, after: str | None = None) -> float | None:
+    """A length: "x 400", "400 mm", "400mm long" (not a diameter like "8mm shaft" when ``after`` matches)."""
+    if m := re.search(r"[x×*]\s*" + NUM + r"\s*(mm)?\b(?!\s*(?:bore|teeth|t\b))", text):
+        return _f(m.group(1))
+    for m in re.finditer(NUM + r"\s*mm\b", text):
+        if after and re.match(r"\s*(" + after + r")", text[m.end():]):
+            continue
+        return _f(m.group(1))
+    return None
+
+
+def _belts(text: str) -> list[dict]:
+    prof = re.search(r"\b(gt2|htd\s*3m|htd\s*5m|3m|5m)\b", text)
+    if not prof:
+        return []
+    profile = {"gt2": "GT2", "3m": "HTD3M", "5m": "HTD5M"}[re.sub(r"htd|\s", "", prof.group(1))]
+    teeth = re.search(r"\b(\d+)\s*(?:t\b|teeth|tooth)", text)
+    bore = re.search(NUM + r"\s*mm\s*bore|bore\s*" + NUM, text)
+    out = []
+    if re.search(r"pulley|idler|sprocket", text):
+        gen = "pulley.idler" if "idler" in text else "pulley.timing"
+        params: dict[str, Any] = {"profile": profile}
+        if teeth:
+            params["teeth"] = int(teeth.group(1))
+        if bore:
+            params["bore_d"] = _f(bore.group(1) or bore.group(2))
+        if gen == "pulley.idler" and re.search(r"smooth|toothless|plain", text):
+            params["toothed"] = False
+        hit = _match(gen, params, f"{profile} {params.get('teeth', 20)}T {gen.split('.')[1]}", prof.group(0), 0.9)
+        if hit:
+            out.append(hit)
+    elif "belt" in text:
+        params = {"profile": profile}
+        if w := re.search(NUM + r"\s*mm\s*(?:wide|width)|(\d+)\s*mm\s*[x×*]", text):
+            params["width"] = _f(w.group(1) or w.group(2))
+        if (length := _length_in(text, after=r"wide|width")) and length != params.get("width"):
+            params["length"] = length
+        hit = _match("belt.timing", params, f"{profile} belt", prof.group(0), 0.9)
+        if hit:
+            out.append(hit)
+    return out
+
+
+def _linear(text: str) -> list[dict]:
+    out = []
+    if m := re.search(r"\b(mgn\s*(?:7|9|12|15)|hgr?\s*(?:15|20|25)|hg[hw]?\s*(?:15|20|25))\s*([ch])?\b", text):
+        size = re.sub(r"\s", "", m.group(1)).upper().replace("HGH", "HGR").replace("HGW", "HGR")
+        size = size if size.startswith(("MGN", "HGR")) else size.replace("HG", "HGR")
+        if re.search(r"carriage|block|slider", text) or m.group(2):
+            params: dict[str, Any] = {"size": size, "block": (m.group(2) or "c").upper()}
+            hit = _match("linear.guide_carriage", params, f"{size}{params['block']} block", m.group(0), 0.9)
+        else:
+            params = {"size": size}
+            bare = re.search(r"\brail\s*" + NUM + r"\b", text)
+            if length := _length_in(text) or (_f(bare.group(1)) if bare else None):
+                params["length"] = length
+            hit = _match("linear.guide_rail", params, f"{size} rail" + (f" x {params['length']:g}" if "length" in params
+                                                                        else ""), m.group(0), 0.9)
+        if hit:
+            out.append(hit)
+    if m := re.search(r"\bsfu\s*(\d{4})\b", text):
+        des = f"SFU{m.group(1)}"
+        if re.search(r"\bnut\b", text):
+            hit = _match("linear.ball_nut", {"designation": des}, f"{des} ball nut", m.group(0), 0.9)
+        else:
+            params = {"designation": des}
+            if (length := _length_in(text)) and length >= 50:
+                params["length"] = length
+            hit = _match("linear.ball_screw", params, f"{des} ball screw", m.group(0), 0.9)
+        if hit:
+            out.append(hit)
+    if m := re.search(r"\b(lmf?\d{1,2}l?uu)\b", text):
+        des = m.group(1).upper()
+        hit = _match("linear.bushing", {"designation": des}, des, m.group(0), 0.95)
+        if hit:
+            out.append(hit)
+    if re.search(r"linear\s*(shaft|rod)|chrome\s*(rod|shaft)|smooth\s*rod|\bh6\b", text):
+        if d := re.search(NUM + r"\s*mm\s*(?:linear|chrome|smooth|shaft|rod)|(?:shaft|rod)\s*(?:d\s*)?" + NUM, text):
+            params = {"diameter": int(_f(d.group(1) or d.group(2)))}
+            bare = re.search(r"\b(?:shaft|rod)\s+" + NUM + r"\b", text)
+            length = _length_in(text, after=r"linear|chrome|smooth|shaft|rod") or (_f(bare.group(1)) if bare else None)
+            if length:
+                params["length"] = length
+            hit = _match("linear.shaft", params, f"linear shaft {params['diameter']} h6", d.group(0), 0.85)
+            if hit:
+                out.append(hit)
+    if m := re.search(r"\bucp\s*(\d{3})\b", text):
+        hit = _match("bearing.pillow_block", {"designation": f"UCP{m.group(1)}"}, f"UCP{m.group(1)}", m.group(0), 0.95)
+        if hit:
+            out.append(hit)
+    return out
+
+
+def _small_parts(text: str) -> list[dict]:
+    out = []
+    if re.search(r"din\s*705|set\s*collar|shaft\s*collar", text) and not re.search(r"lock\s*collar", text):
+        if d := re.search(r"din\s*705\s*(?:a\s*)?(\d+)|(\d+)\s*mm", text):
+            hit = _match("shaft.collar", {"d": int(d.group(1) or d.group(2))}, f"DIN 705 A {d.group(1) or d.group(2)}",
+                         d.group(0), 0.9)
+            if hit:
+                out.append(hit)
+    if re.search(r"dowel|iso\s*8734|iso\s*2338|parallel\s*pin", text):
+        if m := re.search(NUM + r"\s*(?:mm\s*)?[x×*]\s*" + NUM, text):
+            params: dict[str, Any] = {"d": _f(m.group(1)) if "." in m.group(1) else int(m.group(1)),
+                                      "length": _f(m.group(2))}
+            if "2338" in text or "unhardened" in text:
+                params["standard"] = "ISO 2338"
+            hit = _match("pin.dowel", params, f"dowel {m.group(1)} x {m.group(2)}", m.group(0), 0.9)
+            if hit:
+                out.append(hit)
+    if re.search(r"compression\s*spring|\bspring\b", text):
+        if m := re.search(NUM + r"\s*[x×*]\s*" + NUM + r"\s*[x×*]\s*" + NUM, text):
+            params = {"wire_d": _f(m.group(1)), "mean_d": _f(m.group(2)), "free_length": _f(m.group(3))}
+            hit = _match("spring.compression", params, f"compression spring {m.group(0)}", m.group(0), 0.85)
+            if hit:
+                out.append(hit)
+    return out
+
+
 RULES = (_screws, _nuts_and_washers, _bearings, _o_rings, _circlips, _keys, _gears, _vslot, _pipes, _flanges,
-         _drives, _openbuilds)
+         _drives, _openbuilds, _belts, _linear, _small_parts)
 
 
 def lookup(text: str, limit: int = 5) -> list[dict]:

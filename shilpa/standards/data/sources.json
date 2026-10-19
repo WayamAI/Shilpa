@@ -22,5 +22,61 @@
     "source": "SKF general catalogue values (rounded); 608, 6000 and 6200 cross-checked against bd_warehouse's bearing table.",
     "licence": "Dimensions and ratings are published facts; no catalogue text or drawings reproduced.",
     "units": "mm, g, kN"
+  },
+  "belt_profiles.csv": {
+    "title": "Synchronous belt profiles GT2, HTD 3M and HTD 5M: pitch, pitch-line differential, groove and belt sizes",
+    "standards": ["ISO 13050 (HTD curvilinear profiles)", "Gates GT2 (proprietary profile)"],
+    "basis": "Pitch and pitch-line differential (pulley OD = teeth x pitch / pi - 2 x PLD) as published for each profile; the groove is simplified to a round groove of the published tooth height, which is enough for envelopes and clearances, not for tooth contact.",
+    "source": "Belt manufacturers' published profile data (Gates, Optibelt), rounded. Approximate: verify against the supplier's pulley drawing before machining a pulley.",
+    "licence": "Dimensions are facts; no catalogue drawings reproduced.",
+    "units": "mm"
+  },
+  "linear_guides.csv": {
+    "title": "Miniature (MGN) and standard (HGR) profile rail guides: rail, block and mounting dimensions",
+    "standards": [],
+    "basis": "Rail width and height, mounting-hole pitch, block width, assembly height, block length (C standard, H long) and block mounting pattern, as typical of HIWIN MGN / HG and compatible guides.",
+    "source": "Manufacturers' published catalogue dimensions, from memory of the common values. Approximate: guides are not dimensionally standardised across makers, so verify every value against the chosen supplier's catalogue before designing around it.",
+    "licence": "Dimensions are facts; no catalogue drawings reproduced.",
+    "units": "mm"
+  },
+  "sfu_ball_screws.csv": {
+    "title": "SFU rolled ball screws and flanged single nuts (12-25 mm)",
+    "standards": ["DIN 69051 (form similar)"],
+    "basis": "Screw diameter and lead, ball size, nut body diameter, round flange diameter and thickness, nut length and flange bolt circle, as typical of SFU-series nuts (flange flats not modelled).",
+    "source": "Typical supplier datasheet values for SFU nuts. Approximate: SFU nuts vary between makers; verify against the supplier's drawing.",
+    "licence": "Dimensions are facts; no catalogue drawings reproduced.",
+    "units": "mm"
+  },
+  "linear_bushings.csv": {
+    "title": "Linear ball bushings LMxxUU (standard and long) and LMFxxUU (round flange)",
+    "standards": ["JIS B 1564 (dimension series)"],
+    "basis": "Shaft diameter d, outside diameter D, length L; for flanged types the flange diameter, thickness, bolt circle and hole size. Retaining-ring grooves are not modelled.",
+    "source": "Common catalogue values for the LM series (Misumi, THK-compatible). The plain LM sizes are well established; flange dimensions are approximate, verify against the supplier.",
+    "licence": "Dimensions are facts; no catalogue drawings reproduced.",
+    "units": "mm"
+  },
+  "ucp_pillow_blocks.csv": {
+    "title": "UCP 201-208 pillow block units (cast housing with a set-screw insert bearing)",
+    "standards": ["ISO 3228"],
+    "basis": "Bore d, shaft centre height H, length L, bolt spacing J, base width A, bolt hole, base thickness, overall height and insert width per the ISO 3228 P2xx housing series.",
+    "source": "Common catalogue values for UCP2xx units (NSK, FYH, SKF SY-compatible), rounded. Approximate: verify against the supplier.",
+    "licence": "Dimensions are facts; no catalogue drawings reproduced.",
+    "units": "mm"
+  },
+  "din705_collars.csv": {
+    "title": "Set collars DIN 705 form A (with set screw)",
+    "standards": ["DIN 705"],
+    "basis": "Bore d, outside diameter D, width b and set screw size.",
+    "source": "DIN 705 form A dimension table as published by fastener suppliers, rounded. Approximate for the smallest sizes.",
+    "licence": "Dimensions are facts; the standard document is not reproduced.",
+    "units": "mm"
+  },
+  "iso8734_dowels.csv": {
+    "title": "Parallel dowel pins ISO 8734 (hardened) and ISO 2338 (unhardened): diameters and length ranges",
+    "standards": ["ISO 8734", "ISO 2338"],
+    "basis": "Nominal diameter (tolerance m6) and the commercial length range per diameter; lengths take the preferred series 3-100 mm within that range.",
+    "source": "Length ranges as listed by fastener suppliers for ISO 8734 / ISO 2338 pins (approximate at the range ends).",
+    "licence": "Dimensions are facts; the standard documents are not reproduced.",
+    "units": "mm"
   }
 }
