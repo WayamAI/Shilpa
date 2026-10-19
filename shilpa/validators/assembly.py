@@ -13,6 +13,7 @@ joint at its assembled value; coupled multi-joint sweeps are not sampled.
 from __future__ import annotations
 
 import json
+from collections.abc import Collection
 from dataclasses import asdict, dataclass, field
 from itertools import combinations
 
@@ -92,13 +93,22 @@ class _Interference:
     def __init__(self, build: AssemblyBuild):
         self.spec = build.spec
         self.threshold = build.spec.tolerances.interference_volume
+        # Optimal boxes cost milliseconds each and every solid meets many partners (all pairs, every swept
+        # pose), so each is computed once. Holding the shape keeps its id from being reused while cached.
+        self._boxes: dict[int, tuple] = {}
+
+    def box(self, s):
+        hit = self._boxes.get(id(s))
+        if hit is None:
+            hit = self._boxes[id(s)] = (s, s.bounding_box())
+        return hit[1]
 
     def allowed(self, a: str, b: str) -> float:
         w = self.spec.allowance(a, b)
         return max(w.max_volume, self.threshold) if w else self.threshold
 
     def volume(self, s1, s2) -> float:
-        if not _boxes_touch(s1.bounding_box(), s2.bounding_box()):
+        if not _boxes_touch(self.box(s1), self.box(s2)):
             return 0.0
         return common_volume(s1, s2)
 
@@ -119,7 +129,9 @@ def bill_of_materials(build: AssemblyBuild) -> list[dict]:
     return list(lines.values())
 
 
-def validate_assembly(build: AssemblyBuild) -> AssemblyReport:
+def validate_assembly(build: AssemblyBuild, skip_sweeps: Collection[str] = ()) -> AssemblyReport:
+    """Run every assembly check. ``skip_sweeps`` names joints whose swept motion the caller measures
+    itself (a product check with exact clearances); they are reported as skipped, not sampled here."""
     spec = build.spec
     tol = spec.tolerances
     checks: list[Check] = []
@@ -184,6 +196,9 @@ def validate_assembly(build: AssemblyBuild) -> AssemblyReport:
     # -- swept motion: one joint at a time across its limits
     for m, _ in build.order:
         if m.type not in SWEPT or m.limits is None:
+            continue
+        if m.name in skip_sweeps:
+            checks.append(Check(f"sweep[{m.name}]", True, list(m.limits), None, note="measured by the caller (skipped here)"))
             continue
         moving = build.moving_side(m)
         if not moving <= set(build.placed):
