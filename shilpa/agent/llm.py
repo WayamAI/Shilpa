@@ -4,6 +4,11 @@ Every call goes through ``call_structured``. It charges the job budget before an
 after the call, and turns refusals, truncation, timeouts and malformed JSON into
 typed ShilpaErrors so the workflow persists a clear result instead of an empty
 success. SDK retries are disabled so retries are not multiplied across layers.
+
+Kill switch: with ``SHILPA_LLM=off`` (the default when ``AZURE_OPENAI_ENDPOINT`` is
+empty) every call raises ``PlannerDisabled`` before any client is created, so no
+request can reach a paid API. Tests install a fake client with ``use_client``;
+a fake never leaves the process, so it is allowed while the switch is off.
 """
 
 from __future__ import annotations
@@ -11,8 +16,11 @@ from __future__ import annotations
 import copy
 import json
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import lru_cache
+from typing import Any
 
 from ..contracts.errors import ErrorCode, ShilpaError
 from ..settings import settings
@@ -21,6 +29,40 @@ _UNSUPPORTED_KEYWORDS = {
     "default", "title", "minLength", "maxLength", "minItems", "maxItems",
     "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "discriminator", "format",
 }
+
+
+PLANNER_DISABLED_MESSAGE = ("The AI planner is disabled on this server (SHILPA_LLM=off), so requests in plain language "
+                            "cannot be planned. Start from a reference part, assembly or sheet-metal example instead, "
+                            "or edit parameters directly.")
+
+
+class PlannerDisabled(ShilpaError):
+    """Raised for every model call while the kill switch is off. Never retryable."""
+
+    def __init__(self, message: str = PLANNER_DISABLED_MESSAGE):
+        super().__init__(ErrorCode.INTERNAL, message, details={"planner": "disabled"})
+        self.info.retryable = False
+
+
+# A fake client installed by tests (``use_client``). Real clients are only ever built by ``_client``.
+_client_override: Any = None
+
+
+@contextmanager
+def use_client(fake: Any) -> Iterator[Any]:
+    """Route every ``call_structured`` through ``fake`` (an object with ``chat.completions.create``)."""
+    global _client_override
+    prev, _client_override = _client_override, fake
+    try:
+        yield fake
+    finally:
+        _client_override = prev
+
+
+def ensure_enabled() -> None:
+    """Raise the typed, user-facing error when the kill switch is off and no fake client is installed."""
+    if _client_override is None and not settings.llm_enabled:
+        raise PlannerDisabled()
 
 
 @dataclass
@@ -92,6 +134,9 @@ def _nullable(prop: dict) -> dict:
 
 
 def _client():
+    if _client_override is not None:
+        return _client_override
+    ensure_enabled()  # the kill switch is checked before the SDK is even imported
     from openai import AzureOpenAI
 
     if not settings.llm_configured:
@@ -126,13 +171,16 @@ def call_structured(
     purpose: str = "",
     timeout_s: float | None = None,
 ) -> dict:
+    ensure_enabled()
     budget.check()
     import openai
 
     max_out = min(max_output_tokens, budget.output_tokens - budget.used_output)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     t0 = time.time()
-    client = _client() if timeout_s is None else _client().with_options(timeout=timeout_s)
+    client = _client()
+    if timeout_s is not None and hasattr(client, "with_options"):
+        client = client.with_options(timeout=timeout_s)
 
     def create():
         return client.chat.completions.create(

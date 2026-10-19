@@ -40,6 +40,9 @@ class Settings:
     aoai_api_version: str = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
     aoai_deployment: str = os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
     aoai_timeout_s: float = float(os.getenv("AZURE_OPENAI_TIMEOUT_S", 90))
+    # Kill switch for every model call: SHILPA_LLM=off|on. Defaults to off when no endpoint is set,
+    # so a checkout without Azure credentials can never reach a paid API by accident.
+    llm_mode: str = os.getenv("SHILPA_LLM", "on" if os.getenv("AZURE_OPENAI_ENDPOINT") else "off").strip().lower()
     # Worker
     worker_timeout_s: int = _int("SHILPA_WORKER_TIMEOUT_S", 300)
     lock_duration_s: int = _int("SHILPA_LOCK_DURATION_S", 60)
@@ -51,8 +54,20 @@ class Settings:
         return self.var_dir / "blobs"
 
     @property
+    def llm_enabled(self) -> bool:
+        """False when the kill switch is off: no model call may leave this process."""
+        return self.llm_mode not in ("off", "0", "false", "no", "disabled")
+
+    @property
     def llm_configured(self) -> bool:
-        return bool(self.aoai_endpoint and self.aoai_deployment)
+        return self.llm_enabled and bool(self.aoai_endpoint and self.aoai_deployment)
+
+    @property
+    def planner_status(self) -> str:
+        """disabled (kill switch) | online | not_configured."""
+        if not self.llm_enabled:
+            return "disabled"
+        return "online" if self.llm_configured else "not_configured"
 
 
 settings = Settings()

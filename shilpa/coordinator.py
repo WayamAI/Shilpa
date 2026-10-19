@@ -46,8 +46,86 @@ def _record_usage(s, job: Job, budget: Budget, used: dict) -> None:
     budget.calls.clear()
 
 
+# Job kinds whose input is already a complete, typed spec: no planner, no repair loop.
+DIRECT_KINDS = ("assembly", "sheet_metal", "product")
+
+
+def exec_kind(job: Job) -> str | None:
+    kind = (job.input or {}).get("exec")
+    return kind if kind in DIRECT_KINDS else None
+
+
+def check_direct(kind: str, spec) -> dict | None:
+    """Static check of a direct job's spec before any CAD runs; returns an error dict or None."""
+    from pydantic import ValidationError
+
+    try:
+        if kind == "assembly":
+            from .contracts.assembly import AssemblySpec
+
+            AssemblySpec.model_validate(spec)
+        elif kind == "sheet_metal":
+            from .sheetmetal import SheetMetalSpec
+
+            SheetMetalSpec.model_validate(spec)
+        elif kind == "product":
+            from .workers.kinds import NOT_INSTALLED, product_runner
+
+            if product_runner() is None:
+                raise ShilpaError(ErrorCode.UNSUPPORTED_OPERATION, NOT_INSTALLED)
+    except ValidationError as exc:
+        e = exc.errors()[0]
+        where = ".".join(str(x) for x in e.get("loc", ()))
+        return ShilpaError(ErrorCode.INVALID_SCHEMA, f"{kind.replace('_', ' ')} spec is invalid at {where or 'top level'}: {e['msg']}"
+                           ).info.model_dump(mode="json")
+    except ShilpaError as exc:
+        err = exc.info.model_dump(mode="json")
+        err["retryable"] = False
+        return err
+    return None
+
+
+def handle_direct(job_id: str) -> None:
+    """queued -> planning -> executing for assembly, sheet-metal and product jobs (the spec is the plan)."""
+    with tx() as s:
+        job = load(s, job_id)
+        if job is None or job.state in TERMINAL:
+            return
+        if job.cancel_requested:
+            transition(s, job, "cancelled")
+            return
+        if job.state == "queued":
+            transition(s, job, "planning")
+        elif job.state != "planning":
+            return
+        kind, spec = exec_kind(job), (job.input or {}).get("spec")
+        used = dict(job.budget_used or {})
+        error = check_direct(kind, spec)
+        if error is None and used.get("cad_executions", 0) >= settings.budgets.cad_executions:
+            error = ShilpaError(ErrorCode.BUDGET_EXHAUSTED, "CAD execution budget exhausted").info.model_dump(mode="json")
+        if error:
+            transition(s, job, "failed", error=error, budget_used=used, event_data={"error": error})
+            return
+        n = used.get("cad_executions", 0) + 1
+        used["cad_executions"] = n
+        s.add(JobAttempt(tenant_id=job.tenant_id, job_id=job.id, number=n, recipe_hash=recipe_hash(spec or {}), status="queued"))
+        detail = {"instances": len(spec.get("instances", []))} if kind == "assembly" else \
+            {"flanges": len(spec.get("flanges", [])) + len(spec.get("hems", []))} if kind == "sheet_metal" else {}
+        transition(s, job, "executing", recipe=spec, budget_used=used,
+                   event_data={"attempt": n, "mode": "direct", "kind": kind, **detail},
+                   outbox=("cad", {"job_id": job.id, "attempt": n, "tenant_id": job.tenant_id}))
+
+
 def handle_plan(msg: dict) -> None:
     job_id = msg["job_id"]
+    with tx() as s:
+        job = load(s, job_id)
+        if job is None or job.state in TERMINAL:
+            return
+        direct = exec_kind(job) is not None
+    if direct:
+        handle_direct(job_id)
+        return
     with tx() as s:
         job = load(s, job_id)
         if job is None or job.state in TERMINAL:

@@ -3,6 +3,9 @@
 This is what a CAD worker runs for one attempt (blueprint section 4.1). It writes
 into a staging directory and returns a manifest; publishing a version is the
 caller's responsibility and only happens when ``result.ok`` is true.
+
+``execute_kind`` is the same contract for assemblies, sheet metal and products
+(``shilpa/workers/kinds.py``).
 """
 
 from __future__ import annotations
@@ -156,3 +159,15 @@ def _freecad_checks(built, feats: list[dict], out_dir: Path, ref: geometry.Measu
         ok = all(abs(a - b) <= geometry.DIM_TOL for a, b in zip(fc.measurement.bbox_size, ref.bbox_size))
         checks.append(geometry.Check("freecad_matches_build123d_bbox", ok, list(ref.bbox_size), list(fc.measurement.bbox_size), geometry.DIM_TOL))
     return checks
+
+
+KINDS = ("assembly", "sheet_metal", "product")
+
+
+def execute_kind(kind: str, spec: dict, out_dir: Path, options: dict | None = None, cancel_check=None) -> dict:
+    """Run one non-part job kind; returns a result dict shaped like ``ExecutionResult.to_dict()``."""
+    from .workers.kinds import EXECUTORS
+
+    if kind not in EXECUTORS:
+        raise ShilpaError(ErrorCode.UNSUPPORTED_OPERATION, f"unknown job kind {kind!r}; have {sorted(EXECUTORS)}")
+    return EXECUTORS[kind](spec, Path(out_dir), options or {}, cancel_check)
