@@ -6,11 +6,12 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 
 import { Conversation, type ChatItem, type JobState } from "@/components/studio/conversation";
+import { KindWorkspace } from "@/components/studio/kind-workspace";
 import { ExportPanel, ParamsPanel, ValidationPanel, VersionsPanel } from "@/components/studio/part-panels";
 import { Button, Tabs } from "@/components/ui/controls";
 import { EmptyState, Panel, Select, StatusBadge } from "@/components/ui/primitives";
 import { useSession } from "@/context/session-context";
-import { api, errText, streamJob, type Job, type ProjectDetail, type Spec, type Version } from "@/lib/api";
+import { api, errText, streamJob, type Job, type ModelKind, type ProjectDetail, type Spec, type Version } from "@/lib/api";
 
 // three.js needs the browser: load the viewer on the client only.
 const ModelViewer = dynamic(() => import("@/components/studio/model-viewer"), {
@@ -20,10 +21,11 @@ const ModelViewer = dynamic(() => import("@/components/studio/model-viewer"), {
 
 type Tab = "params" | "validation" | "versions" | "export";
 const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
+const KIND_LABEL: Record<ModelKind, string> = { part: "part", assembly: "assembly", sheet_metal: "sheet metal", product: "product" };
 
 export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
   const { id: projectId } = use(params);
-  const { me } = useSession();
+  const { me, health } = useSession();
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
@@ -96,6 +98,8 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
   const activeJob = Object.values(jobs).map((j) => j.job).find((j) => !TERMINAL.has(j.state)) ?? null;
   const canWrite = !!me?.can_write;
   const model = project?.models.find((m) => m.id === modelId);
+  const kind: ModelKind = version?.kind ?? model?.kind ?? "part";
+  const isPart = kind === "part";
 
   function newPart() {
     setModelId(null);
@@ -155,7 +159,8 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
             <p className="truncate text-body-sm text-tertiary">
               {model ? (
                 <>
-                  {model.name} · v{version?.number ?? model.head_number}
+                  {model.name}
+                  {!isPart ? ` · ${KIND_LABEL[kind]}` : ""} · v{version?.number ?? model.head_number}
                   {version && !isHead ? " (older version)" : ""}
                 </>
               ) : (
@@ -166,7 +171,13 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
           {version ? (
             <span className="hidden shrink-0 items-center gap-2 sm:flex">
               <StatusBadge tone={version.validation_passed ? "success" : "error"}>
-                {version.validation_passed ? "geometry validated" : "validation failed"}
+                {isPart
+                  ? version.validation_passed
+                    ? "geometry validated"
+                    : "validation failed"
+                  : version.validation_passed
+                    ? "all checks passed"
+                    : "checks failed"}
               </StatusBadge>
               <StatusBadge tone="neutral">not reviewed for release</StatusBadge>
             </span>
@@ -187,7 +198,8 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
               {!modelId ? <option value="">New part</option> : null}
               {project.models.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.name} · v{m.head_number}
+                  {m.name}
+                  {m.kind && m.kind !== "part" ? ` · ${KIND_LABEL[m.kind]}` : ""} · v{m.head_number}
                 </option>
               ))}
             </Select>
@@ -207,60 +219,76 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-3 lg:grid-cols-[320px_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[340px_minmax(0,1fr)_380px]">
-        <Panel
-          padded={false}
-          className="min-h-[420px] lg:min-h-0"
-          title="Part"
-          action={version ? <span className="text-caption tabular text-quaternary">{version.recipe_hash.slice(0, 8)}</span> : undefined}
-        >
-          {version ? (
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="shrink-0 border-b border-muted px-4 py-2.5">
-                <Tabs<Tab>
-                  label="Part details"
-                  value={tab}
-                  onChange={setTab}
-                  tabs={[
-                    { id: "params", label: "Parameters" },
-                    { id: "validation", label: "Checks" },
-                    { id: "versions", label: "Versions" },
-                    { id: "export", label: "Export" },
-                  ]}
-                />
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                {tab === "params" ? (
-                  <ParamsPanel key={version.id} version={version} editable={canWrite && isHead && !activeJob} isHead={isHead} onApply={applyParams} />
-                ) : tab === "validation" ? (
-                  <ValidationPanel version={version} />
-                ) : tab === "versions" ? (
-                  <VersionsPanel
-                    versions={versions}
-                    current={version.id}
-                    canRestore={canWrite && !activeJob}
-                    onOpen={async (vid) => setVersion(await api.version(vid))}
-                    onRestore={restore}
+        {version && !isPart ? (
+          <KindWorkspace
+            key={version.id}
+            version={version}
+            versions={versions}
+            canWrite={canWrite}
+            busy={!!activeJob}
+            freecadAvailable={!!health?.freecad_available}
+            onOpenVersion={async (vid) => setVersion(await api.version(vid))}
+            onRestore={restore}
+            onExportFcstd={exportFcstd}
+          />
+        ) : (
+          <>
+          <Panel
+            padded={false}
+            className="min-h-[420px] lg:min-h-0"
+            title="Part"
+            action={version ? <span className="text-caption tabular text-quaternary">{version.recipe_hash.slice(0, 8)}</span> : undefined}
+          >
+            {version ? (
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="shrink-0 border-b border-muted px-4 py-2.5">
+                  <Tabs<Tab>
+                    label="Part details"
+                    value={tab}
+                    onChange={setTab}
+                    tabs={[
+                      { id: "params", label: "Parameters" },
+                      { id: "validation", label: "Checks" },
+                      { id: "versions", label: "Versions" },
+                      { id: "export", label: "Export" },
+                    ]}
                   />
-                ) : (
-                  <ExportPanel version={version} canExport={canWrite && !activeJob} onExportFcstd={exportFcstd} />
-                )}
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                  {tab === "params" ? (
+                    <ParamsPanel key={version.id} version={version} editable={canWrite && isHead && !activeJob} isHead={isHead} onApply={applyParams} />
+                  ) : tab === "validation" ? (
+                    <ValidationPanel version={version} />
+                  ) : tab === "versions" ? (
+                    <VersionsPanel
+                      versions={versions}
+                      current={version.id}
+                      canRestore={canWrite && !activeJob}
+                      onOpen={async (vid) => setVersion(await api.version(vid))}
+                      onRestore={restore}
+                    />
+                  ) : (
+                    <ExportPanel version={version} canExport={canWrite && !activeJob} onExportFcstd={exportFcstd} />
+                  )}
+                </div>
               </div>
-            </div>
-          ) : (
-            <EmptyState title="No part selected" detail="The parameters, checks, versions and files of a part appear here." />
-          )}
-        </Panel>
+            ) : (
+              <EmptyState title="No part selected" detail="The parameters, checks, versions and files of a part appear here." />
+            )}
+          </Panel>
 
-        <Panel padded={false} className="min-h-[420px] lg:min-h-0" title="Model" action={version ? <span className="text-caption text-quaternary">drag to orbit · scroll to zoom</span> : undefined}>
-          <ModelViewer glbId={glb} size={version?.validation?.measurement?.bbox_size ?? null} />
-        </Panel>
+          <Panel padded={false} className="min-h-[420px] lg:min-h-0" title="Model" action={version ? <span className="text-caption text-quaternary">drag to orbit · scroll to zoom</span> : undefined}>
+            <ModelViewer glbId={glb} size={version?.validation?.measurement?.bbox_size ?? null} />
+          </Panel>
+          </>
+        )}
 
-        <Panel padded={false} className="min-h-[480px] lg:col-span-2 lg:min-h-[420px] xl:col-span-1 xl:min-h-0" title={modelId && isHead ? "Edit with Shilpa" : "New part"}>
+        <Panel padded={false} className="min-h-[480px] lg:col-span-2 lg:min-h-[420px] xl:col-span-1 xl:min-h-0" title={modelId && isHead && isPart ? "Edit with Shilpa" : modelId ? "Shilpa" : "New part"}>
           <Conversation
             projectId={projectId}
             chat={chat}
             jobs={jobs}
-            editTarget={modelId && version && isHead ? version : null}
+            editTarget={modelId && version && isHead && isPart ? version : null}
             busy={!!activeJob}
             say={say}
             trackJob={trackJob}

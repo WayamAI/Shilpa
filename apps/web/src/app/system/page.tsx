@@ -22,6 +22,7 @@ export default function SystemPage() {
   const jobs = usage?.jobs ?? {};
   const total = Object.values(jobs).reduce((a, b) => a + b, 0);
   const ops = health?.adapters.build123d ?? [];
+  const plannerOff = health?.planner === "disabled";
 
   return (
     <>
@@ -31,9 +32,9 @@ export default function SystemPage() {
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
             <KpiTile
               label="Planner"
-              value={health ? (health.llm_configured ? "Online" : "Off") : "—"}
-              hint={health?.llm_deployment ?? "Azure OpenAI not configured"}
-              tone={health?.llm_configured ? "success" : "warning"}
+              value={health ? (health.llm_configured ? "Online" : plannerOff ? "Disabled" : "Off") : "—"}
+              hint={plannerOff ? "SHILPA_LLM=off · no model calls" : (health?.llm_deployment ?? "Azure OpenAI not configured")}
+              tone={health?.llm_configured ? "success" : plannerOff ? "neutral" : "warning"}
             />
             <KpiTile label="Model calls" value={llm ? String(llm.events) : "0"} hint={llm ? `${(llm.input_tokens / 1000).toFixed(1)}k in · ${(llm.output_tokens / 1000).toFixed(1)}k out` : undefined} />
             <KpiTile label="CAD compute" value={cpu ? `${Math.round(cpu.cpu_seconds)}s` : "0s"} hint={cpu ? `${cpu.events} geometry runs` : undefined} />
@@ -50,7 +51,13 @@ export default function SystemPage() {
               <ul className="flex flex-col">
                 {[
                   { name: "API and job queue", detail: "FastAPI · SQLite · DB-backed queue", ok: !!health },
-                  { name: "Planner", detail: health?.llm_deployment ? `Azure OpenAI · ${health.llm_deployment}` : "Azure OpenAI", ok: !!health?.llm_configured },
+                  {
+                    name: "Planner",
+                    detail: plannerOff ? "Disabled by SHILPA_LLM=off" : health?.llm_deployment ? `Azure OpenAI · ${health.llm_deployment}` : "Azure OpenAI",
+                    ok: !!health?.llm_configured,
+                  },
+                  { name: "Assemblies and sheet metal", detail: "Placement, interference, sweep, flat pattern · no AI needed", ok: !!health },
+                  { name: "Product templates", detail: health?.products_available ? "shilpa.product installed" : "Not installed yet", ok: !!health?.products_available },
                   { name: "build123d engine", detail: `Open CASCADE · ${ops.length} operations`, ok: ops.length > 0 },
                   { name: "FreeCAD engine", detail: "Native FCStd export", ok: !!health?.freecad_available },
                   { name: "Identity", detail: health?.auth_mode === "dev" ? "Local dev identities (Entra ID in Azure)" : "Entra ID", ok: !!me },

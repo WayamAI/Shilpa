@@ -27,12 +27,19 @@ async function lastJobSucceeds(page: Page, timeout = 120_000) {
 
 const sizeChip = (page: Page) => page.getByTestId("model-viewer").getByText(/ mm$/).last();
 
+/** Whether the AI planner can run here (not disabled by SHILPA_LLM=off, and configured). */
+async function plannerOnline(page: Page): Promise<boolean> {
+  const h = await (await page.request.get("/v1/health")).json();
+  return h.planner ? h.planner === "online" : !!h.llm_configured;
+}
+
 test("sign-in gate redirects and admits the dev engineer", async ({ page }) => {
   await page.goto("/projects");
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await signIn(page);
-  await expect(page.getByTitle("Azure OpenAI planner")).toContainText("Online");
+  const online = await plannerOnline(page);
+  await expect(page.getByTitle(/^Azure OpenAI planner/)).toContainText(online ? "Online" : /Disabled|Not configured/);
   await expect(page.getByRole("heading", { name: "Projects", level: 2, exact: true })).toBeVisible();
 });
 
@@ -76,6 +83,7 @@ test("reference part, parameter edit, restore and FreeCAD export", async ({ page
 });
 
 test("drawing upload, review and generation", async ({ page }) => {
+  test.skip(!(await plannerOnline(page)), "needs the AI planner (disabled or not configured)");
   await signIn(page);
   await newProject(page, `E2E drawing ${Date.now()}`);
   await page.getByTestId("drawing-input").setInputFiles(path.join(DRAWINGS, "P01_vector.pdf"));
@@ -93,6 +101,7 @@ test("drawing upload, review and generation", async ({ page }) => {
 });
 
 test("language request with a clarifying question", async ({ page }) => {
+  test.skip(!(await plannerOnline(page)), "needs the AI planner (disabled or not configured)");
   await signIn(page);
   await newProject(page, `E2E language ${Date.now()}`);
   await page.getByLabel("Describe a part").fill("Steel spacer with 20 mm OD and 10 mm ID.");

@@ -15,14 +15,14 @@ import { fetchBlob } from "@/lib/api";
 // glTF from the CAD worker is in metres with Y up. The scene works in millimetres
 // (scale 1000). CAD axes map to scene axes as X->X, Y->-Z, Z->Y.
 
-type Palette = { background: string; material: string; edge: string; cell: string; section: string; x: string; y: string; z: string; theme: string };
+export type Palette = { background: string; material: string; edge: string; cell: string; section: string; x: string; y: string; z: string; theme: string };
 
 /**
  * Resolve the --viewer-* semantic tokens for the active theme. This component is
  * client-only (dynamic import, ssr: false) and the theme attribute is set before
  * the theme state changes, so reading computed styles during render is safe.
  */
-function usePalette(): Palette {
+export function usePalette(): Palette {
   const { theme } = useTheme();
   return useMemo(() => {
     const css = getComputedStyle(document.documentElement);
@@ -41,7 +41,7 @@ function usePalette(): Palette {
   }, [theme]);
 }
 
-function webglAvailable(): boolean {
+export function webglAvailable(): boolean {
   try {
     const c = document.createElement("canvas");
     return !!(c.getContext("webgl2") || c.getContext("webgl"));
@@ -50,7 +50,7 @@ function webglAvailable(): boolean {
   }
 }
 
-function FitCamera({ object, nonce }: { object: THREE.Object3D | null; nonce: number }) {
+export function FitCamera({ object, nonce }: { object: THREE.Object3D | null; nonce: number }) {
   const { camera, controls } = useThree() as unknown as {
     camera: THREE.PerspectiveCamera;
     controls: { target: THREE.Vector3; update: () => void } | null;

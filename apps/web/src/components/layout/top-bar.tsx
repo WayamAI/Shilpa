@@ -13,6 +13,7 @@ export function TopBar({ onMenu, title }: { onMenu?: () => void; title?: string 
   const pathname = usePathname();
   const { me, health } = useSession();
   const item = navItemForPath(pathname);
+  const disabled = health?.planner === "disabled";
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-muted bg-page px-4 sm:gap-4 sm:px-5">
@@ -28,13 +29,13 @@ export function TopBar({ onMenu, title }: { onMenu?: () => void; title?: string 
         {health ? (
           <span
             className="hidden h-8 items-center gap-2 rounded-full border border-muted bg-action px-3 text-label-sm text-tertiary sm:flex"
-            title="Azure OpenAI planner"
+            title={disabled ? "Azure OpenAI planner (disabled with SHILPA_LLM=off)" : "Azure OpenAI planner"}
           >
-            <StatusDot tone={health.llm_configured ? "success" : "warning"} />
+            <StatusDot tone={health.llm_configured ? "success" : disabled ? "neutral" : "warning"} />
             Planner
             <span className="text-quaternary">·</span>
-            <span className={health.llm_configured ? "text-success" : "text-warning"}>
-              {health.llm_configured ? "Online" : "Not configured"}
+            <span className={health.llm_configured ? "text-success" : disabled ? "text-tertiary" : "text-warning"}>
+              {health.llm_configured ? "Online" : disabled ? "Disabled" : "Not configured"}
             </span>
           </span>
         ) : null}
