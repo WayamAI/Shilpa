@@ -20,6 +20,13 @@ test("pages fit a phone viewport", async ({ page }) => {
   await page.screenshot({ path: "test-results/mobile-system.png" });
   expect(await overflow()).toBeLessThanOrEqual(0);
 
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("link", { name: "Parts catalogue" }).click();
+  await expect(page).toHaveURL(/\/catalog$/);
+  await expect(page.getByTestId("part-viewer")).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
+  await page.screenshot({ path: "test-results/mobile-catalog.png", fullPage: true });
+  expect(await overflow()).toBeLessThanOrEqual(0);
+
   await page.goto("/projects");
   await page.getByRole("link").filter({ hasText: /parts?$/ }).first().click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);

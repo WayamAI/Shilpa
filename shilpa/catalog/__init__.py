@@ -74,7 +74,7 @@ def resolve(generator: str, params: dict[str, Any] | None = None) -> BuiltPart:
         p = gen.params.model_validate(params or {})
     except ValidationError as exc:
         raise ShilpaError(ErrorCode.INVALID_PARAMETER, f"{generator}: {exc.errors()[0]['msg']}",
-                          feature_id=generator, details={"errors": exc.errors(include_url=False)}) from None
+                          feature_id=generator, details={"errors": exc.errors(include_url=False, include_context=False)}) from None
     part = gen.build(p)
     if not part.solid.is_valid:
         raise ShilpaError(ErrorCode.VALIDATION_FAILED, f"{generator} produced an invalid solid", feature_id=generator)

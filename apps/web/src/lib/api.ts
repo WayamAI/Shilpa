@@ -213,6 +213,62 @@ export async function uploadDrawing(projectId: string, file: File): Promise<Uplo
   return data as UploadInfo;
 }
 
+// --- standard-parts catalog ---------------------------------------------------------
+
+/** A JSON-schema property as pydantic writes it (only the keys the parameter form reads). */
+export type SchemaProp = {
+  type?: "number" | "integer" | "string" | "boolean" | "array" | "null";
+  enum?: (string | number)[];
+  anyOf?: SchemaProp[];
+  items?: SchemaProp;
+  prefixItems?: SchemaProp[];
+  default?: unknown;
+  title?: string;
+  description?: string;
+  minimum?: number;
+  maximum?: number;
+  exclusiveMinimum?: number;
+  exclusiveMaximum?: number;
+  minItems?: number;
+  maxItems?: number;
+};
+export type CatalogGenerator = {
+  name: string; family: string; summary: string; standard: string;
+  params: { properties: Record<string, SchemaProp>; required?: string[] };
+};
+export type Catalog = { families: string[]; generators: CatalogGenerator[]; materials: string[] };
+export type PartMesh = { positions: string; indices: string; vertices: number; triangles: number; bbox: number[][] };
+export type CatalogPort = {
+  name: string; label: string; kind: "face" | "axis" | "point"; origin: number[]; z: number[]; x: number[];
+  contract: Record<string, unknown>; on_geometry: boolean; note: string | null;
+};
+export type CatalogPreview = {
+  generator: string; family: string; name: string; params: Record<string, unknown>; meta: Record<string, unknown>;
+  ports: CatalogPort[]; mesh: PartMesh; size: number[]; volume_mm3: number; timings_ms: Record<string, number>;
+};
+
+export const catalogApi = {
+  list: () => req<Catalog>("GET", "/v1/catalog"),
+  preview: (generator: string, params: Record<string, unknown>) =>
+    req<CatalogPreview>("POST", "/v1/catalog/preview", { generator, params }),
+};
+
+export async function downloadCatalogStep(generator: string, params: Record<string, unknown>) {
+  const res = await fetch("/v1/catalog/step", {
+    method: "POST",
+    headers: { ...authHeader(), "Content-Type": "application/json" },
+    body: JSON.stringify({ generator, params }),
+  });
+  if (!res.ok) throw new ApiError(res.status, { code: "download_failed", message: res.statusText });
+  const name = /filename="?([^";]+)"?/.exec(res.headers.get("content-disposition") || "")?.[1] || "part.step";
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
 export async function fetchBlob(path: string): Promise<Blob> {
   const res = await fetch(path, { headers: authHeader() });
   if (!res.ok) throw new ApiError(res.status, { code: "download_failed", message: res.statusText });

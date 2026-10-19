@@ -155,6 +155,37 @@ def route_request(body: RouteIn, p: Principal = Depends(principal)):
     return {**r.to_dict(), "planner": settings.planner_status}
 
 
+class CatalogPartIn(BaseModel):
+    generator: str = Field(min_length=1)
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+@app.get("/v1/catalog")
+def catalog(p: Principal = Depends(principal)):
+    """Every standard-part generator with its family and JSON parameter schema."""
+    from ..catalog.preview import browse
+
+    return browse()
+
+
+@app.post("/v1/catalog/preview")
+def catalog_preview(body: CatalogPartIn, p: Principal = Depends(principal)):
+    """Build one catalog part now (no job: these build in about a second) and return its mesh, ports and data."""
+    from ..catalog.preview import preview
+
+    return preview(body.generator, body.params)
+
+
+@app.post("/v1/catalog/step")
+def catalog_step(body: CatalogPartIn, p: Principal = Depends(principal)):
+    from fastapi.responses import Response
+
+    from ..catalog.preview import step
+
+    data, name = step(body.generator, body.params)
+    return Response(data, media_type="application/step", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
 @app.get("/v1/examples")
 def examples(p: Principal = Depends(principal)):
     """Golden reference recipes, offered in the studio as starting points."""
