@@ -291,11 +291,18 @@ def mesh_layout(a: BuiltPart, b: BuiltPart, direction: tuple[float, float] = (1.
     Supports spur/helical pairs and a spur gear inside a ring gear. Raises ``INVALID_PARAMETER`` for pairs
     that cannot mesh (module, pressure angle or helix hand mismatch).
     """
-    ga, gb = a.meta.get("generator"), b.meta.get("generator")
-    pa, pb = a.meta.get("params", {}), b.meta.get("params", {})
-    kinds = {"gear.spur", "gear.helical", "gear.ring"}
-    if ga not in kinds or gb not in kinds:
+    return mesh_layout_params(a.meta.get("generator"), a.meta.get("params", {}), b.meta.get("generator"),
+                              b.meta.get("params", {}), direction)
+
+
+PARAMS = {"gear.spur": SpurParams, "gear.helical": HelicalParams, "gear.ring": RingParams}
+
+
+def mesh_layout_params(ga: str, pa: dict, gb: str, pb: dict, direction: tuple[float, float] = (1.0, 0.0)) -> dict:
+    """``mesh_layout`` from generator names and params alone (no solids built); params get their defaults."""
+    if ga not in PARAMS or gb not in PARAMS:
         raise ShilpaError(ErrorCode.UNSUPPORTED_OPERATION, f"mesh_layout needs two round gears, got {ga} and {gb}")
+    pa, pb = PARAMS[ga].model_validate(pa).model_dump(), PARAMS[gb].model_validate(pb).model_dump()
     for key in ("module", "pressure_angle"):
         if pa[key] != pb[key]:
             raise ShilpaError(ErrorCode.INVALID_PARAMETER, f"gears cannot mesh: {key} {pa[key]} vs {pb[key]}")

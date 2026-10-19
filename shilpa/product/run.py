@@ -43,23 +43,31 @@ def product_bom(spec: ProductSpec, build) -> list[dict]:
 def resolve_request(spec_or_request: Any, planner: Planner = "offline") -> tuple[ProductSpec | None, dict | None]:
     """Turn any accepted input into a ``ProductSpec``; returns ``(None, planner_result)`` when refused."""
     from .templates.bicycle import BicycleChoices, bicycle_spec
+    from .templates.gearbox import GearboxChoices, gearbox_spec
+
+    def from_choices(choices):
+        return gearbox_spec(choices) if isinstance(choices, GearboxChoices) else bicycle_spec(choices)
 
     if isinstance(spec_or_request, ProductSpec):
         return spec_or_request, None
-    if isinstance(spec_or_request, BicycleChoices):
-        return bicycle_spec(spec_or_request), None
+    if isinstance(spec_or_request, (BicycleChoices, GearboxChoices)):
+        return from_choices(spec_or_request), None
     if isinstance(spec_or_request, dict):
         if "template" in spec_or_request and "assembly" in spec_or_request:
             return ProductSpec.model_validate(spec_or_request), None
+        if spec_or_request.get("product_class") == "gearbox":
+            return gearbox_spec({k: v for k, v in spec_or_request.items() if k != "product_class"}), None
         return bicycle_spec(spec_or_request), None
     if isinstance(spec_or_request, str):
         from ..agent import product_planner as pp
 
-        res = pp.plan_product(spec_or_request) if planner == "llm" else pp.parse_request_offline(spec_or_request)
+        # The LLM planner only knows the bicycle template; gearboxes always use the offline parser (no model call).
+        use_llm = planner == "llm" and not pp.is_gearbox_request(spec_or_request)
+        res = pp.plan_product(spec_or_request) if use_llm else pp.parse_request_offline(spec_or_request)
         info = res.to_dict()
         if not res.supported or res.choices is None:
             return None, info
-        return bicycle_spec(res.choices), info
+        return from_choices(res.choices), info
     raise TypeError(f"run_product takes a ProductSpec, a choices or spec dict, or request text; got {type(spec_or_request).__name__}")
 
 
@@ -95,7 +103,7 @@ def run_product(spec_or_request: Any, out_dir: str | Path, *, planner: Planner =
     exports: dict[str, str] = {}
     t = time.perf_counter()
     if build.placed:
-        exports["step"] = str(export_step(build, out / "bicycle.step"))
+        exports["step"] = str(export_step(build, out / f"{spec.requirements.product_class}.step"))
         cs, js = write_bom(build, out)
         exports.update(bom_csv=str(cs), bom_json=str(js))
     rows = product_bom(spec, build)

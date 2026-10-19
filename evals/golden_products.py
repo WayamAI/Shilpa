@@ -1,9 +1,9 @@
-"""Golden products: bicycle variants with their outcomes fixed before running (roadmap R5 product suite).
+"""Golden products: bicycles and gearboxes with their outcomes fixed before running (roadmap R5 product suite).
 
 Each case is a request (text for the offline parser, or a choices dict) plus what must happen:
 
 * ``status``: the router outcome (``passed`` first time, ``repaired``, ``unresolved``, ``unsupported``);
-* ``size`` / ``wheel``: the template's sizing-table and wheel choice;
+* ``size`` / ``wheel``: the bicycle template's sizing-table and wheel choice (bicycles only);
 * ``first_fail``: checks that must fail on the first build (empty: the first build passes);
 * ``warnings``: warning-level checks expected on the final build (exact set);
 * ``changes``: skeleton keys the router must change (exact set, order free).
@@ -23,7 +23,21 @@ Cases:
   50 mm tyre (longer fork, wider stays), go 1x and lengthen the chainstays, then pass.
 - ``drone``: "design a drone" is refused as an unsupported product class (no build).
 
-Run:  uv run python evals/golden_products.py [case ...]     (about 3 minutes for all)
+Gearboxes (``gearbox.spur_single_v1``), outcomes from the sizing rules in the template docstring:
+
+- ``gb_small``: 3:1 at 1 N.m; the bending-sized m1 gears also pass contact, so the first build passes.
+- ``gb_10nm``: 3:1 at 10 N.m; contact (Hertz) fails at the standard 10 m face, the router widens it.
+- ``gb_4to1_text``: "4:1 gearbox, 20 Nm input at 1500 rpm"; contact needs more than a 16 m face, so the
+  module steps up (design), the input 6001 bearing falls short of 10 000 h (62xx, part), then the face widens.
+- ``gb_close_bores``: 2:1 hardened at 5 N.m; m1 puts the shafts 25.5 mm apart, closer than the two
+  bearing housings allow, so the plates cannot even be built; the router steps the module (design).
+- ``gb_motor``: "speed reducer from 1450 rpm to 360 rpm output, 2.2 kW motor, 20k hours": ratio (4.03)
+  and torque (14.5 N.m) come from the motor data; contact needs more than a 16 m face, so the module steps up.
+- ``gb_overload``: 6:1 at 100 N.m: the 600 N.m output needs a shaft beyond the 40 mm bearings the
+  template stocks, so it ends unresolved after the repairs that do exist.
+- ``gb_planetary``: "planetary gearbox 10:1" is refused (only single-stage spur).
+
+Run:  uv run python evals/golden_products.py [case ...]     (about 5 minutes for all)
 """
 
 from __future__ import annotations
@@ -55,7 +69,28 @@ GOLDEN: dict[str, dict] = {
                       "warnings": ["toe_overlap"],
                       "changes": ["max_tyre_width", "chainrings", "chainline", "chainstay_length"]},
     "drone": {"request": "design a drone", "status": "unsupported"},
+    "gb_small": {"request": "3:1 gearbox, 1 Nm input at 1500 rpm", "status": "passed", "first_fail": [], "warnings": [],
+                 "changes": []},
+    "gb_10nm": {"request": {"product_class": "gearbox", "ratio": 3, "input_torque_nm": 10}, "status": "repaired",
+                "first_fail": ["tooth_contact"], "warnings": [], "changes": ["face_width"]},
+    "gb_4to1_text": {"request": "4:1 gearbox, 20 Nm input at 1500 rpm", "status": "repaired",
+                     "first_fail": ["tooth_contact", "bearing_life_in"], "warnings": [],
+                     "changes": ["module", "bearing_series_in", "face_width"]},
+    "gb_close_bores": {"request": {"product_class": "gearbox", "ratio": 2, "input_torque_nm": 5,
+                                   "gear_material": "hardened_steel", "life_hours": 30000},
+                       "status": "repaired", "first_fail": ["bearing_spacing", "tooth_contact"], "warnings": [],
+                       "changes": ["module", "face_width"]},
+    "gb_motor": {"request": "speed reducer from 1450 rpm to 360 rpm output, 2.2 kW motor, 20k hours",
+                 "status": "repaired", "first_fail": ["tooth_contact"], "warnings": [], "changes": ["module"]},
+    "gb_overload": {"request": {"product_class": "gearbox", "ratio": 6, "input_torque_nm": 100, "input_rpm": 3000,
+                                "life_hours": 20000},
+                    "status": "unresolved", "first_fail": ["tooth_contact", "bearing_life_in", "shaft_torsion_out"],
+                    "warnings": [], "changes": ["module", "bearing_series_in", "face_width", "shaft_d_in"]},
+    "gb_planetary": {"request": "planetary gearbox 10:1", "status": "unsupported"},
 }
+
+GEARBOX_KEYS = ("pinion_teeth", "gear_teeth", "module", "face_width", "shaft_d_in", "shaft_d_out", "bearing_in",
+                "bearing_out")
 
 
 def run_case(name: str) -> tuple[dict, list[str]]:
@@ -72,14 +107,19 @@ def run_case(name: str) -> tuple[dict, list[str]]:
     r = run_with_router(spec)
     first = r.iterations[0]["failed"]
     final = r.report
-    summary = {"status": r.status, "size": r.spec.value("size"), "wheel": r.spec.value("wheel_bsd"), "first_fail": first,
+    summary = {"status": r.status, "first_fail": first,
                "warnings": sorted(c.name for c in final.warnings), "changes": [h.param for h in r.spec.history],
-               "failed": [c.name for c in final.failed], "seconds": round(r.seconds, 1),
-               "checks": {c.name: c.actual for c in final.checks if c.name.startswith(("tyre_", "steering", "crank", "toe"))}}
+               "failed": [c.name for c in final.failed], "seconds": round(r.seconds, 1)}
+    if r.spec.template.startswith("gearbox."):
+        summary["checks"] = {k: r.spec.value(k) for k in GEARBOX_KEYS}
+    else:
+        summary.update(size=r.spec.value("size"), wheel=r.spec.value("wheel_bsd"),
+                       checks={c.name: c.actual for c in final.checks
+                               if c.name.startswith(("tyre_", "steering", "crank", "toe"))})
     errs = []
     for key in ("status", "size", "wheel"):
-        if summary[key] != g[key]:
-            errs.append(f"{key} {summary[key]!r} != {g[key]!r}")
+        if key in g and summary.get(key) != g[key]:
+            errs.append(f"{key} {summary.get(key)!r} != {g[key]!r}")
     product_first = [c for c in first if not c.startswith("assembly")]
     if not set(g["first_fail"]) <= set(product_first) or (not g["first_fail"] and first):
         errs.append(f"first build failed {first}, expected {g['first_fail']}")

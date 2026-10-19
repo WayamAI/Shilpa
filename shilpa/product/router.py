@@ -192,18 +192,32 @@ SUGGEST = {
 COVERED = ("front_tyre", "rear_tyre")
 
 
+def _is_gearbox(spec: ProductSpec) -> bool:
+    return spec.template.startswith("gearbox.")
+
+
+def _rules(spec: ProductSpec) -> tuple[dict, dict, tuple]:
+    """The template's repair rules, warning suggestions and covered instances."""
+    if _is_gearbox(spec):
+        from . import gearbox
+
+        return gearbox.RULES, gearbox.SUGGEST, gearbox.COVERED
+    return RULES, SUGGEST, COVERED
+
+
 def plan_repairs(spec: ProductSpec, report: ProductReport) -> tuple[list[Action], list[dict], list[dict]]:
+    rules, suggest, covered = _rules(spec)
     actions: list[Action] = []
     unresolved, suggestions = [], []
     for c in report.checks:
         if c.passed:
             continue
         if c.severity == "warning":
-            suggestions.append({"check": c.name, "actual": c.actual, "suggestion": SUGGEST.get(c.name, "warning only")})
+            suggestions.append({"check": c.name, "actual": c.actual, "suggestion": suggest.get(c.name, "warning only")})
             continue
-        if c.category == "assembly" and (c.name == "assembly" or any(r in COVERED for r in c.responsible)):
+        if c.category == "assembly" and (c.name == "assembly" or any(r in covered for r in c.responsible)):
             continue
-        rule = RULES.get(c.name)
+        rule = rules.get(c.name)
         out = rule(spec, c) if rule else f"no repair rule for {c.name}"
         if isinstance(out, str):
             unresolved.append({"check": c.name, "level": c.level, "responsible": c.responsible, "reason": out,
@@ -224,6 +238,10 @@ def apply_repairs(spec: ProductSpec, actions: list[Action], iteration: int) -> P
             sk[a.param] = sk[a.param].model_copy(update={"value": a.new, "source": "router", "note": a.reason})
         history.append(ChangeRecord(iteration=iteration, param=a.param, old=old, new=a.new, level=a.level, check=a.check,
                                     reason=a.reason, responsible=a.responsible))
+    if _is_gearbox(spec):
+        from .templates.gearbox import spec_from_skeleton as gearbox_spec_from_skeleton
+
+        return gearbox_spec_from_skeleton(spec.requirements, sk, spec.name, history)
     new = spec_from_skeleton(spec.requirements, sk, spec.name, history)
     # A longer fork shortens the derived head tube; below the minimum the stack has to grow instead.
     htl = new.skeleton["head_tube_length"]
@@ -250,7 +268,12 @@ def run_with_router(spec: ProductSpec, max_iter: int = 4, steps: int = 9, run_as
     for it in range(max_iter + 1):
         ti = time.perf_counter()
         build = build_assembly(spec.assembly)
-        report = check_bicycle(spec, build, run_assembly=run_assembly, steps=steps)
+        if _is_gearbox(spec):
+            from .gearbox import check_gearbox
+
+            report = check_gearbox(spec, build, run_assembly=run_assembly, steps=steps)
+        else:
+            report = check_bicycle(spec, build, run_assembly=run_assembly, steps=steps)
         actions, unresolved, suggestions = plan_repairs(spec, report)
         row = {"iteration": it, "passed": report.passed, "failed": [c.name for c in report.failed],
                "warnings": [c.name for c in report.warnings], "seconds": round(time.perf_counter() - ti, 1),

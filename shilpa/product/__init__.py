@@ -4,6 +4,7 @@ Entry point for the studio and scripts::
 
     from shilpa.product import run_product
     result = run_product("medium road bike for a 178 cm rider, 700c", "out/bike")
+    result = run_product("4:1 gearbox, 20 Nm input at 1500 rpm", "out/gearbox")
 
 ``run_product(spec_or_request, out_dir, *, planner="offline", freecad=None, renders=True,
 max_iter=4, steps=9, log=None) -> dict``
@@ -13,6 +14,8 @@ max_iter=4, steps=9, log=None) -> dict``
 * request text: parsed by the rule-based ``parse_request_offline`` (default, no LLM) or, with
   ``planner="llm"``, by the structured-output product planner;
 * a ``BicycleChoices`` or a choices dict (``{"use_case": "gravel", "wheel_size": "650b"}``);
+* a ``GearboxChoices`` or a dict with ``product_class="gearbox"`` (``{"product_class": "gearbox",
+  "ratio": 4, "input_torque_nm": 20}``);
 * a ``ProductSpec`` or its JSON dict (``template`` and ``assembly`` keys), e.g. an edited spec.
 
 ``freecad=None`` exports ``assembly.FCStd`` only when FreeCAD is found (``tools/freecad`` or

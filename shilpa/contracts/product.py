@@ -60,6 +60,11 @@ class Requirements(_Strict):
     frame_size: Literal["XS", "S", "M", "L", "XL", "XXL"] | None = None
     wheel_size: Literal["700c", "650b"] | None = None
     tyre_width_mm: float | None = Field(default=None, ge=20, le=60)
+    # Gearbox (``gearbox.spur_single_v1``): reduction ratio, input torque and speed, bearing life target.
+    ratio: float | None = Field(default=None, ge=1.0, le=10.0)
+    input_torque_nm: float | None = Field(default=None, gt=0, le=1000)
+    input_rpm: float | None = Field(default=None, gt=0, le=10000)
+    life_hours: float | None = Field(default=None, gt=0, le=200000)
     materials: list[str] = Field(default_factory=list)
     # Governing interface standards by role: bb, headset, front_axle, rear_axle, seatpost, bar_clamp.
     standards: dict[str, str] = Field(default_factory=dict)

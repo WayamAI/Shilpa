@@ -451,6 +451,27 @@ def _standards(spec: ProductSpec, build: AssemblyBuild) -> ProductCheck:
                         responsible=[b.split(".")[0] for b in bad], note="; ".join(bad) or "every governing standard matches the built ports")
 
 
+def assembly_checks(spec: ProductSpec, assembly_report: AssemblyReport | None) -> list[ProductCheck]:
+    """The generic assembly report as product checks: one per failed assembly check, then the overall result."""
+    if assembly_report is None:
+        return []
+    checks = []
+    known = {i.id for i in spec.assembly.instances}
+    for c in assembly_report.checks:
+        if c.passed:
+            continue
+        resp = []
+        if c.name.startswith(("interference[", "sweep[", "contact[", "part_built[", "clearance[")):
+            inside = c.name[c.name.index("[") + 1:-1]
+            resp = [x for x in inside.replace("~", "+").replace(".", "+").split("+") if x in known]
+        checks.append(ProductCheck(f"assembly:{c.name}", False, "assembly", c.actual, c.requested, None, level="part",
+                                   responsible=resp, note=c.note))
+    checks.append(ProductCheck("assembly", assembly_report.passed, "assembly",
+                               len(assembly_report.failed), 0, None, level="part",
+                               note=None if assembly_report.passed else f"failed: {assembly_report.failed}"))
+    return checks
+
+
 def check_bicycle(spec: ProductSpec, build: AssemblyBuild, assembly_report: AssemblyReport | None = None,
                   run_assembly: bool = True, steps: int = 9) -> ProductReport:
     t = {}
@@ -466,19 +487,7 @@ def check_bicycle(spec: ProductSpec, build: AssemblyBuild, assembly_report: Asse
     if assembly_report is None and run_assembly:
         assembly_report = validate_assembly(build, skip_sweeps=("steering", "cranks"))  # exact sweeps below
     t["assembly"] = round(time.perf_counter() - t0, 2)
-    if assembly_report is not None:
-        for c in assembly_report.checks:
-            if c.passed:
-                continue
-            resp = []
-            if c.name.startswith(("interference[", "sweep[", "contact[", "part_built[")):
-                inside = c.name[c.name.index("[") + 1:-1]
-                resp = [x for x in inside.replace("~", "+").replace(".", "+").split("+") if x in {i.id for i in spec.assembly.instances}]
-            checks.append(ProductCheck(f"assembly:{c.name}", False, "assembly", c.actual, c.requested, None, level="part",
-                                       responsible=resp, note=c.note))
-        checks.append(ProductCheck("assembly", assembly_report.passed, "assembly",
-                                   len(assembly_report.failed), 0, None, level="part",
-                                   note=None if assembly_report.passed else f"failed: {assembly_report.failed}"))
+    checks += assembly_checks(spec, assembly_report)
     placed = set(build.placed)
     needed = {"frame", "fork", "front_tyre", "rear_tyre", "crankset", "rear_hub", "seatpost"}
     if not needed <= placed:

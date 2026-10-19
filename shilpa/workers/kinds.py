@@ -27,6 +27,7 @@ import base64
 import hashlib
 import json
 import math
+import shutil
 import time
 from pathlib import Path
 from typing import Any
@@ -489,7 +490,7 @@ def execute_sheet_metal(spec: dict, out_dir: Path, options: dict | None = None, 
 
 # ---------------------------------------------------------------- product
 
-PRODUCT_FILES = {"STEP": "bicycle.step", "FCSTD": "assembly.FCStd", "BOM_CSV": "bom.csv", "BOM_JSON": "bom.json",
+PRODUCT_FILES = {"STEP": "product.step", "FCSTD": "assembly.FCStd", "BOM_CSV": "bom.csv", "BOM_JSON": "bom.json",
                  "PRODUCT_BOM_CSV": "product_bom.csv", "PRODUCT_BOM_JSON": "product_bom.json", "MESHES": "meshes.json",
                  "VIEWER": "viewer.json", "VALIDATION": "validation.json", "RECIPE": "product_spec.json",
                  "ASSEMBLY_SPEC": "spec.json", "PRODUCT": "report.json", "RENDER_SIDE": "render_side.png",
@@ -563,6 +564,9 @@ def execute_product(payload: dict, out_dir: Path, options: dict | None = None, c
     if cancel_check and cancel_check():
         return _fail(ErrorCode.CANCELLED, "cancelled", timings)
 
+    step = (res.get("exports") or {}).get("step")
+    if step and Path(step).name != PRODUCT_FILES["STEP"]:  # bicycle.step, gearbox.step: one published name
+        shutil.copyfile(step, out_dir / PRODUCT_FILES["STEP"])
     progress(out_dir, f"{res.get('product')}: {status}; meshing parts for the viewer")
     from ..assembly.build import build_assembly
     from ..contracts.assembly import part_number

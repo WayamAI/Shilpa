@@ -104,6 +104,15 @@ PRODUCTS = [
     {"id": "wide_tyres", "title": "Road frame with 50 mm tyres",
      "description": "Tyres wider than the frame was designed for: the clearance checks fail and the router repairs the design.",
      "spec": {"frame_size": "M", "tyre_width_mm": 50}, "expected": {"status": "repaired"}},
+    {"id": "gearbox_small", "title": "Gearbox 3:1, 1 N.m",
+     "description": "A light single-stage spur reducer: sized once, every check passes first time.",
+     "request": "3:1 gearbox, 1 Nm input at 1500 rpm", "expected": {"status": "passed"}},
+    {"id": "gearbox_4to1", "title": "Gearbox 4:1, 20 N.m",
+     "description": "Contact stress and bearing life fail at first; the router steps the module, bearing and face width.",
+     "request": "4:1 gearbox, 20 Nm input at 1500 rpm", "expected": {"status": "repaired"}},
+    {"id": "gearbox_motor", "title": "Reducer for a 2.2 kW motor",
+     "description": "1450 rpm in, 360 rpm out, 20 000 h bearing life: ratio and torque come from the motor data.",
+     "request": "speed reducer from 1450 rpm to 360 rpm output, 2.2 kW motor, 20k hours", "expected": {"status": "repaired"}},
 ]
 
 

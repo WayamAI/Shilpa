@@ -2,9 +2,9 @@
 
 Each placed solid is tessellated, projected orthographically, flat-shaded
 (Lambert, two-sided, plus ambient) and painted far-to-near at twice the output
-size, then downsampled for anti-aliasing. Painter's ordering by triangle depth
-is exact for a mesh this fine except where long triangles interpenetrate, which
-shows as small speckles on touching parts; it is a review image, not a
+size, then downsampled for anti-aliasing. Long triangles are bisected first
+(``_split_long``) so painter's ordering by triangle depth holds; what remains
+shows as small speckles where parts touch. It is a review image, not a
 marketing render.
 """
 
@@ -55,6 +55,30 @@ def _mesh(shape, tol: float) -> tuple[np.ndarray, np.ndarray]:
     return np.array([tuple(v) for v in verts], float), np.array(tris, int)
 
 
+def _split_long(tri: np.ndarray, lmax: float, passes: int = 12) -> np.ndarray:
+    """Bisect triangles across their longest edge until no edge exceeds ``lmax``.
+
+    Painter's ordering sorts by each triangle's mean depth, which goes wrong for the long
+    slivers OCCT makes on flat faces with holes (a side plate's sliver can sort behind a
+    gear it covers). Bisecting keeps every triangle short, so the sort holds; the winding
+    is kept, and splitting along the longest edge grows a sliver's count only linearly."""
+    done = []
+    for _ in range(passes):
+        e = np.stack([np.linalg.norm(tri[:, 1] - tri[:, 0], axis=1), np.linalg.norm(tri[:, 2] - tri[:, 1], axis=1),
+                      np.linalg.norm(tri[:, 0] - tri[:, 2], axis=1)], axis=1)
+        big = e.max(axis=1) > lmax
+        if not big.any():
+            break
+        done.append(tri[~big])
+        t, k = tri[big], e[big].argmax(axis=1)
+        # Rotate each triangle so its longest edge runs from vertex 0 to vertex 1.
+        t = np.stack([t[np.arange(len(t)), (k + j) % 3] for j in range(3)], axis=1)
+        mid = (t[:, 0] + t[:, 1]) / 2
+        tri = np.concatenate([np.stack([t[:, 0], mid, t[:, 2]], axis=1), np.stack([mid, t[:, 1], t[:, 2]], axis=1)])
+    done.append(tri)
+    return np.concatenate(done)
+
+
 def render(build: AssemblyBuild, path: str | Path, view: str = "three_quarter", size: tuple[int, int] = (1600, 1000),
            title: str | None = None, ground_z: float | None = None, tol: float = 0.4, hidden: tuple[str, ...] = ()) -> Path:
     path = Path(path)
@@ -63,17 +87,17 @@ def render(build: AssemblyBuild, path: str | Path, view: str = "three_quarter", 
     light = R.T @ np.array([-0.35, 0.55, 0.75])
     light /= np.linalg.norm(light)
     polys, depth, cols = [], [], []
-    for iid, shape in build.placed.items():
-        if iid in hidden:
-            continue
-        v, t = _mesh(shape, tol)
+    meshes = {iid: _mesh(shape, tol) for iid, shape in build.placed.items() if iid not in hidden}
+    pts = np.concatenate([v for v, t in meshes.values() if len(t)] or [np.zeros((1, 3))])
+    lmax = max(float(np.linalg.norm(pts.max(axis=0) - pts.min(axis=0))) * 0.03, 1e-6)
+    for iid, (v, t) in meshes.items():
         if not len(t):
             continue
         inst = build.spec.instance(iid)
         rgb = np.array(ImageColor.getrgb(inst.color or "#8a8a8a"), float)
-        cam = v @ R.T
-        tri = cam[t]  # (n, 3, 3)
-        n = np.cross(v[t[:, 1]] - v[t[:, 0]], v[t[:, 2]] - v[t[:, 0]])
+        world = _split_long(v[t], lmax)  # (n, 3, 3)
+        tri = world @ R.T
+        n = np.cross(world[:, 1] - world[:, 0], world[:, 2] - world[:, 0])
         norm = np.linalg.norm(n, axis=1)
         keep = norm > 1e-12
         n[keep] /= norm[keep, None]

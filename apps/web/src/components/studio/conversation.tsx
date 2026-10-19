@@ -73,7 +73,7 @@ export function Conversation({
       const route = await api.route(t);
       if (route.kind === "product" && health?.products_available) {
         // Product templates read requests with a rule-based parser: no AI call, even with the planner on.
-        say({ kind: "system", text: "This reads as a product. Running the bicycle template with its offline parser (about 30 s)." });
+        say({ kind: "system", text: "This reads as a product. Running its template with the offline parser (about 30 s)." });
         trackJob(await api.runProduct(projectId, { request: t }));
         return;
       }
@@ -161,8 +161,9 @@ export function Conversation({
                   for anything critical that is missing.
                 </p>
                 <p>
-                  Assemblies, sheet-metal parts and products start from the reference starters below, and a bike request such as “medium road
-                  bike for a 178 cm rider, 700c” runs the bicycle template: none of it needs the AI planner.
+                  Assemblies, sheet-metal parts and products start from the reference starters below. A bike request such as “medium road
+                  bike for a 178 cm rider, 700c” runs the bicycle template, and “4:1 gearbox, 20 Nm input at 1500 rpm” runs the gearbox
+                  template: none of it needs the AI planner.
                 </p>
                 {plannerDisabled ? (
                   <p className="rounded-lg border border-muted bg-raised px-3 py-2 text-secondary" data-testid="planner-disabled">
@@ -506,7 +507,7 @@ function routeMessage(route: Route, llm: boolean): string {
     part: llm ? "" : " Start from a reference part instead, then edit its parameters.",
     sheet_metal: " Language planning for sheet metal is not wired yet: start from a sheet-metal example and build from its spec.",
     assembly: " Language planning for assemblies is not wired yet: start from a reference assembly to see placement and every check.",
-    product: " The bicycle template is not installed on this server yet.",
+    product: " The product templates are not installed on this server yet.",
   };
   return `${what}${disabled}${next[route.kind] ?? ""}`;
 }

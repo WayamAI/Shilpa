@@ -16,6 +16,11 @@ fields the model filled in are tagged ``llm``.
 width, size words, 1x / 2x, quick release) produce the same ``PlannerResult``,
 so the product flow can be demonstrated and tested without Azure. It refuses
 non-bicycle requests the same way the model is told to.
+
+Gearbox requests (``gearbox.spur_single_v1``) are parsed offline only:
+``parse_request_offline`` recognises them first (``is_gearbox_request``) and
+reads ratio, input or output torque, power, speeds, bearing life and gear
+material; the LLM planner's schema covers the bicycle template alone.
 """
 
 from __future__ import annotations
@@ -30,6 +35,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from ..contracts.errors import ErrorCode, ShilpaError
 from ..product.templates import SUPPORTED
 from ..product.templates.bicycle import SIZE_TABLE, BicycleChoices
+from ..product.templates.gearbox import GearboxChoices
 from .llm import Budget, call_structured, strict_schema
 
 OverrideKey = Literal["stack", "reach", "head_angle", "seat_angle", "chainstay_length", "bb_drop", "fork_offset",
@@ -111,7 +117,7 @@ class PlannerResult:
     supported: bool
     message: str
     plan: dict | None = None
-    choices: BicycleChoices | None = None
+    choices: BicycleChoices | GearboxChoices | None = None
     usage: list[dict] = field(default_factory=list)
     seconds: float = 0.0
 
@@ -179,6 +185,96 @@ def _f(x: str) -> float:
     return float(x.replace(",", "."))
 
 
+_GEARBOX = re.compile(r"\b(gear\s*box(?:es)?|gear\s*reducers?|speed\s*reducers?|reduction\s*(?:gear(?:box)?|drive|unit)s?|"
+                      r"reducers?|gear\s*heads?)\b", re.I)
+# Gearbox kinds the single-stage spur template must not improvise.
+_GEARBOX_UNSUPPORTED = re.compile(r"\b(planetary|epicyclic|worm|helical|herringbone|bevel|hypoid|cycloidal|harmonic|"
+                                  r"two[-\s]*stage|2[-\s]*stage|three[-\s]*stage|3[-\s]*stage|multi[-\s]*stage|"
+                                  r"gearmotor|gear\s*motor|differential|transmission)\b", re.I)
+
+
+def is_gearbox_request(text: str) -> bool:
+    return bool(_GEARBOX.search(text))
+
+
+def _is_output(low: str, m: re.Match) -> bool:
+    """A value marked as the output side: "output 360 rpm", "to 360 rpm", "360 rpm output", "120 N.m at the output".
+    The nearest side word wins, so "30 Nm at the output, input 1000 rpm" reads 1000 rpm as the input."""
+    after = re.match(r"\s*(?:at the\s*)?(output|out|input|in)\b", low[m.end():m.end() + 16])
+    if after:
+        return after.group(1).startswith("out")
+    before = low[max(0, m.start() - 24):m.start()]
+    marks = list(re.finditer(r"output|\bout\b|input|\bin\b|\bfrom\b|\bto\s*$", before))
+    return bool(marks) and marks[-1].group(0).strip() in ("output", "out", "to")
+
+
+def parse_gearbox_offline(text: str) -> PlannerResult:
+    """Rule-based gearbox parser: ratio ("4:1", "ratio 4", "4 to 1", "4x reduction"), torque ("20 Nm",
+    "output torque 80 N.m"), power ("1.5 kW"), speeds ("1500 rpm", "output 375 rpm"), bearing life
+    ("20000 h", "20k hours") and "hardened" gears. An output torque or speed is turned into the input
+    value through the ratio; input and output speeds alone give the ratio."""
+    t0 = time.perf_counter()
+    low = text.lower()
+    bad = _GEARBOX_UNSUPPORTED.search(low)
+    if bad:
+        what = f"{bad.group(1)} gearbox"
+        reason = f"{bad.group(1)!r} is beyond the single-stage spur gearbox template"
+        plan = {"supported": False, "product_class": what, "template": None, "unsupported_reason": reason,
+                "parser": "offline"}
+        return PlannerResult(True, False, unsupported_message(what, reason), plan, None, [], time.perf_counter() - t0)
+    found: dict = {}
+    matched: dict[str, str] = {}
+    out_torque = out_rpm = power = None
+    if m := (re.search(_NUM + r"\s*(?::|to)\s*1\b", low) or re.search(r"ratio\D{0,8}" + _NUM, low)
+             or re.search(_NUM + r"\s*x\s*reduction", low)):
+        found["ratio"], matched["ratio"] = _f(m.group(1)), m.group(0)
+    for m in re.finditer(_NUM + r"\s*(?:n\s*\.?\s*m|newton[-\s]*met(?:er|re)s?)\b", low):
+        if _is_output(low, m):
+            out_torque, matched["output_torque_nm"] = _f(m.group(1)), m.group(0)
+        else:
+            found["input_torque_nm"], matched["input_torque_nm"] = _f(m.group(1)), m.group(0)
+    if m := re.search(_NUM + r"\s*kw\b", low):
+        power, matched["power_kw"] = _f(m.group(1)), m.group(0)
+    for m in re.finditer(_NUM + r"\s*(?:rpm|r/min|rev/min)", low):
+        if _is_output(low, m):
+            out_rpm, matched["output_rpm"] = _f(m.group(1)), m.group(0)
+        else:
+            found["input_rpm"], matched["input_rpm"] = _f(m.group(1)), m.group(0)
+    if m := re.search(_NUM + r"\s*(k)?\s*(?:h|hrs?|hours)\b", low):
+        found["life_hours"] = _f(m.group(1)) * (1000 if m.group(2) else 1)
+        matched["life_hours"] = m.group(0)
+    if m := re.search(r"\b(case[-\s]*hardened|hardened|carburi[sz]ed|ground)\b", low):
+        found["gear_material"], matched["gear_material"] = "hardened_steel", m.group(0)
+
+    notes = []
+    if "ratio" not in found and out_rpm and found.get("input_rpm"):
+        found["ratio"] = round(found["input_rpm"] / out_rpm, 3)
+        notes.append(f"ratio {found['ratio']:g} from {found['input_rpm']:g} rpm in / {out_rpm:g} rpm out")
+    ratio = found.get("ratio", 3.0)
+    if "input_rpm" not in found and out_rpm:
+        found["input_rpm"] = round(out_rpm * ratio, 1)
+        notes.append(f"input speed {found['input_rpm']:g} rpm from the output speed x ratio")
+    if "input_torque_nm" not in found and out_torque:
+        found["input_torque_nm"] = round(out_torque / ratio, 3)
+        notes.append(f"input torque {found['input_torque_nm']:g} N.m from the output torque / ratio")
+    if "input_torque_nm" not in found and power:
+        rpm = found.get("input_rpm", 1500.0)
+        found["input_torque_nm"] = round(9549.0 * power / rpm, 3)
+        notes.append(f"input torque {found['input_torque_nm']:g} N.m from {power:g} kW at {rpm:g} rpm")
+    notes = [f"offline parser: {k} from {v.strip()!r}" for k, v in matched.items()] + notes
+    plan = {"supported": True, "product_class": "gearbox", "template": "gearbox.spur_single_v1",
+            "unsupported_reason": None, **found, "stated_by_user": sorted(found), "assumptions": notes,
+            "parser": "offline"}
+    try:
+        choices = GearboxChoices(**found, text=text, notes=notes)
+    except (ValidationError, ValueError) as exc:
+        return PlannerResult(False, True, f"parsed choices rejected by the template: {exc}", plan, None, [],
+                             time.perf_counter() - t0)
+    desc = f"{choices.ratio:g}:1, {choices.input_torque_nm:g} N.m at {choices.input_rpm:g} rpm"
+    return PlannerResult(True, True, f"gearbox.spur_single_v1: {desc} (offline parser)", plan, choices, [],
+                         time.perf_counter() - t0)
+
+
 def parse_request_offline(text: str) -> PlannerResult:
     """Rule-based request parser (no model call), with the same result shape as ``plan_product``.
 
@@ -189,6 +285,8 @@ def parse_request_offline(text: str) -> PlannerResult:
     "1x" / "2x" drivetrains, "quick release" axles, BSA73 and crank length ("172.5 mm cranks").
     Everything matched is user-stated; the rest falls back to the template's sizing table and defaults.
     """
+    if is_gearbox_request(text) and not _BIKE.search(text):
+        return parse_gearbox_offline(text)
     t0 = time.perf_counter()
     low = text.lower()
     found: dict = {}
