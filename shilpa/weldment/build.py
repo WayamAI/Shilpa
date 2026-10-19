@@ -222,6 +222,16 @@ def build_weldment(spec: WeldmentSpec, strict: bool = False) -> WeldmentResult:
         pieces[e.id] = piece
         cut_list.append(_cut_entry(e, piece, higher, checks))
 
+    # Later cuts use a piece's outer envelope as a tool, and OCCT booleans may raise tolerances on shared
+    # sub-shapes in place, so a piece valid when coped can be invalid now. Such defects make the frame fuse
+    # come out inside-out (negative volume); ShapeFix heals them. Checked once, after all coping.
+    for pid, piece in list(pieces.items()):
+        if not piece.is_valid:
+            fixed = piece.fix()
+            checks.append({"name": f"piece_valid:{pid}", "passed": bool(fixed.is_valid), "severity": "warning",
+                           "detail": "healed with ShapeFix" if fixed.is_valid else "invalid after coping; ShapeFix failed"})
+            pieces[pid] = fixed
+
     part = None
     if pieces:
         shapes = list(pieces.values())
@@ -232,7 +242,9 @@ def build_weldment(spec: WeldmentSpec, strict: bool = False) -> WeldmentResult:
         fsolids = fused.solids()
         checks.append({"name": "single_solid", "passed": len(fsolids) == 1, "detail": f"{len(fsolids)} solids"})
         solid = fsolids[0] if len(fsolids) == 1 else fused
-        checks.append({"name": "valid_solid", "passed": bool(solid.is_valid), "detail": ""})
+        ok = bool(solid.is_valid) and solid.volume > 0
+        checks.append({"name": "valid_solid", "passed": ok,
+                       "detail": "" if ok else f"valid={solid.is_valid}, volume {solid.volume:.1f} (inside-out when negative)"})
         vol_sum = sum(p.volume for p in shapes)
         checks.append({"name": "volume_additive", "passed": abs(solid.volume - vol_sum) <= 1e-4 * vol_sum + 1e-3,
                        "detail": f"fused {solid.volume:.3f} vs pieces {vol_sum:.3f}", "severity": "warning"})

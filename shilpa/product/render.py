@@ -22,6 +22,7 @@ VIEWS = {
     # name: (azimuth deg from the drive side (-Y) toward the front, elevation deg)
     "side": (0.0, 0.0),
     "three_quarter": (35.0, 18.0),
+    "iso": (45.0, 35.264),  # true isometric: the camera looks down the (1, -1, 1) diagonal
     "front": (90.0, 8.0),
 }
 

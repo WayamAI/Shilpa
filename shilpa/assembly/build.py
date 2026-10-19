@@ -39,7 +39,10 @@ def register_source(kind: str, fn: SourceFn, *, replace: bool = False) -> None:
 
 
 def sources() -> set[str]:
-    return set(_SOURCES)
+    """Kinds that can be built: registered sources plus the built-in catalog / weldment / sheet-metal fallbacks."""
+    from .sources import BUILTIN
+
+    return set(_SOURCES) | set(BUILTIN)
 
 
 def _recipe_source(ref: RecipeRef) -> BuiltPart:

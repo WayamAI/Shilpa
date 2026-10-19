@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import math
 import time
+from collections import OrderedDict
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
@@ -188,21 +189,31 @@ def _pieces(build: AssemblyBuild, iid: str) -> dict[str, Any]:
 
 SAMPLE_SPACING = 1.5  # mm between surface samples in the coarse sweep pass
 SWEEP_HORIZON = 25.0  # mm; sample pairs farther apart are not resolved (KD-tree queries stop there)
-_SAMPLES: dict[int, np.ndarray] = {}
+SAMPLE_CACHE = 256  # part-local solids whose samples are kept (a bicycle has ~40 pieces)
+_SAMPLES: OrderedDict[int, tuple[Any, np.ndarray]] = OrderedDict()
 
 
 def _surface_samples(solid) -> np.ndarray:
-    """Points on a solid's surface about ``SAMPLE_SPACING`` apart (mesh vertices plus seeded area samples)."""
+    """Points on a solid's surface about ``SAMPLE_SPACING`` apart (mesh vertices plus seeded area samples).
+
+    Cached per part-local solid (parts are memoised by their source, so a router loop re-samples only
+    rebuilt parts). The cache holds the solid itself so its ``id`` cannot be reused while cached.
+    """
     key = id(solid.wrapped)
-    if key not in _SAMPLES:
+    hit = _SAMPLES.get(key)
+    if hit is None or hit[0] is not solid.wrapped:
         import trimesh
 
         verts, tris = solid.tessellate(0.1, 0.2)
         mesh = trimesh.Trimesh(np.array([tuple(v) for v in verts]), np.array(tris), process=False)
         n = int(mesh.area / SAMPLE_SPACING**2 * 1.3) + 1
         pts, _ = trimesh.sample.sample_surface(mesh, n, seed=0)
-        _SAMPLES[key] = np.vstack([mesh.vertices, pts])
-    return _SAMPLES[key]
+        hit = _SAMPLES[key] = (solid.wrapped, np.vstack([mesh.vertices, pts]))
+        while len(_SAMPLES) > SAMPLE_CACHE:
+            _SAMPLES.popitem(last=False)
+    else:
+        _SAMPLES.move_to_end(key)
+    return hit[1]
 
 
 class _Swept:
@@ -210,7 +221,9 @@ class _Swept:
 
     Exact BRepExtrema between coped tubes costs 0.3-3 s per pair, so a sweep first measures sampled
     surface points with a KD-tree (error below about one sample spacing), then re-measures exactly only
-    the poses and piece pairs that come within ``refine`` mm of the closest coarse result.
+    the piece pairs that come within ``refine`` mm (three spacings) of the closest coarse result, each at
+    its closest sampled pose, plus every pose where a pair may touch. The reported minimum is exact
+    BRepExtrema at sampled poses; between poses it is not interpolated.
     """
 
     def __init__(self, build: AssemblyBuild, static: str):
@@ -225,18 +238,22 @@ class _Swept:
             pts.append(p @ T[:3, :3].T + T[:3, 3])
             labels += [name] * len(p)
         self.tree = cKDTree(np.vstack(pts))
-        self.labels = labels
+        self.names = list(self.pieces)
+        self.label_idx = np.array([self.names.index(n) for n in labels] + [-1])  # -1: KD-tree "no hit" index
         self.world = {n: s.moved(_loc(T)) for n, s in self.pieces.items()}
 
     def coarse(self, iid: str, T: np.ndarray) -> list[tuple[float, str, str]]:
-        """(distance, moving piece, static piece) per moving piece, from the samples."""
+        """(distance, moving piece, static piece) for every static piece within the horizon of each moving piece."""
         out = []
         for name, solid in _pieces(self.build, iid).items():
             p = _surface_samples(solid) @ T[:3, :3].T + T[:3, 3]
             d, idx = self.tree.query(p, k=1, distance_upper_bound=SWEEP_HORIZON, workers=-1)
-            k = int(np.argmin(d))
-            if np.isfinite(d[k]):
-                out.append((float(d[k]), name, self.labels[idx[k]]))
+            hit = np.isfinite(d)
+            if not hit.any():
+                continue
+            dmin = np.full(len(self.names), np.inf)
+            np.minimum.at(dmin, self.label_idx[idx[hit]], d[hit])
+            out += [(float(dmin[k]), name, self.names[k]) for k in np.flatnonzero(np.isfinite(dmin))]
         return out
 
     def exact(self, iid: str, piece: str, static_piece: str, T: np.ndarray) -> float:
@@ -285,7 +302,8 @@ def _steering(spec: ProductSpec, build: AssemblyBuild, steps: int) -> ProductChe
     target = spec.targets.get("steer_clearance_min", 0.0)
     return ProductCheck("steering_sweep", d > target, "motion", round(d, 3), target, "mm", level="design",
                         responsible=["steer_lock", pair.split(".")[0] if pair else "fork"],
-                        note=f"min distance over +-{lock:g} deg at {at:g} deg ({pair})" + (f"; contact at {hits}" if hits else ""),
+                        note=(f"min distance over +-{lock:g} deg at {at:g} deg ({pair})" if pair else
+                              f"nothing within {SWEEP_HORIZON:g} mm over +-{lock:g} deg") + (f"; contact at {hits}" if hits else ""),
                         detail={"lock": lock, "contact_angles": hits, "min_at": at, "pair": pair, "refined": len(rows)})
 
 
@@ -295,7 +313,9 @@ def _cranks(spec: ProductSpec, build: AssemblyBuild, steps: int) -> ProductCheck
     d, at, pair, _ = _Swept(build, "frame").sweep(poses, ("crankset",))
     target = spec.targets.get("crank_clearance_min", 2.0)
     return ProductCheck("crank_sweep", d >= target, "motion", round(d, 3), target, "mm", level="design",
-                        responsible=["cs_bend", "q_factor", "chainline"], note=f"min crankset-frame distance at {at:g} deg ({pair})")
+                        responsible=["cs_bend", "q_factor", "chainline"],
+                        note=f"min crankset-frame distance at {at:g} deg ({pair})" if pair else
+                        f"nothing within {SWEEP_HORIZON:g} mm over a full turn")
 
 
 def _toe_box(build: AssemblyBuild, T_crank: np.ndarray, side: str, toe_reach: float) -> bd.Solid:
@@ -444,7 +464,7 @@ def check_bicycle(spec: ProductSpec, build: AssemblyBuild, assembly_report: Asse
                                note="; ".join(i.message for i in issues) or "tree leaves map to instances; standards consistent",
                                level="design"))
     if assembly_report is None and run_assembly:
-        assembly_report = validate_assembly(build)
+        assembly_report = validate_assembly(build, skip_sweeps=("steering", "cranks"))  # exact sweeps below
     t["assembly"] = round(time.perf_counter() - t0, 2)
     if assembly_report is not None:
         for c in assembly_report.checks:

@@ -10,10 +10,17 @@ not an improvised design.
 
 Provenance: fields the request states are tagged ``user`` in the skeleton,
 fields the model filled in are tagged ``llm``.
+
+``parse_request_offline`` is the no-LLM path: a few regular-expression rules
+(rider height in cm / m / ft-in, inseam, 700c / 650b, road / gravel, tyre
+width, size words, 1x / 2x, quick release) produce the same ``PlannerResult``,
+so the product flow can be demonstrated and tested without Azure. It refuses
+non-bicycle requests the same way the model is told to.
 """
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Literal
@@ -152,4 +159,110 @@ def plan_product(text: str, budget: Budget | None = None, timeout_s: float = 120
     return PlannerResult(True, True, f"{plan.template}: {plan.use_case or 'road'} "
                          f"{plan.frame_size or (str(plan.rider_height_cm) + ' cm rider' if plan.rider_height_cm else '')} "
                          f"{plan.wheel_size or '700c'}".strip(), plan.model_dump(), choices, budget.calls,
+                         time.perf_counter() - t0)
+
+
+# ---------------------------------------------------------------- offline (no LLM) parser
+
+_BIKE = re.compile(r"\b(bi(?:ke|cycle)s?|cycle|frameset)\b", re.I)
+# Product classes the bicycle template must not improvise, even when the word "bike" appears.
+_UNSUPPORTED = re.compile(r"\b(drone|quad-?copter|multi-?rotor|uav|car|motor\s*bike|motorbike|motorcycle|scooter|e-?bike|"
+                          r"electric|tandem|tricycle|trike|unicycle|full[-\s]*suspension|mtb|mountain\s*bike|chair|table|"
+                          r"robot|enclosure|conveyor)\b", re.I)
+_SIZE_WORDS = [(r"\bsize\s+(xxl|xl|xs|s|m|l)\b", None), (r"\b(xxl|2xl|extra[-\s]*extra[-\s]*large)\b", "XXL"),
+               (r"\b(xl|extra[-\s]*large)\b", "XL"), (r"\b(xs|extra[-\s]*small)\b", "XS"), (r"\b(large)\b", "L"),
+               (r"\b(medium|mid-?size)\b", "M"), (r"\b(small)\b", "S")]
+_NUM = r"(\d+(?:[.,]\d+)?)"
+
+
+def _f(x: str) -> float:
+    return float(x.replace(",", "."))
+
+
+def parse_request_offline(text: str) -> PlannerResult:
+    """Rule-based request parser (no model call), with the same result shape as ``plan_product``.
+
+    Recognises rider height ("178 cm", "1.85 m", "2 m rider", "6 ft 1"), inseam ("inseam 84 cm"),
+    wheel size ("700c", "700x32", "29er" -> 700c; "650b", "27.5" -> 650b), use case ("gravel",
+    "adventure", "all-road", "cx" -> gravel; "road", "endurance", "race" -> road), tyre width
+    ("45 mm tyres", "tires 32mm", "700x32c"), frame-size words (XS ... XXL, "small", "medium"),
+    "1x" / "2x" drivetrains, "quick release" axles, BSA73 and crank length ("172.5 mm cranks").
+    Everything matched is user-stated; the rest falls back to the template's sizing table and defaults.
+    """
+    t0 = time.perf_counter()
+    low = text.lower()
+    found: dict = {}
+    matched: dict[str, str] = {}
+    bad = _UNSUPPORTED.search(low)
+    if bad or not _BIKE.search(low):
+        if bad:
+            what, reason = bad.group(1), f"{bad.group(1)!r} is not something the diamond-frame bicycle template makes"
+        else:
+            words = re.sub(r"^(please\s+)?(design|make|build|create|draw|model)\s+(me\s+)?(an?\s+|the\s+)?", "", low.strip()).split()
+            what, reason = " ".join(words[:3]) or "unknown", "the request does not ask for a bicycle"
+        plan = {"supported": False, "product_class": what, "template": None, "unsupported_reason": reason, "parser": "offline"}
+        return PlannerResult(True, False, unsupported_message(what, reason), plan, None, [], time.perf_counter() - t0)
+
+    rest = low
+    if m := re.search(r"inseam\D{0,12}" + _NUM + r"\s*(cm|mm|in(?:ch(?:es)?)?\b|\")", low):
+        v, u = _f(m.group(1)), m.group(2)
+        found["rider_inseam_cm"] = round(v / 10 if u == "mm" else v * 2.54 if u.startswith(("in", '"')) else v, 1)
+        matched["rider_inseam_cm"] = m.group(0)
+        rest = low[:m.start()] + " " + low[m.end():]
+    if m := re.search(_NUM + r"\s*cm\b", rest):
+        if 100 < _f(m.group(1)) < 230:
+            found["rider_height_cm"], matched["rider_height_cm"] = _f(m.group(1)), m.group(0)
+    elif m := re.search(_NUM + r"\s*(?:m|metres?|meters?)\b", rest):
+        if 1.0 < _f(m.group(1)) < 2.3:
+            found["rider_height_cm"], matched["rider_height_cm"] = round(_f(m.group(1)) * 100, 1), m.group(0)
+    elif m := re.search(r"\b(\d)\s*(?:ft|foot|feet|')\s*(\d{1,2})?", rest):
+        cm = (int(m.group(1)) * 12 + int(m.group(2) or 0)) * 2.54
+        if 100 < cm < 230:
+            found["rider_height_cm"], matched["rider_height_cm"] = round(cm, 1), m.group(0)
+
+    if m := re.search(r"\b(650\s*b|27\.5|584)(?![\d.])", low):
+        found["wheel_size"], matched["wheel_size"] = "650b", m.group(0)
+    elif m := re.search(r"\b(700\s*c?|29er|622)(?!\d)", low):
+        found["wheel_size"], matched["wheel_size"] = "700c", m.group(0)
+
+    if m := re.search(r"\b(gravel|adventure|all[-\s]*road|cx|cyclo-?cross|bikepacking)\b", low):
+        found["use_case"], matched["use_case"] = "gravel", m.group(0)
+    elif m := re.search(r"\b(road|endurance|race|racing)\b", low):
+        found["use_case"], matched["use_case"] = "road", m.group(0)
+
+    tyre = (re.search(r"\b(?:700|650b?)\s*[x×]\s*" + _NUM + r"\s*c?\b", low)
+            or re.search(_NUM + r"\s*mm\s*(?:wide\s*)?(?:tyres?|tires?|rubber)", low)
+            or re.search(r"(?:tyres?|tires?)\D{0,12}" + _NUM + r"\s*mm", low))
+    if tyre and 20 <= _f(tyre.group(1)) <= 60:
+        found["tyre_width_mm"], matched["tyre_width_mm"] = _f(tyre.group(1)), tyre.group(0)
+
+    for pat, size in _SIZE_WORDS:
+        if m := re.search(pat, low):
+            found["frame_size"], matched["frame_size"] = size or m.group(1).upper(), m.group(0)
+            break
+
+    if m := re.search(r"\b1\s*x\b|\bsingle\s*(?:ring|chainring)\b", low):
+        found["chainrings"], matched["chainrings"] = [40], m.group(0)
+    elif m := re.search(r"\b2\s*x\b|\bdouble\b|\bcompact\b", low):
+        found["chainrings"], matched["chainrings"] = [50, 34], m.group(0)
+    if m := re.search(r"quick[-\s]*release|\bqr\b", low):
+        found["rear_axle"], found["front_axle"] = "135x10qr", "100x9qr"
+        matched["rear_axle"] = matched["front_axle"] = m.group(0)
+    if m := re.search(r"\bbsa\s*73\b|\b73\s*mm\s*(?:bb|bottom bracket|shell)", low):
+        found["bb_standard"], matched["bb_standard"] = "BSA73", m.group(0)
+    if m := re.search(_NUM + r"\s*mm\s*cranks?", low):
+        if 150 <= _f(m.group(1)) <= 185:
+            found["crank_length_mm"], matched["crank_length_mm"] = _f(m.group(1)), m.group(0)
+
+    notes = [f"offline parser: {k} from {v.strip()!r}" for k, v in matched.items()]
+    plan = {"supported": True, "product_class": "bicycle", "template": "bicycle.diamond_v1", "unsupported_reason": None,
+            **found, "overrides": [], "stated_by_user": sorted(found), "assumptions": notes, "parser": "offline"}
+    try:
+        choices = BicycleChoices(**found, text=text, notes=notes)
+    except (ValidationError, ValueError) as exc:
+        return PlannerResult(False, True, f"parsed choices rejected by the template: {exc}", plan, None, [],
+                             time.perf_counter() - t0)
+    who = found.get("frame_size") or (f"{found['rider_height_cm']:g} cm rider" if "rider_height_cm" in found else "")
+    desc = " ".join(x for x in (found.get("use_case", "road"), who, found.get("wheel_size", "700c")) if x)
+    return PlannerResult(True, True, f"bicycle.diamond_v1: {desc} (offline parser)", plan, choices, [],
                          time.perf_counter() - t0)

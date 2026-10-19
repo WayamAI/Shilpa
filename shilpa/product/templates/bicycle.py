@@ -42,7 +42,8 @@ XXL    193-205     624    400    73.0   72.5   595  415  70    175    120   720
 =====  ==========  =====  =====  =====  =====  ===  ===  ====  =====  ====  ===
 
 Gravel deltas: stack +20, reach -5, HA -1.5 deg, CS +15, drop +3. Fork offset is
-50 mm for XS/S and 47/45 mm above (gravel 50 throughout). ST is centre-to-top.
+50 mm for XS/S and 47/45 mm above (gravel 55 for XS/S, 50 above, keeping trail under
+80 mm on the slack small gravel frames). ST is centre-to-top.
 Inseam, when not given, is estimated as 0.47 x height (approx).
 """
 
@@ -70,6 +71,7 @@ SIZE_TABLE: dict[str, tuple[float, ...]] = {
 }
 GRAVEL_DELTA = {"stack": 20.0, "reach": -5.0, "head_angle": -1.5, "chainstay_length": 15.0, "bb_drop": 3.0}
 ROAD_FORK_OFFSET = {"XS": 50.0, "S": 50.0, "M": 47.0, "L": 45.0, "XL": 45.0, "XXL": 45.0}
+GRAVEL_FORK_OFFSET = {"XS": 55.0, "S": 55.0, "M": 50.0, "L": 50.0, "XL": 50.0, "XXL": 50.0}
 # Compact top-tube slope (deg) by size, more on small frames for standover; gravel +2.
 TT_SLOPE = {"XS": 14.0, "S": 12.0, "M": 10.0, "L": 8.0, "XL": 6.0, "XXL": 5.0}
 WHEEL_BSD = {"700c": 622, "650b": 584}
@@ -172,7 +174,7 @@ def skeleton_from_choices(c: BicycleChoices) -> tuple[Requirements, dict[str, Sk
     sk["seat_tube_nominal"] = _p(row["seat_tube_length"], "mm", "table", f"size {size}, centre to top")
     sk["seat_tube_length"] = _p(None, "mm", "derived")
     sk["tt_slope"] = _p(TT_SLOPE[size] + (2.0 if gravel else 0.0), "deg", "table", "compact top tube drops toward the seat tube")
-    sk["fork_offset"] = _p(50.0 if gravel else ROAD_FORK_OFFSET[size], "mm", "table")
+    sk["fork_offset"] = _p((GRAVEL_FORK_OFFSET if gravel else ROAD_FORK_OFFSET)[size], "mm", "table")
     sk["crown_clearance"] = _p(8.0, "mm", "default", "design gap above the largest tyre under the fork crown")
     sk["fork_a2c"] = _p(None, "mm", "derived")
     sk["head_tube_length"] = _p(None, "mm", "derived")

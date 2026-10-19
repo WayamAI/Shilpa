@@ -36,6 +36,10 @@ from .templates.bicycle import CROWN_HEIGHT, SEATPOST_LENGTHS, spec_from_skeleto
 
 MAX_CHAINSTAY = 460.0  # mm; beyond this the bike stops being a road or gravel bike
 CHAINSTAY_STEP = 10.0  # mm per repair step when the chainstays crowd the tyre
+# Measured on the M road frame with a 50 mm tyre: each 10 mm of chainstay buys ~1.2 mm of tyre clearance
+# (the stays open out along a longer line). An overlapping tyre has an unknown depth: assume 3 mm more.
+CLEARANCE_PER_STEP = 1.2
+OVERLAP_MARGIN = 3.0
 MIN_HEAD_TUBE = 90.0
 
 
@@ -102,13 +106,26 @@ def _tyre_rear(spec: ProductSpec, c: ProductCheck) -> list[Action] | str:
         return [Action("max_tyre_width", round(max_tyre + c.detail["deficit"] + 1.0, 1), "design", c.name,
                        "tyre crowds the seat stays; widen their bend by designing for a wider tyre", "frame")]
     if member.startswith(("chainstay", "seat_tube", "bb_shell")):
+        actions = []
+        rings = _v(spec, "chainrings")
+        if len(rings) > 1 and spec.skeleton["chainrings"].source != "user":
+            # The inner ring limits how far out the stay may bend behind the BB; a single ring sits on the
+            # chainline, ~4 mm further out, so the stay clears both ring and tyre (the usual wide-tyre answer).
+            actions += [Action("chainrings", [40], "design", c.name, f"tyre crowds {member} next to a {rings} double; "
+                               "a 1x ring lets the chainstays bend wider", "drivetrain"),
+                        Action("chainline", _v(spec, "rear_chainline"), "design", c.name,
+                               "1x ring on the cassette centre line", "drivetrain")]
         cs = _v(spec, "chainstay_length")
         if cs + CHAINSTAY_STEP > MAX_CHAINSTAY:
+            if actions:
+                return actions
             return f"tyre crowds {member} and the chainstays are already {cs:g} mm (limit {MAX_CHAINSTAY:g})"
-        steps = max(1, math.ceil((c.detail["deficit"] + (4.0 if c.detail.get("overlap_mm3") else 0.0)) / 3.0))
+        need = c.detail["deficit"] + (OVERLAP_MARGIN if c.detail.get("overlap_mm3") else 0.0)
+        steps = max(1, math.ceil(need / CLEARANCE_PER_STEP))
         new = min(MAX_CHAINSTAY, cs + CHAINSTAY_STEP * steps)
-        return [Action("chainstay_length", new, "design", c.name,
-                       f"tyre {c.actual} mm from {member}; lengthen the chainstays so the stays open out before the tyre", "frame")]
+        return actions + [Action("chainstay_length", new, "design", c.name,
+                                 f"tyre {c.actual} mm from {member}; lengthen the chainstays so the stays open out "
+                                 "before the tyre", "frame")]
     return f"tyre meets frame member {member!r}; no repair rule"
 
 
