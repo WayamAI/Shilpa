@@ -9,6 +9,7 @@ dependencies = [
     "build123d==0.13.0",
     "fastapi>=0.143.3",
     "httpx>=0.28.1",
+    "jsonschema>=4.23",
     "openai>=3.35.1",
     "pillow>=13.0.0",
     "py-gearworks>=0.0.24",

@@ -42,7 +42,8 @@ def main() -> None:
             print("npm not found; studio not started")
 
     print(f"\nShilpa local stack: API http://127.0.0.1:{args.port}  studio http://localhost:3100")
-    print(f"Azure OpenAI planner: {'configured' if settings.llm_configured else 'NOT configured (set .env)'}\n")
+    service = f"Ollama Cloud ({settings.ollama_model})" if settings.llm_provider == "ollama" else "Azure OpenAI"
+    print(f"{service} planner: {'configured' if settings.llm_configured else 'NOT configured (set .env)'}\n")
     try:
         while True:
             for name, p in procs:

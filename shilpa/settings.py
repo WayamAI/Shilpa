@@ -40,9 +40,17 @@ class Settings:
     aoai_api_version: str = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
     aoai_deployment: str = os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
     aoai_timeout_s: float = float(os.getenv("AZURE_OPENAI_TIMEOUT_S", 90))
-    # Kill switch for every model call: SHILPA_LLM=off|on. Defaults to off when no endpoint is set,
-    # so a checkout without Azure credentials can never reach a paid API by accident.
-    llm_mode: str = os.getenv("SHILPA_LLM", "on" if os.getenv("AZURE_OPENAI_ENDPOINT") else "off").strip().lower()
+    # Which model service the planner uses: azure (Azure OpenAI) or ollama (Ollama Cloud, native chat API).
+    llm_provider: str = os.getenv("SHILPA_LLM_PROVIDER", "azure").strip().lower()
+    ollama_api_key: str = os.getenv("OLLAMA_API_KEY", "")
+    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "https://ollama.com").rstrip("/")
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "deepseek-v4.1-flash")
+    ollama_timeout_s: float = float(os.getenv("OLLAMA_TIMEOUT_S", 120))
+    # Kill switch for every model call: SHILPA_LLM=off|on. Defaults to off when no service is configured,
+    # so a checkout without credentials can never reach a paid API by accident.
+    llm_mode: str = os.getenv("SHILPA_LLM", "on" if (os.getenv("AZURE_OPENAI_ENDPOINT") or (
+        os.getenv("SHILPA_LLM_PROVIDER", "").lower() == "ollama" and os.getenv("OLLAMA_API_KEY"))) else "off"
+    ).strip().lower()
     # Worker
     worker_timeout_s: int = _int("SHILPA_WORKER_TIMEOUT_S", 300)
     lock_duration_s: int = _int("SHILPA_LOCK_DURATION_S", 60)
@@ -60,7 +68,14 @@ class Settings:
 
     @property
     def llm_configured(self) -> bool:
+        if self.llm_provider == "ollama":
+            return self.llm_enabled and bool(self.ollama_api_key and self.ollama_model)
         return self.llm_enabled and bool(self.aoai_endpoint and self.aoai_deployment)
+
+    @property
+    def llm_model(self) -> str:
+        """The model or deployment name calls go to (for logs and the health endpoint)."""
+        return self.ollama_model if self.llm_provider == "ollama" else self.aoai_deployment
 
     @property
     def planner_status(self) -> str:

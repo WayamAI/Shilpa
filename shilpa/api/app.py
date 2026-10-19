@@ -116,7 +116,8 @@ def health():
 
     return {"ok": True, "llm_configured": settings.llm_configured, "auth_mode": settings.auth_mode,
             "planner": settings.planner_status, "llm_enabled": settings.llm_enabled,
-            "llm_deployment": (settings.aoai_deployment or None) if settings.llm_enabled else None,
+            "llm_deployment": (settings.llm_model or None) if settings.llm_enabled else None,
+            "llm_provider": settings.llm_provider if settings.llm_enabled else None,
             "freecad_available": freecad_adapter.available(),
             "products_available": product_runner() is not None,
             "job_kinds": ["part", "assembly", "sheet_metal", "product"],

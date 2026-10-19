@@ -1,4 +1,12 @@
-"""Azure OpenAI gateway with structured outputs and a shared job budget (blueprint section 9).
+"""Model gateway with structured outputs and a shared job budget (blueprint section 9).
+
+Two services, chosen by ``SHILPA_LLM_PROVIDER``: Azure OpenAI (``azure``, strict
+JSON-schema structured outputs enforced by the service) and Ollama Cloud
+(``ollama``, its native chat API). Ollama Cloud does not enforce the schema for
+reasoning models, so the schema goes into the system prompt, thinking is turned
+off, the reply is parsed leniently (markdown fences stripped), checked against
+the schema with ``jsonschema``, and sent back once with the validation errors
+when it does not match.
 
 Every call goes through ``call_structured``. It charges the job budget before and
 after the call, and turns refusals, truncation, timeouts and malformed JSON into
@@ -162,6 +170,102 @@ def _token_provider():
     return get_bearer_token_provider(cred, "https://cognitiveservices.azure.com/.default")
 
 
+# ---------------------------------------------------------------- Ollama Cloud
+
+OLLAMA_SCHEMA_RULES = (
+    "\n\nRespond with exactly one JSON object and nothing else: no markdown fences, no prose before or after. "
+    "It must validate against the JSON Schema below. Use exactly these property names and no others; every listed "
+    "property is required (use null where the schema allows null and the value is unknown); string values must be one "
+    "of the enum values where an enum is given.\nJSON Schema:\n")
+
+
+def _json_object(text: str) -> dict:
+    """The JSON object in a reply, tolerating markdown fences and text around it."""
+    t = (text or "").strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[1] if "\n" in t else ""
+        t = t.rsplit("```", 1)[0]
+    i, j = t.find("{"), t.rfind("}")
+    if i < 0 or j < i:
+        raise json.JSONDecodeError("no JSON object in the reply", t, 0)
+    return json.loads(t[i:j + 1])
+
+
+def _ollama_messages(system: str, user: str | list, schema: dict) -> list[dict]:
+    """Ollama chat messages: the schema goes into the system prompt (Ollama Cloud does not enforce ``format``
+    for reasoning models), and OpenAI-style content parts become text plus base64 ``images``."""
+    msg: dict[str, Any] = {"role": "user", "content": user}
+    if isinstance(user, list):
+        texts, images = [], []
+        for part in user:
+            if part.get("type") == "text":
+                texts.append(part["text"])
+            elif part.get("type") == "image_url":
+                url = part["image_url"]["url"]
+                images.append(url.split(",", 1)[1] if url.startswith("data:") else url)
+        msg = {"role": "user", "content": "\n\n".join(texts), **({"images": images} if images else {})}
+    return [{"role": "system", "content": system + OLLAMA_SCHEMA_RULES + json.dumps(schema)}, msg]
+
+
+def _ollama_chat(messages: list[dict], schema: dict, max_out: int, timeout: float) -> dict:
+    import httpx
+
+    ensure_enabled()
+    if not settings.llm_configured:
+        raise ShilpaError(ErrorCode.INTERNAL, "Ollama Cloud is not configured: set OLLAMA_API_KEY and OLLAMA_MODEL in .env")
+    body = {"model": settings.ollama_model, "messages": messages, "stream": False, "format": schema, "think": False,
+            "options": {"temperature": 0, "num_predict": max_out}}
+    try:
+        r = httpx.post(f"{settings.ollama_base_url}/api/chat", json=body, timeout=timeout,
+                       headers={"Authorization": f"Bearer {settings.ollama_api_key}"})
+    except httpx.TimeoutException:
+        raise ShilpaError(ErrorCode.MODEL_TIMEOUT, f"model call timed out after {timeout:g} s")
+    except httpx.HTTPError as exc:
+        raise ShilpaError(ErrorCode.INTERNAL, f"model service unreachable: {type(exc).__name__}")
+    if r.status_code != 200:
+        detail = r.text[:200].replace(settings.ollama_api_key, "***") if settings.ollama_api_key else r.text[:200]
+        raise ShilpaError(ErrorCode.INTERNAL, f"model service error {r.status_code}: {detail}")
+    return r.json()
+
+
+def _call_ollama(system: str, user: str | list, schema: dict, budget: Budget, max_out: int, purpose: str,
+                 timeout_s: float | None) -> dict:
+    """One schema-checked call, with one repair round when the reply does not match the schema."""
+    from jsonschema import Draft202012Validator
+
+    validator = Draft202012Validator(schema)
+    messages = _ollama_messages(system, user, schema)
+    timeout = timeout_s or settings.ollama_timeout_s
+    for attempt in (1, 2):
+        budget.check()
+        t0 = time.time()
+        d = _ollama_chat(messages, schema, max_out, timeout)
+        in_tok, out_tok = int(d.get("prompt_eval_count") or 0), int(d.get("eval_count") or 0)
+        budget.used_input += in_tok
+        budget.used_output += out_tok
+        budget.calls.append({"purpose": purpose + (" (repair)" if attempt == 2 else ""), "input_tokens": in_tok,
+                             "output_tokens": out_tok, "ms": round((time.time() - t0) * 1000),
+                             "model": d.get("model") or settings.ollama_model})
+        content = (d.get("message") or {}).get("content") or ""
+        if d.get("done_reason") == "length":
+            raise ShilpaError(ErrorCode.MODEL_TRUNCATED, "model output was truncated; no partial plan is accepted")
+        try:
+            data = _json_object(content)
+            problems = [f"{'/'.join(str(p) for p in e.absolute_path) or '(root)'}: {e.message}"
+                        for e in validator.iter_errors(data)]
+        except json.JSONDecodeError as exc:
+            data, problems = None, [f"the reply was not a JSON object ({exc.msg})"]
+        if not problems:
+            return data
+        if attempt == 2:
+            raise ShilpaError(ErrorCode.INVALID_SCHEMA, "model reply does not match the schema after one repair: "
+                              + "; ".join(problems[:5]))
+        messages = messages + [{"role": "assistant", "content": content},
+                               {"role": "user", "content": "That reply does not match the JSON Schema: "
+                                + "; ".join(problems[:12]) + ". Send the corrected JSON object only."}]
+    raise AssertionError("unreachable")
+
+
 def call_structured(
     *,
     system: str,
@@ -173,11 +277,14 @@ def call_structured(
     purpose: str = "",
     timeout_s: float | None = None,
 ) -> dict:
-    # The kill switch is enforced in ``_client``: no real client exists while SHILPA_LLM=off.
+    # The kill switch is enforced in ``_client`` / ``_ollama_chat``: no request leaves while SHILPA_LLM=off.
     budget.check()
+    max_out = min(max_output_tokens, budget.output_tokens - budget.used_output)
+    if _client_override is None and settings.llm_provider == "ollama":
+        ensure_enabled()
+        return _call_ollama(system, user, schema, budget, max_out, purpose, timeout_s)
     import openai
 
-    max_out = min(max_output_tokens, budget.output_tokens - budget.used_output)
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     t0 = time.time()
     client = _client()
