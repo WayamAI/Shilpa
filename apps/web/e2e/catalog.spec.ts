@@ -76,3 +76,18 @@ test("typed part names open the exact part", async ({ page }, info) => {
   await expect(page.getByText("ISO 4762 M10-1.5 x 40").filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: info.outputPath("catalog-lookup.png") });
 });
+
+test("pipe flanges and OpenBuilds parts by name", async ({ page }, info) => {
+  await page.goto("/catalog");
+  const matches = page.getByTestId("catalog-matches").filter({ visible: true });
+  await page.getByLabel("Search parts").fill("NPS 4 class 300 weld neck flange");
+  await matches.getByRole("button", { name: /weld-neck flange NPS 4 class 300/ }).click();
+  await expect(page.getByTestId("part-viewer")).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
+  await expect(page.getByText(/255 × 255/).first()).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: info.outputPath("catalog-flange.png") });
+
+  await page.getByLabel("Search parts").fill("NEMA 17");
+  await matches.getByRole("button", { name: /NEMA 17 stepper/ }).click();
+  await expect(page.getByText(/42.42 × 42.42/).first()).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: info.outputPath("catalog-nema.png") });
+});

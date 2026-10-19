@@ -37,7 +37,18 @@ from shilpa.catalog.designations import lookup
     ("spur gear m2 z20", "gear.spur", {"module": 2.0, "teeth": 20}),
     ("helical gear module 1.5 30 teeth", "gear.helical", {"module": 1.5, "teeth": 30}),
     ("2040 x 500", "vslot.rail", {"profile": "2040", "length": 500.0}),
-    ("c-beam 1000 mm", "vslot.rail", {"profile": "c_beam", "length": 1000.0}),
+    ("c-beam 1000 mm", "openbuilds.c_beam_rail", {"length": 1000.0}),
+    ("2 in sch 40 pipe x 1000", "pipe.straight", {"nps": "2", "identifier": "40", "material": "steel", "length": 1000.0}),
+    ('1/2" type K copper tube', "pipe.straight", {"nps": "1/2", "identifier": "K", "material": "copper"}),
+    ("NPS 4 class 300 weld neck flange", "flange.weld_neck", {"nps": "4", "flange_class": 300}),
+    ('4" 150# blind flange', "flange.blind", {"nps": "4", "flange_class": 150}),
+    ("#40 sprocket 20T", "drive.sprocket", {"chain": "40", "teeth": 20}),
+    ("worm wheel m2 z30", "drive.worm_wheel", {"module": 2.0, "teeth": 30}),
+    ("worm m1.5 2 start", "drive.worm", {"module": 1.5, "starts": 2}),
+    ("NEMA 17", "openbuilds.stepper_motor", {"motor_type": "Nema17"}),
+    ("Tr8 lead screw 400 mm", "openbuilds.lead_screw", {"length": 400.0}),
+    ("xl gantry plate", "openbuilds.cbeam_gantry_plate_xl", {}),
+    ("8 mm lock collar", "openbuilds.lock_collar", {"inside_diameter": "8mm"}),
     ("t-nut m5", "vslot.tnut", {"thread": "M5"}),
 ])
 def test_lookup(text, gen, params):
@@ -52,7 +63,7 @@ def test_lookup(text, gen, params):
 
 
 @pytest.mark.parametrize("text", ["M6x21 socket head", "bracket with 4 holes", "1/4-20 x 1\" socket head cap screw",
-                                  "", "hello"])
+                                  "", "hello", "NPS 14 weld neck flange"])
 def test_no_match_for_non_standard_or_unrelated(text):
     assert lookup(text) == []
 

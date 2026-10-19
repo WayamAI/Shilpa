@@ -31,6 +31,10 @@ FAMILIES = [  # (name prefix, family title), first match wins
     ("ring.", "Seals, circlips and keys"),
     ("key.", "Seals, circlips and keys"),
     ("gear.", "Gears"),
+    ("drive.", "Chain and worm drives"),
+    ("pipe.", "Pipes and flanges"),
+    ("flange.", "Pipes and flanges"),
+    ("openbuilds.", "OpenBuilds motion"),
     ("vslot.", "V-slot extrusion"),
     ("bike.", "Bicycle parts"),
 ]

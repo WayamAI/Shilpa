@@ -21,6 +21,10 @@ DENSITY_G_CM3: dict[str, float] = {
     "carbon_fibre": 1.55,  # cured CFRP laminate
     "nylon": 1.15,
     "acetal": 1.41,  # POM (Delrin)
+    "copper": 8.96,
+    "iron": 7.20,  # cast / ductile iron
+    "pvc": 1.40,
+    "abs": 1.05,
     "rubber": 1.20,
     "polyurethane": 1.20,
 }

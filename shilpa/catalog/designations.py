@@ -18,6 +18,10 @@ part-type words):
   ``DIN 6885 A 8x7x40``).
 * Gears (``spur gear m2 z20``, ``helical gear module 1.5 30 teeth``, ``rack m2``),
   V-slot (``2040 x 500``, ``C-beam 1000 mm``, ``V-slot wheel``, ``T-nut M5``).
+* Pipe and flanges (``2 in sch 40 pipe x 1000``, ``NPS 4 class 300 weld neck
+  flange``, ``1/2" type K copper tube``), sprockets (``#40 sprocket 20T``),
+  worm drives (``worm wheel m2 z30``), OpenBuilds parts (``NEMA 17``, ``Tr8
+  lead screw 400 mm``, ``gantry plate``, ``8 mm lock collar``).
 
 Each match is validated against the generator's parameter model (nothing is
 built) and comes back as ``{generator, params, label, matched, score}``, best
@@ -339,14 +343,17 @@ def _vslot(text: str) -> list[dict]:
     out = []
     if m := re.search(r"\b(2020|2040|2060|2080|4040|4080|c[-\s]?beam)\b(?:\s*(?:rail|extrusion|profile|v[-\s]?slot))?"
                       r"(?:\s*[x×*]\s*" + NUM + r"|\s+" + NUM + r"\s*mm)?", text):
-        profile = "c_beam" if m.group(1).startswith("c") else m.group(1)
-        params: dict[str, Any] = {"profile": profile}
         length = m.group(2) or m.group(3)
-        if length:
-            params["length"] = _f(length)
-        hit = _match("vslot.rail", params, f"V-slot {profile.replace('_', '-')}" + (f" x {_f(length):g} mm" if length
-                                                                                       else ""), m.group(0), 0.85)
-        if hit and (length or re.search(r"v[-\s]?slot|extrusion|rail|profile|c[-\s]?beam", text)):
+        if m.group(1).startswith("c"):  # the OpenBuilds C-beam profile, not the V-slot cell approximation
+            params: dict[str, Any] = {"length": _f(length)} if length else {}
+            hit = _match("openbuilds.c_beam_rail", params, "C-beam" + (f" x {_f(length):g} mm" if length else ""),
+                         m.group(0), 0.85)
+        else:
+            params = {"profile": m.group(1), **({"length": _f(length)} if length else {})}
+            hit = _match("vslot.rail", params, f"V-slot {m.group(1)}" + (f" x {_f(length):g} mm" if length else ""),
+                         m.group(0), 0.85)
+        if hit and not re.search(r"plate|mount|gantry", text) and (
+                length or re.search(r"v[-\s]?slot|extrusion|rail|profile|c[-\s]?beam", text)):
             out.append(hit)
     if re.search(r"v[-\s]?(slot\s*)?wheel|mini\s*wheel", text):
         size = "mini" if "mini" in text else "standard"
@@ -361,7 +368,151 @@ def _vslot(text: str) -> list[dict]:
     return out
 
 
-RULES = (_screws, _nuts_and_washers, _bearings, _o_rings, _circlips, _keys, _gears, _vslot)
+# ---------------------------------------------------------------- pipes, flanges, drives, OpenBuilds
+
+# A pipe size never sticks to a letter ("M6" is a thread, not NPS 6).
+_NPS = r"(?:nps\s*)?(?<![a-z\d./])(\d+\s+\d/\d|\d/\d|\d+(?:\.\d+)?)\s*(?:\"|in(?:ch(?:es)?)?\b)?"
+
+
+def _nps_value(raw: str) -> str:
+    raw = re.sub(r"\s+", " ", raw.strip())
+    return {"0.5": "1/2", "0.75": "3/4", "1.25": "1 1/4", "1.5": "1 1/2", "2.5": "2 1/2"}.get(raw, raw.rstrip(".0") if
+                                                                                              raw.endswith(".0") else raw)
+
+
+def _pipes(text: str) -> list[dict]:
+    if not re.search(r"\bpipe\b|\btube\b", text) or "flange" in text:
+        return []
+    m = re.search(_NPS + r"\s*(?:sch(?:edule)?\s*(\w+)|type\s*([klm])\b)?", text)
+    if not m:
+        return []
+    nps = _nps_value(m.group(1))
+    ident = (m.group(2) or m.group(3) or "").upper() or None
+    mat = next((x for x in ("stainless", "copper", "pvc", "iron", "abs", "steel") if x in text),
+               "copper" if ident in ("K", "L", "M") else "steel")
+    ident = ident or ("40" if mat == "steel" else "40S" if mat == "stainless" else None)
+    params: dict[str, Any] = {"nps": nps, "material": mat}
+    if ident:
+        params["identifier"] = ident
+    if lm := re.search(r"[x×*]\s*" + NUM + r"\s*(mm|m\b)?|\b" + NUM + r"\s*(mm|m)\s*(?:long|length)?", text):
+        val, unit = (lm.group(1), lm.group(2)) if lm.group(1) else (lm.group(3), lm.group(4))
+        params["length"] = _f(val) * (1000 if unit == "m" else 1)
+    from .mechanical import schedule_label
+
+    label = f"NPS {nps} {schedule_label(ident) if ident else ''} {mat} pipe".replace("  ", " ")
+    hit = _match("pipe.straight", params, label, m.group(0), 0.85)
+    return [hit] if hit else []
+
+
+FLANGE_WORDS = [(r"weld(?:ing)?[-\s]?neck|\bwn\b", "flange.weld_neck"), (r"slip[-\s]?on|\bso\b", "flange.slip_on"),
+                (r"socket[-\s]?weld|\bsw\b", "flange.socket_weld"), (r"blind|\bblrf\b", "flange.blind"),
+                (r"lap(?:ped)?[-\s]?(?:joint)?|\blj\b", "flange.lapped")]
+
+
+def _flanges(text: str) -> list[dict]:
+    if "flange" not in text or re.search(r"\b(nut|screw|bolt)s?\b", text):
+        return []
+    gen = next((g for p, g in FLANGE_WORDS if re.search(p, text)), "flange.weld_neck")
+    m = re.search(_NPS, text)
+    if not m:
+        return []
+    cls = re.search(r"(?:class|cl\.?)\s*(150|300)|\b(150|300)\s*(?:#|lb)", text)
+    params: dict[str, Any] = {"nps": _nps_value(m.group(1))}
+    if cls:
+        params["flange_class"] = int(cls.group(1) or cls.group(2))
+    for face in ("raised", "flat", "ring", "tongue", "groove", "male", "female"):
+        if re.search(rf"\b{face}\b|\b{face[0]}f\b" if face in ("raised", "flat") else rf"\b{face}\b", text) and \
+                gen != "flange.lapped":
+            params["face_type"] = face.title()
+            break
+    label = f"{gen.split('.')[1].replace('_', '-')} flange NPS {params['nps']} class {params.get('flange_class', 150)}"
+    hit = _match(gen, params, label, m.group(0), 0.9)
+    return [hit] if hit else []
+
+
+def _drives(text: str) -> list[dict]:
+    out = []
+    if "sprocket" in text:
+        chain = re.search(r"(?:ansi\s*|#|no\.?\s*)?\b(25|35|40|41|50|60|80)\b(?!\s*(?:t\b|teeth|tooth))", text)
+        teeth = re.search(r"\b(\d+)\s*(?:t\b|teeth|tooth)", text)
+        params: dict[str, Any] = {}
+        if chain:
+            params["chain"] = chain.group(1)
+        if teeth:
+            params["teeth"] = int(teeth.group(1))
+        if params:
+            hit = _match("drive.sprocket", params, f"ANSI {params.get('chain', '40')} sprocket "
+                         f"{params.get('teeth', 20)}T", "sprocket", 0.85)
+            if hit:
+                out.append(hit)
+    if "worm" in text:
+        gen = "drive.worm_wheel" if re.search(r"worm\s*(wheel|gear)", text) else "drive.worm"
+        params = {}
+        if mod := re.search(r"\bm(?:od(?:ule)?)?\s*=?\s*" + NUM + r"\b", text):
+            params["module"] = _f(mod.group(1))
+        if gen == "drive.worm_wheel" and (z := re.search(r"\bz\s*=?\s*(\d+)\b|\b(\d+)\s*(?:t\b|teeth)", text)):
+            params["teeth"] = int(z.group(1) or z.group(2))
+        if st := re.search(r"\b(\d)\s*[-\s]?start", text):
+            params["starts"] = int(st.group(1))
+        label = gen.split(".")[1].replace("_", " ") + (f" m{params['module']:g}" if "module" in params else "") + (
+            f" z{params['teeth']}" if "teeth" in params else "") + (f" {params['starts']}-start" if "starts" in params
+                                                                     else "")
+        hit = _match(gen, params, label, "worm", 0.85)
+        if hit:
+            out.append(hit)
+    return out
+
+
+OPENBUILDS_WORDS = [
+    (r"nema\s*-?\s*17", "openbuilds.stepper_motor", {"motor_type": "Nema17"}, "NEMA 17 stepper"),
+    (r"nema\s*-?\s*23", "openbuilds.stepper_motor", {"motor_type": "Nema23"}, "NEMA 23 stepper"),
+    (r"(?:x\s*-?\s*large|xl)\s*(?:c[-\s]?beam\s*)?gantry\s*plate", "openbuilds.cbeam_gantry_plate_xl", {},
+     "C-beam gantry plate XL"),
+    (r"gantry\s*plate", "openbuilds.cbeam_gantry_plate", {}, "C-beam gantry plate"),
+    (r"end\s*mount", "openbuilds.cbeam_end_mount", {}, "C-beam end mount"),
+    (r"riser\s*plate", "openbuilds.cbeam_riser_plate", {}, "C-beam riser plate"),
+    (r"spacer\s*block", "openbuilds.spacer_block", {}, "spacer block"),
+    (r"\bl[-\s]?bracket|angle\s*bracket", "openbuilds.l_bracket", {}, "L-bracket"),
+    (r"eccentric\s*spacer", "openbuilds.eccentric_spacer", {}, "eccentric spacer"),
+    (r"(?:anti[-\s]?backlash|lead\s*screw)\s*nut", "openbuilds.anti_backlash_nut_block", {}, "anti-backlash nut block"),
+    (r"flex(?:ible)?\s*coupl", "openbuilds.flexible_coupler", {}, "flexible coupler"),
+    (r"lock\s*collar|shaft\s*collar", "openbuilds.lock_collar", {}, "lock collar"),
+    (r"xtreme", "openbuilds.xtreme_v_wheel", {}, "Xtreme solid V-wheel"),
+    (r"shim", "openbuilds.shim_washer", {}, "shim washer"),
+]
+
+
+def _openbuilds(text: str) -> list[dict]:
+    out = []
+    for pat, gen, params, label in OPENBUILDS_WORDS:
+        if m := re.search(pat, text):
+            params = dict(params)
+            if gen == "openbuilds.lock_collar" and (d := re.search(r"\b(5|8)\s*mm\b", text)):
+                params["inside_diameter"] = f"{d.group(1)}mm"
+            hit = _match(gen, params, label, m.group(0), 0.9)
+            if hit:
+                out.append(hit)
+            break
+    if m := re.search(r"\btr\s*8(?:\s*x\s*8)?\b|lead\s*screw(?!\s*nut)", text):
+        params = {}
+        if lm := re.search(r"(?:[x×*]|length)\s*" + NUM + r"(?!\s*x)|\b" + NUM + r"\s*mm", text):
+            length = _f(lm.group(1) or lm.group(2))
+            if length >= 20:
+                params["length"] = length
+        hit = _match("openbuilds.lead_screw", params, f"Tr8x8 lead screw" + (f" x {params['length']:g}" if params
+                                                                               else ""), m.group(0), 0.85)
+        if hit:
+            out.append(hit)
+    if m := re.search(r"alumin(?:i)?um\s*spacer\s*(\d+(?:\.\d+)?)\s*mm|spacer\s*(\d+(?:\.\d+)?)\s*mm", text):
+        size = f"{m.group(1) or m.group(2)}mm"
+        hit = _match("openbuilds.aluminium_spacer", {"length": size}, f"aluminium spacer {size}", m.group(0), 0.85)
+        if hit:
+            out.append(hit)
+    return out
+
+
+RULES = (_screws, _nuts_and_washers, _bearings, _o_rings, _circlips, _keys, _gears, _vslot, _pipes, _flanges,
+         _drives, _openbuilds)
 
 
 def lookup(text: str, limit: int = 5) -> list[dict]:

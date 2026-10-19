@@ -4,7 +4,7 @@ Shilpa depends on these open-source parts libraries (installed from PyPI, not ve
 
 | Package | Used for | Licence |
 |---|---|---|
-| [bd_warehouse](https://github.com/gumyr/bd_warehouse) | ISO fasteners (`shilpa/catalog/fasteners.py`); screws, nuts, washers, bearing data, O-rings, circlips and keys from its dimension tables (`shilpa/catalog/warehouse.py`) | Apache-2.0 |
+| [bd_warehouse](https://github.com/gumyr/bd_warehouse) | ISO fasteners (`shilpa/catalog/fasteners.py`); screws, nuts, washers, bearing data, O-rings, circlips and keys from its dimension tables (`shilpa/catalog/warehouse.py`); pipe and ASME B16.5 flange tables, OpenBuilds parts, sprockets and worm gears (`shilpa/catalog/mechanical.py`) | Apache-2.0 |
 | [py_gearworks](https://github.com/GarryBGoode/py_gearworks) | Involute gears and racks (`shilpa/catalog/gears.py`) | Apache-2.0 |
 | [bd_vslot](https://github.com/keeeal/bd-vslot) | V-slot wheels and T-nuts (`shilpa/catalog/vslot.py`) | MIT |
 
