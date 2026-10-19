@@ -9,6 +9,16 @@ bodies wait until a boolean merges them; a cut turns the additive feature into i
 subtractive twin. Recipes that do not fit a linear history return a typed unsupported
 error before FreeCAD runs.
 
+Named references (IR 1.2) lower to explicit subelements: the build123d build resolves
+the reference and records the selected entities' signatures, and fc_build.py picks the
+FreeCAD edges / faces with the same signatures (identical geometry in both kernels).
+A FreeCAD parameter edit then keeps those subelements through FreeCAD's own topological
+naming, but cannot re-resolve the reference: a fillet on "every hole's entry edge" keeps
+its old edges when the hole count changes. ``selection_drift`` compares an edited
+document's selections with a build123d rebuild of the same edit and flags that case, so
+the caller re-lowers instead of trusting the edited document. A named hole entry face
+is not lowered (its sketch plane has no expression link to the parameters).
+
 FreeCAD runs as a separate FreeCADCmd process (its own Python) on fc_build.py.
 """
 
@@ -27,7 +37,7 @@ from pathlib import Path
 from ..contracts import expr
 from ..contracts.compile import PLANE_AXES, CompiledFeature, CompiledRecipe
 from ..contracts.errors import ErrorCode, ShilpaError
-from ..contracts.ir import HOLE_OPS, SKETCH_OPS
+from ..contracts.ir import HOLE_OPS, SKETCH_OPS, NamedSelector
 from ..settings import ROOT
 
 SCRIPT = Path(__file__).parent / "freecad_script" / "fc_build.py"
@@ -85,6 +95,7 @@ class _Lowerer:
         self.c = compiled
         self.params = compiled.params
         self.bbox = {f["id"]: f.get("detail", {}).get("bbox") for f in feature_results}
+        self.detail = {f["id"]: f.get("detail", {}) for f in feature_results}
         self.sketches: dict[str, dict] = {}
         self.helices: dict[str, CompiledFeature] = {}
         self.pending: dict[str, list[dict]] = {}  # standalone bodies (their ops) waiting to be merged by a boolean
@@ -165,7 +176,9 @@ class _Lowerer:
             elif cf.op == "shell":
                 self.require_tip(fid, f.body_ref)
                 self.ops.append({"id": fid, "pd": "Thickness", "size": self.q(f.thickness_ref), "inward": f.direction == "inward",
-                                 "faces": [s.model_dump() for s in f.open_faces]})
+                                 "faces": [s.model_dump() for s in f.open_faces if not isinstance(s, NamedSelector)],
+                                 "face_signatures": self._signatures(fid) if any(isinstance(s, NamedSelector) for s in f.open_faces)
+                                 else None})
                 self.advance(fid)
             elif cf.op in ("mirror", "linear_pattern", "polar_pattern"):
                 self._transform(cf)
@@ -173,6 +186,8 @@ class _Lowerer:
                 self.require_tip(fid, f.body_ref)
                 size = self.q(f.radius_ref if cf.op == "fillet" else f.distance_ref)
                 sel = f.edges.model_dump()
+                if isinstance(f.edges, NamedSelector):
+                    sel = {**sel, "signatures": self._signatures(fid), "expected_count": len(self._signatures(fid))}
                 sel["diameter_value"] = cf.values.get("edges.diameter")
                 self.ops.append({"id": fid, "pd": cf.op.capitalize(), "size": size, "selector": sel})
                 self.advance(fid)
@@ -182,6 +197,13 @@ class _Lowerer:
             self.unsupported("the recipe output is not the end of the feature history", self.c.output_id)
         params = {k: {"value": q.value, "kind": q.kind} for k, q in self.params.items()}
         return {"params": params, "ops": self.ops}
+
+    def _signatures(self, fid: str) -> list[dict]:
+        """Signatures of the entities the build123d build selected for a named reference."""
+        sigs = self.detail.get(fid, {}).get("selected")
+        if not sigs:
+            self.unsupported("named reference has no resolved selection from the build123d build", fid)
+        return sigs
 
     def _new_body(self, fid: str, ops: list[dict]) -> None:
         if self.tip is None:
@@ -283,6 +305,8 @@ class _Lowerer:
     def _holes(self, cf: CompiledFeature) -> None:
         f, fid = cf.spec, cf.id
         tip = self.require_tip(fid, f.body_ref)
+        if f.entry_face is not None:
+            self.unsupported("a named hole entry face has no parametric sketch placement in PartDesign", fid)
         plane = SIDE_PLANE[f.face]
         centers = self._centers(cf, tip)
         d = self.qv(cf, "diameter_ref")
@@ -464,6 +488,26 @@ def _short_workdir() -> Path:
     base = Path(os.getenv("SHILPA_FREECAD_SCRATCH") or settings.var_dir / "fc")
     base.mkdir(parents=True, exist_ok=True)
     return Path(tempfile.mkdtemp(prefix="j", dir=base))
+
+
+def selection_drift(build, fc_result: dict) -> list[str]:
+    """Selections an edited FreeCAD document kept that a build123d rebuild of the same edit would change.
+
+    ``build`` is the build123d BuildResult of the edited recipe; ``fc_result`` the result of
+    ``edit_fcstd`` (fc_build.py reports each fillet / chamfer / thickness feature's
+    subelements after recompute). A count mismatch means FreeCAD's stored references no
+    longer say what the recipe's selector means; re-lower the edited recipe.
+    """
+    fc = {s["id"]: s for s in fc_result.get("selections", [])}
+    out = []
+    for f in build.features:
+        want = f.detail.get("edges", f.detail.get("open_faces")) if f.op in ("fillet", "chamfer", "shell") else None
+        if want is None or f.id not in fc:
+            continue
+        got = len(fc[f.id]["subs"])
+        if got != want:
+            out.append(f"{f.id}: FreeCAD keeps {got} {'faces' if f.op == 'shell' else 'edges'}, the recipe now selects {want}")
+    return out
 
 
 def build_fcstd(compiled: CompiledRecipe, feature_results: list[dict], out_dir: Path) -> dict:
