@@ -23,7 +23,11 @@ Skeleton formulas (``frame_nodes``):
   ``S = st_length * s`` (centre-to-top).
 * Top tube: front node ``T - tt_offset * u``; rear node where a line from there,
   sloping down toward the rear at ``tt_slope``, meets the seat-tube axis.
-* Down tube front node ``B + dt_offset * u``.
+* Down tube front node ``B + dt_offset * u``, with ``dt_offset`` raised when
+  needed to ``(r_dt + R_ht cos theta) / sin theta + 3 mm`` (``theta`` the
+  down-tube-to-steering-axis angle) so the down tube's lower contour meets
+  the head tube above its bottom face and the lower cup seat stays a full
+  annulus (``dt_offset_min``).
 * Derived: wheelbase ``F.x - R.x``; front centre ``|F - BB|`` in XZ; trail
   ``(wheel_radius * cos HA - offset) / sin HA`` measured on level ground at the
   front axle height; ``front_axle_level_error = F.z - R.z`` (zero when the
@@ -71,7 +75,9 @@ class FrameGeometry(BaseModel):
     seat_tube_length: float = Field(530.0, gt=0)  # BB centre to seat-tube top
     tt_slope: float = Field(6.0, ge=-10, le=25)  # top tube drops this much toward the rear
     tt_offset: float = Field(20.0, ge=0)  # top-tube axis below head-tube top, along the steering axis
-    dt_offset: float = Field(25.0, ge=0)  # down-tube axis above head-tube bottom
+    # Down-tube axis above head-tube bottom; raised to ``dt_offset_min`` (tube OD, head-tube OD and the
+    # down-tube angle) when smaller, so the down tube never breaks through the lower cup seat face.
+    dt_offset: float = Field(25.0, ge=0)
     ss_offset: float = Field(18.0, ge=0)  # seat-stay node below the top-tube node, along the seat tube
     # Fork / front end (used for front axle, wheelbase and trail)
     fork_a2c: float = Field(395.0, gt=0)
@@ -151,7 +157,8 @@ def frame_nodes(g: FrameGeometry) -> tuple[dict[str, Vec3], dict[str, float]]:
         raise ShilpaError(ErrorCode.PRECONDITION_FAILED,
                           f"top tube meets the seat tube {lam:.1f} mm up; seat_tube_length {g.seat_tube_length:g} is too short",
                           field="seat_tube_length")
-    dt_front = _add(ht_bottom, u, g.dt_offset)
+    dt_off = dt_offset_effective(g, ht_bottom, u)
+    dt_front = _add(ht_bottom, u, dt_off)
     ss_top = _add(bb, s, lam - g.ss_offset)
 
     old, _ = REAR_AXLES[g.rear_axle]
@@ -214,8 +221,41 @@ def frame_nodes(g: FrameGeometry) -> tuple[dict[str, Vec3], dict[str, float]]:
         "top_tube_on_seat_tube": lam,
         "effective_top_tube": g.reach + g.stack / math.tan(sa),  # horizontal, at head-tube top height
         "wheel_radius": wheel_r,
+        "dt_offset": dt_off,
     }
     return nodes, derived
+
+
+DT_BOTTOM_MARGIN = 3.0  # mm of intact head-tube wall (weld toe) between the down tube and the bottom face
+
+
+def dt_offset_min(g: FrameGeometry, theta: float) -> float:
+    """Smallest down-tube offset (along the steering axis, above the head-tube bottom) that keeps the
+    down tube clear of the head-tube bottom face.
+
+    In the frame plane the down tube's lower contour runs parallel to its axis at ``r = dt_od / 2`` and
+    meets the head tube's outer surface (``R = head_tube_od / 2`` from the steering axis) a distance
+    ``(r + R cos theta) / sin theta`` below the down-tube node, where ``theta`` is the angle between the
+    down tube (pointing up to the head tube) and the steering axis. Nearer the bore the contour is higher,
+    and off the frame plane the tube surface is higher still, so this point is the lowest one.
+    """
+    r, R = g.dt[0] / 2, g.head_tube_od / 2
+    return (r + R * math.cos(theta)) / math.sin(theta) + DT_BOTTOM_MARGIN
+
+
+def dt_offset_effective(g: FrameGeometry, ht_bottom: Vec3, u: Vec3) -> float:
+    """``g.dt_offset``, raised to ``dt_offset_min`` when the down tube would break through the head-tube
+    bottom face (splitting the lower cup's seat annulus). The angle depends on the node, so iterate."""
+    off = g.dt_offset
+    for _ in range(4):
+        front = _add(ht_bottom, u, off)
+        length = math.sqrt(sum(c * c for c in front))
+        theta = math.acos(max(-1.0, min(1.0, sum(a * b for a, b in zip(front, u)) / length)))
+        need = dt_offset_min(g, theta)
+        if off >= need - 1e-9:
+            return off
+        off = need
+    return off
 
 
 def _stay_end(g: FrameGeometry, side: str) -> str:
