@@ -402,6 +402,7 @@ class CranksetParams(CatalogParams):
     ring_spacing: float = Field(8.0, gt=0)  # approx
     arm_thickness: float = 14.0
     arm_width: float = 20.0
+    spider_bore: float = Field(46.0, gt=0)  # clear bore of the spider around the BB cup (approx)
 
     @field_validator("teeth")
     @classmethod
@@ -428,7 +429,9 @@ def crankset(p: CranksetParams) -> BuiltPart:
     pds = [pitch_diameter(z) for z in p.teeth]
     r_spider = pitch_diameter(p.teeth[0]) / 2 - 6
     rings = [ring(r_spider - 3, outside_diameter(tn) / 2, z - 1, z + 1) for tn, z in zip(p.teeth, zs)]
-    spider = ring(0, r_spider, min(zs) - 1, max(zs) + 1)
+    # The spider is a hollow cup from the ring pack out to the drive arm, open in the middle so the
+    # bottom-bracket cup (external cups stand ~45 mm off the frame centre) fits inside it.
+    spider = ring(min(p.spider_bore / 2, r_spider - 4), r_spider, min(-q + t, min(zs) - 1), max(zs) + 1)
     spindle = ring(0, p.spindle_d / 2, -q + t / 2, q - t / 2)
     hw = p.arm_width / 2
 
