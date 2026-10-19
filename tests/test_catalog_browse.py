@@ -18,7 +18,7 @@ def test_catalog_lists_families_and_schemas():
     with client() as c:
         d = c.get("/v1/catalog", headers=H).json()
     fams = {g["family"] for g in d["generators"]}
-    assert {"Gears", "V-slot extrusion", "Bicycle parts", "Fasteners", "Bearings"} <= fams
+    assert {"Gears", "V-slot extrusion", "Bicycle parts", "Screws", "Nuts", "Washers", "Bearings"} <= fams
     assert "Other" not in fams
     spur = next(g for g in d["generators"] if g["name"] == "gear.spur")
     assert spur["params"]["properties"]["teeth"]["minimum"] == 10

@@ -46,3 +46,16 @@ test("an invalid size explains itself, and the V-slot rail builds", async ({ pag
   await page.getByRole("spinbutton", { name: "Bore d" }).fill("60");
   await expect(page.getByTestId("build-error")).toContainText("web", { timeout: 30_000 });
 });
+
+test("screws come from the standards' tables, lengths included", async ({ page }, info) => {
+  await page.goto("/catalog");
+  await page.getByLabel("Search parts").fill("socket head cap");
+  await page.getByTestId("catalog-list").getByRole("button", { name: /Socket head cap screw \(ASME/ }).click();
+  await expect(page.getByText(/ISO 4762 M6-1 x 16/).first()).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("spinbutton", { name: "Length" }).fill("21");
+  await expect(page.getByTestId("build-error")).toContainText("not a nominal iso4762 length", { timeout: 30_000 });
+  await page.getByRole("spinbutton", { name: "Length" }).fill("25");
+  await page.getByRole("combobox", { name: "Size" }).selectOption("M8-1.25");
+  await expect(page.getByText(/ISO 4762 M8-1.25 x 25/).first()).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: info.outputPath("catalog-screw.png") });
+});

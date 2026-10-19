@@ -22,11 +22,18 @@ from . import list_generators, resolve
 from .materials import DENSITY_G_CM3
 
 FAMILIES = [  # (name prefix, family title), first match wins
+    ("screw.", "Screws"),
+    ("nut.", "Nuts"),
+    ("washer.", "Washers"),
+    ("bearing.", "Bearings"),
+    ("deep_groove", "Bearings"),
+    ("seal.", "Seals, circlips and keys"),
+    ("ring.", "Seals, circlips and keys"),
+    ("key.", "Seals, circlips and keys"),
     ("gear.", "Gears"),
     ("vslot.", "V-slot extrusion"),
+    ("iso", "Template fastener set (M3-M12)"),
     ("bike.", "Bicycle parts"),
-    ("iso", "Fasteners"),
-    ("deep_groove", "Bearings"),
 ]
 
 
@@ -38,7 +45,7 @@ def browse() -> dict:
     order = {title: k for k, (_, title) in enumerate(FAMILIES)}
     gens = [{**g, "family": family(g["name"])} for g in list_generators()]
     gens.sort(key=lambda g: (order.get(g["family"], len(order)), g["name"]))
-    return {"families": [t for _, t in FAMILIES], "generators": gens, "materials": sorted(DENSITY_G_CM3)}
+    return {"families": list(dict.fromkeys(t for _, t in FAMILIES)), "generators": gens, "materials": sorted(DENSITY_G_CM3)}
 
 
 def _key(params: dict | None) -> str:
