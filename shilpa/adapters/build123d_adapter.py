@@ -4,6 +4,11 @@ Each operation is a trusted implementation over validated numbers from
 ``compile_recipe``. The adapter never executes generated code. Preconditions that
 would otherwise produce a broken but "valid" solid are checked explicitly and
 reported as typed failures.
+
+Every body state also gets persistent topology names (``shilpa/topology/naming.py``):
+operations leave naming hints in ``objects["__hints__"]`` and ``_name_feature`` turns
+them, with the kernel history build123d records, into a ``NameTable`` per feature.
+``NamedSelector`` references resolve against the table of the body they modify.
 """
 
 from __future__ import annotations
@@ -17,7 +22,8 @@ import build123d as bd
 
 from ..contracts.compile import CompiledFeature, CompiledRecipe, compile_recipe
 from ..contracts.errors import ErrorCode, ShilpaError
-from ..contracts.ir import EdgeSelector
+from ..contracts.ir import EdgeSelector, NamedSelector
+from ..topology import naming as tn
 from . import CAPABILITY_MATRIX
 
 ADAPTER_NAME = "build123d"
@@ -62,6 +68,7 @@ class BuildResult:
     compiled: CompiledRecipe
     features: list[FeatureResult]
     error: ShilpaError | None = None
+    names: dict[str, "tn.NameTable"] = field(default_factory=dict)  # feature id -> topology names of that body
 
     @property
     def ok(self) -> bool:
@@ -83,12 +90,12 @@ def build(recipe, cancel_check=None) -> BuildResult:
             exc.info.feature_id = exc.info.feature_id or cf.id
             results.append(FeatureResult(cf.id, cf.op, "failed", (time.perf_counter() - t0) * 1000, detail={"error": exc.info.message}))
             results += [FeatureResult(c.id, c.op, "skipped") for c in compiled.features[len(results):]]
-            return BuildResult(None, compiled, results, exc)
+            return BuildResult(None, compiled, results, exc, objects.get("__names__", {}))
         except Exception as exc:  # kernel exceptions from OCP
             err = ShilpaError(ErrorCode.KERNEL_FAILURE, f"{cf.op} failed in the geometry kernel: {exc}", feature_id=cf.id)
             results.append(FeatureResult(cf.id, cf.op, "failed", (time.perf_counter() - t0) * 1000, detail={"error": str(exc)}))
             results += [FeatureResult(c.id, c.op, "skipped") for c in compiled.features[len(results):]]
-            return BuildResult(None, compiled, results, err)
+            return BuildResult(None, compiled, results, err, objects.get("__names__", {}))
         objects[cf.id] = out
         roots = objects.setdefault("__root__", {})
         src = cf.spec.body_ref if cf.op in ("mirror", "linear_pattern", "polar_pattern") else None
@@ -98,11 +105,12 @@ def build(recipe, cancel_check=None) -> BuildResult:
         vol = out.volume if isinstance(out, bd.Part) else None
         if isinstance(out, bd.Part):
             _check_solid(out, cf.id)
+            _name_feature(cf, out, objects, detail)
             bb = out.bounding_box()
             detail = {**detail, "bbox": {"min": [bb.min.X, bb.min.Y, bb.min.Z], "max": [bb.max.X, bb.max.Y, bb.max.Z]}}
         results.append(FeatureResult(cf.id, cf.op, "ok", (time.perf_counter() - t0) * 1000, vol, detail))
     shape = objects[compiled.output_id]
-    return BuildResult(shape, compiled, results)
+    return BuildResult(shape, compiled, results, names=objects.get("__names__", {}))
 
 
 # ---------------------------------------------------------------- helpers
@@ -116,9 +124,10 @@ def _as_part(shape) -> bd.Part:
     """Normalise kernel results (Solid, Compound, ShapeList) to a Part holding their solids."""
     if isinstance(shape, bd.Part):
         return shape
-    if isinstance(shape, bd.Solid):
-        return bd.Part([shape])
-    return bd.Part(list(shape.solids()))
+    part = bd.Part([shape]) if isinstance(shape, bd.Solid) else bd.Part(list(shape.solids()))
+    # Same sub-shapes, new wrapper: keep the kernel history of the operation that made them.
+    part._history = getattr(shape, "_history", None)
+    return part
 
 
 def _check_solid(part: bd.Part, fid: str) -> None:
@@ -249,10 +258,40 @@ def _common_area(a, b) -> float:
     return common.area if common is not None else 0.0
 
 
+def _hole_entry(cf: CompiledFeature, body, objects) -> tuple[str, float, list, bool]:
+    """Entry of a hole series: (side, entry coordinate along the side's axis, flat entry faces, named).
+
+    By default the entry is a bounding-box side; with ``entry_face`` (IR 1.2) it is a named
+    planar face anywhere on the body, e.g. the top of a lower step.
+    """
+    if cf.spec.entry_face is None:
+        side = cf.spec.face
+        axis, sign, _ = SIDES[side]
+        lo, hi = _bb_lo_hi(_bbox(body), axis)
+        return side, (hi if sign > 0 else lo), _side_faces(body, side), False
+    faces, _ = _resolve_named(objects, cf.spec.body_ref, cf.spec.entry_face, "faces", cf.id, "entry_face")
+    planes = set()
+    for f in faces:
+        n = f.normal_at() if f.geom_type.name == "PLANE" else None
+        hit = n is not None and next((sd for sd, (ax, sg, _) in SIDES.items()
+                                      if abs((n.X, n.Y, n.Z)[ax] - sg) < 1e-6), None)
+        if not hit:
+            raise ShilpaError(ErrorCode.PRECONDITION_FAILED, f"entry face {cf.spec.entry_face.ref!r} must be flat and normal to "
+                              "X, Y or Z", feature_id=cf.id, field="entry_face")
+        ax = SIDES[hit][0]
+        planes.add((hit, round((f.center().X, f.center().Y, f.center().Z)[ax], 6)))
+    if len(planes) != 1:
+        raise ShilpaError(ErrorCode.SELECTOR_AMBIGUOUS, f"entry face {cf.spec.entry_face.ref!r} names faces on different "
+                          f"planes {sorted(planes)}", feature_id=cf.id, field="entry_face")
+    side, entry = planes.pop()
+    return side, entry, faces, True
+
+
 def _cut_holes(cf: CompiledFeature, objects, centers: list[tuple[float, float]]):
-    """Drill a hole series into a body from one bounding-box side (top by default)."""
+    """Drill a hole series into a body from one bounding-box side (top by default) or a named face."""
     body = _as_part(objects[cf.spec.body_ref])
-    v, kind, side = cf.values, cf.spec.hole_type, cf.spec.face
+    v, kind = cf.values, cf.spec.hole_type
+    side, entry, faces, named = _hole_entry(cf, body, objects)
     d = v["diameter_ref"]
     r = d / 2
     outer = {"counterbore": v.get("cbore_diameter_ref"), "countersink": v.get("csk_diameter_ref")}.get(kind) or d
@@ -269,11 +308,10 @@ def _cut_holes(cf: CompiledFeature, objects, centers: list[tuple[float, float]])
     bb = _bbox(body)
     axis, sign, (iu, iv) = SIDES[side]
     lo, hi = _bb_lo_hi(bb, axis)
-    entry, extent = (hi if sign > 0 else lo), hi - lo
+    extent = entry - lo if sign > 0 else hi - entry  # material depth behind the entry plane
     inward = _vec(axis, -sign)
     points = [_vec(iu, u) + _vec(iv, w) + _vec(axis, entry) for u, w in centers]
     what = f"{kind} hole pattern of diameter {d:g}" if kind != "simple" else f"hole pattern of diameter {d:g}"
-    faces = _side_faces(body, side)
     if faces:
         # The largest circle of each hole must lie on the flat entry face.
         placed = [bd.Plane(origin=p, z_dir=-inward) * bd.Face(bd.Wire([bd.Edge.make_circle(outer / 2)])) for p in points]
@@ -317,15 +355,24 @@ def _cut_holes(cf: CompiledFeature, objects, centers: list[tuple[float, float]])
     removed = body.volume - out.volume
     if removed <= TOL:
         raise ShilpaError(ErrorCode.PRECONDITION_FAILED, "holes removed no material", feature_id=cf.id)
-    return out, {"centers": [[round(x, 6), round(y, 6)] for x, y in centers], "diameter": d, "face": side,
-                 "hole_type": kind, "removed_volume": removed}
+    _hint(objects, cf, kind="holes", tools=tools, axis=axis, sign=sign, entry=entry,
+          h={"r": r, "cbore_r": (v["cbore_diameter_ref"] / 2) if kind == "counterbore" else None,
+             "cbore_depth": v.get("cbore_depth_ref") if kind == "counterbore" else None,
+             "blind_depth": depth if cf.spec.mode == "blind" else None})
+    detail = {"centers": [[round(x, 6), round(y, 6)] for x, y in centers], "diameter": d, "face": side,
+              "hole_type": kind, "removed_volume": removed}
+    if named:
+        detail["entry"] = entry  # the FreeCAD lowering places the hole sketch on this plane
+    return out, detail
 
 
 # ---------------------------------------------------------------- operations
 
 
 def op_sketch(cf, objects):
-    return _sketch_face(cf), {}
+    sk = _sketch_face(cf)
+    objects.setdefault("__roles__", {})[cf.id] = tn.sketch_roles(cf, sk, _sketch_plane(cf))
+    return sk, {}
 
 
 def op_extrude(cf, objects):
@@ -343,6 +390,7 @@ def op_extrude(cf, objects):
     else:
         sign = -1 if direction in ("negative_z", "negative_normal") else 1
         part = bd.extrude(face, amount=d, dir=normal * sign)
+    _hint(objects, cf, kind="extrude", sketch=cf.spec.profile_ref, normal=normal, shift=normal * offset)
     return _as_part(part), {}
 
 
@@ -385,6 +433,7 @@ def op_revolve(cf, objects):
                           "a revolved profile must stay on one side of its axis", feature_id=cf.id)
     angle = _v(cf, "angle_ref", 360.0)
     part = bd.revolve(faces, AXES[cf.spec.axis], angle)
+    _hint(objects, cf, kind="sections", sketch=cf.spec.profile_ref, first=faces, last=None, open_end=angle < 360.0 - 1e-9)
     return _as_part(part), {"angle": angle}
 
 
@@ -401,12 +450,15 @@ def op_sweep(cf, objects):
             raise ShilpaError(ErrorCode.PRECONDITION_FAILED, "the helix must start inside the profile (profile on XZ, around "
                               f"X = helix radius, Z = helix offset); it starts at ({p0.X:g}, {p0.Y:g}, {p0.Z:g})", feature_id=cf.id)
         part = bd.sweep(faces, path=path, is_frenet=True)
+        _hint(objects, cf, kind="sections", sketch=cf.spec.profile_ref, first=faces, last=None, open_end=True)
+        return _as_part(part), {}
     else:
         t0 = path.tangent_at(0)
         if plane.z_dir.cross(t0).length > 1e-6 or abs((p0 - plane.origin).dot(plane.z_dir)) > 1e-6:
             raise ShilpaError(ErrorCode.PRECONDITION_FAILED, f"profile {cf.spec.profile_ref!r} must lie in the plane through the "
                               f"path start ({p0.X:g}, {p0.Y:g}, {p0.Z:g}) normal to the path", feature_id=cf.id)
         part = bd.sweep(faces, path=path)
+    _hint(objects, cf, kind="sections", sketch=cf.spec.profile_ref, first=faces, last=None, open_end=True)
     return _as_part(part), {}
 
 
@@ -417,6 +469,7 @@ def op_loft(cf, objects):
         if len(fs) != 1:
             raise ShilpaError(ErrorCode.PRECONDITION_FAILED, f"loft section {p!r} must be a single region", feature_id=cf.id)
         faces.append(fs[0])
+    _hint(objects, cf, kind="sections", sketch=cf.spec.profile_refs[0], first=faces[:1], last=faces[-1:], open_end=False)
     return _as_part(bd.loft(faces, ruled=cf.spec.ruled)), {}
 
 
@@ -443,6 +496,7 @@ def op_stepped_shaft(cf, objects):
             clean.append(p)
     profile = bd.Plane.XZ * bd.Polygon(*clean, align=None)
     part = bd.revolve(profile, bd.Axis.Z, 360)
+    _hint(objects, cf, kind="shaft", radii=radii, z_ends=[z0 + sum(lengths[:i + 1]) for i in range(n)], z0=z0, bore=bore)
     return _as_part(part), {"total_length": z - z0}
 
 
@@ -452,7 +506,11 @@ def op_hole(cf, objects):
 
 def op_corner_hole_pattern(cf, objects):
     body = _as_part(objects[cf.spec.body_ref])
-    (u0, u1), (w0, w1) = side_extent(_bbox(body), cf.spec.face)
+    if cf.spec.entry_face is None:
+        (u0, u1), (w0, w1) = side_extent(_bbox(body), cf.spec.face)
+    else:  # inset from the named entry face's own extent
+        side, _, faces, _ = _hole_entry(cf, body, objects)
+        (u0, u1), (w0, w1) = side_extent(bd.Compound(faces).bounding_box(), side)
     e, r = cf.values["edge_offset_ref"], cf.values["diameter_ref"] / 2
     if e <= r + TOL:
         raise ShilpaError(
@@ -508,6 +566,7 @@ def op_pocket(cf, objects):
         raise ShilpaError(ErrorCode.PRECONDITION_FAILED, "pocket leaves no wall at the body boundary", feature_id=cf.id)
     tool = bd.extrude(bd.Pos(0, 0, bb.max.Z - depth) * footprint, amount=depth + EPS)
     out = _as_part(body - tool)
+    _hint(objects, cf, kind="pocket", tool=tool, floor_z=bb.max.Z - depth, center=bd.Vector(cx, cy, 0))
     return out, {"removed_volume": body.volume - out.volume}
 
 
@@ -548,6 +607,7 @@ def op_boolean(cf, objects):
     else:
         out = a & b
     out = _as_part(out)
+    _hint(objects, cf, kind="boolean")
     if cf.spec.operation == "union" and len(out.solids()) > 1:
         raise ShilpaError(ErrorCode.PRECONDITION_FAILED, "union produced disconnected solids; the bodies do not touch", feature_id=cf.id)
     return out, {}
@@ -557,6 +617,9 @@ def op_shell(cf, objects):
     body = _as_part(objects[cf.spec.body_ref])
     openings = []
     for sel in cf.spec.open_faces:
+        if isinstance(sel, NamedSelector):
+            openings += _resolve_named(objects, cf.spec.body_ref, sel, "faces", cf.id, "open_faces")[0]
+            continue
         faces = _side_faces(body, sel.side)
         if len(faces) != sel.expected_count:
             code = ErrorCode.SELECTOR_EMPTY if not faces else ErrorCode.SELECTOR_AMBIGUOUS
@@ -573,7 +636,11 @@ def op_shell(cf, objects):
                           f"local geometry allows ({exc})", feature_id=cf.id, field="thickness_ref")
     if len(out.solids()) != 1 or out.volume >= body.volume * (1 - 1e-9) and cf.spec.direction == "inward":
         raise ShilpaError(ErrorCode.KERNEL_FAILURE, f"shell of thickness {t:g} did not produce one hollow solid", feature_id=cf.id)
-    return out, {"open_faces": len(openings)}
+    _hint(objects, cf, kind="shell", openings=openings, t=t, inward=cf.spec.direction == "inward")
+    detail = {"open_faces": len(openings)}
+    if any(isinstance(sel, NamedSelector) for sel in cf.spec.open_faces):
+        detail["selected"] = [tn.face_signature(f).to_dict() for f in openings]
+    return out, detail
 
 
 def _principal_plane(plane: str, at: float) -> bd.Plane:
@@ -584,21 +651,30 @@ def _principal_plane(plane: str, at: float) -> bd.Plane:
 
 def op_mirror(cf, objects):
     body = _as_part(objects[cf.spec.body_ref])
-    image = _as_part(bd.mirror(body, about=_principal_plane(cf.spec.plane, _v(cf, "offset_ref"))))
+    plane = _principal_plane(cf.spec.plane, _v(cf, "offset_ref"))
+    image = _as_part(bd.mirror(body, about=plane))
     out = _as_part(body.fuse(image)) if cf.spec.keep_original else image
+    o, n = plane.origin, plane.z_dir
+    _hint(objects, cf, kind="copies", keep=cf.spec.keep_original,
+          copies=[(1, image, lambda p: p - n * (2 * (p - o).dot(n)))])
     return out, {"solids": len(out.solids())}
 
 
-def _pattern(body: bd.Part, placements: list) -> bd.Part:
+def _pattern(body: bd.Part, placements: list, objects=None, cf=None) -> bd.Part:
+    copies = [loc * body for loc in placements]
+    if objects is not None:
+        def mover(loc):
+            return lambda p: (loc * bd.Vertex(p.X, p.Y, p.Z)).center()
+        _hint(objects, cf, kind="copies", keep=True, copies=[(i + 1, c, mover(loc)) for i, (c, loc) in enumerate(zip(copies, placements))])
     if not placements:
         return body
-    return _as_part(body.fuse(*[loc * body for loc in placements]))
+    return _as_part(body.fuse(*copies))
 
 
 def op_linear_pattern(cf, objects):
     body = _as_part(objects[cf.spec.body_ref])
     n, s = int(cf.values["count_ref"]), cf.values["spacing_ref"]
-    out = _pattern(body, [bd.Location(UNIT[cf.spec.direction] * s * i) for i in range(1, n)])
+    out = _pattern(body, [bd.Location(UNIT[cf.spec.direction] * s * i) for i in range(1, n)], objects, cf)
     return out, {"copies": n, "solids": len(out.solids())}
 
 
@@ -613,7 +689,7 @@ def op_polar_pattern(cf, objects):
     n = int(cf.values["count_ref"])
     step = polar_step(n, _v(cf, "angle_ref", 360.0))
     rot = {"X": lambda a: bd.Rot(a, 0, 0), "Y": lambda a: bd.Rot(0, a, 0), "Z": lambda a: bd.Rot(0, 0, a)}[cf.spec.axis]
-    out = _pattern(body, [rot(step * i) for i in range(1, n)])
+    out = _pattern(body, [rot(step * i) for i in range(1, n)], objects, cf)
     return out, {"copies": n, "step_deg": step, "solids": len(out.solids())}
 
 
@@ -673,9 +749,22 @@ def _resolve_selector(part, sel: EdgeSelector, fid: str, diameter: float | None 
     return edges
 
 
+def _treated_edges(cf, body, objects) -> tuple[list, dict]:
+    """Edges for a fillet or chamfer: a heuristic EdgeSelector or a persistent NamedSelector."""
+    sel = cf.spec.edges
+    if isinstance(sel, NamedSelector):
+        edges, names = _resolve_named(objects, cf.spec.body_ref, sel, "edges", cf.id, "edges")
+        # Signatures travel to the FreeCAD lowering, which picks the same edges by geometry.
+        detail = {"refs": names, "selected": [tn.edge_signature(e).to_dict() for e in edges]}
+    else:
+        edges, detail = _resolve_selector(body, sel, cf.id, cf.values.get("edges.diameter")), {}
+    _hint(objects, cf, kind="edges", edges=edges)
+    return edges, detail
+
+
 def op_fillet(cf, objects):
     body = _as_part(objects[cf.spec.body_ref])
-    edges = _resolve_selector(body, cf.spec.edges, cf.id, cf.values.get("edges.diameter"))
+    edges, sel_detail = _treated_edges(cf, body, objects)
     r = cf.values["radius_ref"]
     try:
         out = _as_part(body.fillet(r, edges))
@@ -687,12 +776,12 @@ def op_fillet(cf, objects):
             field="radius_ref",
             details={"radius": r},
         )
-    return out, {"edges": len(edges)}
+    return out, {"edges": len(edges), **sel_detail}
 
 
 def op_chamfer(cf, objects):
     body = _as_part(objects[cf.spec.body_ref])
-    edges = _resolve_selector(body, cf.spec.edges, cf.id, cf.values.get("edges.diameter"))
+    edges, sel_detail = _treated_edges(cf, body, objects)
     d = cf.values["distance_ref"]
     try:
         out = _as_part(body.chamfer(d, None, edges))
@@ -700,7 +789,89 @@ def op_chamfer(cf, objects):
         raise ShilpaError(
             ErrorCode.KERNEL_FAILURE, f"chamfer of {d:g} failed on {len(edges)} edges ({exc})", feature_id=cf.id, field="distance_ref"
         )
-    return out, {"edges": len(edges)}
+    return out, {"edges": len(edges), **sel_detail}
+
+
+# ---------------------------------------------------------------- persistent naming
+
+
+def _hint(objects, cf, **hint) -> None:
+    objects.setdefault("__hints__", {})[cf.id] = hint
+
+
+def _resolve_named(objects, body_ref: str, sel: NamedSelector, want: str, fid: str, fname: str) -> tuple[list, list[str]]:
+    """Entities a named reference selects on ``body_ref`` (faces or edges, as ``want`` says), and their names."""
+    table = objects.get("__names__", {}).get(body_ref)
+    if table is None:
+        raise ShilpaError(ErrorCode.SELECTOR_EMPTY, f"body {body_ref!r} has no topology names to resolve {sel.ref!r} against",
+                          feature_id=fid, field=fname)
+    try:
+        kind, ents = table.resolve(sel.ref)
+    except tn.NamingError as exc:
+        raise ShilpaError(ErrorCode.SELECTOR_EMPTY, f"named reference {sel.ref!r}: {exc}", feature_id=fid, field=fname,
+                          details={"available": [n for n, _ in table.faces][:200]})
+    if kind != want:
+        hint = " (use 'A.edges' or 'A&B' to select edges)" if want == "edges" else ""
+        raise ShilpaError(ErrorCode.INVALID_SCHEMA, f"named reference {sel.ref!r} selects {kind}, but {fname} needs {want}{hint}",
+                          feature_id=fid, field=fname)
+    if sel.expected_count is not None and len(ents) != sel.expected_count:
+        raise ShilpaError(ErrorCode.SELECTOR_AMBIGUOUS, f"named reference {sel.ref!r} matched {len(ents)} {kind} but "
+                          f"{sel.expected_count} were expected", feature_id=fid, field=fname,
+                          details={"matched": len(ents), "expected": sel.expected_count, "names": table.names_of(ents)})
+    return ents, table.names_of(ents)
+
+
+def _name_feature(cf, out, objects, detail: dict) -> None:
+    """Name every face of a body state; failures are recorded, never fatal (only a later reference needs them)."""
+    hint = objects.get("__hints__", {}).pop(cf.id, {})
+    tables = objects.setdefault("__names__", {})
+    try:
+        names = _names_for(cf, out, objects, hint, tables)
+        tables[cf.id] = tn.NameTable.from_faces(cf.id, out, names)
+    except Exception as exc:  # noqa: BLE001 - naming is advisory until something references it
+        detail["naming_error"] = f"{type(exc).__name__}: {exc}"
+
+
+def _names_for(cf, out, objects, hint: dict, tables: dict) -> dict[int, str]:
+    """Face names of one operation's result: its own roles plus its inputs' names carried by history."""
+    fid, kind, spec = cf.id, hint.get("kind"), cf.spec
+    history = getattr(out, "_history", None)
+    roles = objects.get("__roles__", {})
+    if kind == "extrude":
+        shifted = [(r, m + hint["shift"]) for r, m in roles[hint["sketch"]]]
+        names = tn.name_primitive(fid, out, shifted, tn.extrude_caps(hint["normal"], out))
+    elif kind == "sections":
+        names = tn.name_primitive(fid, out, roles[hint["sketch"]], tn.section_caps(out, hint["first"], hint["last"]))
+        if hint["open_end"]:
+            tn.name_revolve_end(out, names, fid)
+    elif kind == "shaft":
+        names = tn.name_stepped_shaft(fid, out, hint["radii"], hint["z_ends"], hint["z0"], hint["bore"])
+    elif kind == "shell":
+        return tn.name_shell(fid, tables[spec.body_ref], out, hint["openings"], hint["t"], hint["inward"])
+    else:
+        if kind == "boolean":
+            seeds = tn.seeds_of(tables.get(spec.target_ref)) + tn.seeds_of(tables.get(spec.tool_ref))
+        elif kind == "holes":
+            seeds = tn.seeds_of(tables.get(spec.body_ref))
+            for k, tool in enumerate(hint["tools"]):
+                seeds += tn.hole_tool_roles(fid, k, tool, hint["axis"], hint["sign"], hint["entry"], hint["h"])
+        elif kind == "pocket":
+            seeds = tn.seeds_of(tables.get(spec.body_ref)) + tn.pocket_tool_roles(fid, hint["tool"], hint["floor_z"], hint["center"])
+        elif kind == "copies":
+            body = tables.get(spec.body_ref)
+            seeds = tn.seeds_of(body) if hint["keep"] else []
+            for k, image, point_map in hint["copies"]:
+                seeds += tn.image_names(fid, k, body, image, point_map) if body else []
+        else:
+            seeds = tn.seeds_of(tables.get(getattr(spec, "body_ref", None) or ""))
+        names = tn.inherit(out, history, seeds)
+        if kind == "edges":
+            body = tables.get(spec.body_ref)
+            named = list(zip(hint["edges"], body.names_of(hint["edges"]))) if body else []
+            tn.name_generated(fid, out, history, named, names)
+        tn.coincident(out, names, seeds)
+    tn.leftovers(out, names, fid, "blend" if kind == "edges" else "face")
+    return names
 
 
 def _with_plane(fn):

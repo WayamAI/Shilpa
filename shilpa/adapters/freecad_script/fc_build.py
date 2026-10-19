@@ -310,6 +310,37 @@ def select_faces(shape, side):
     return names
 
 
+# ------------------------------------------------------------------ named references (signatures from the build123d build)
+
+CURVES = {"LINE": ("Line", "LineSegment"), "CIRCLE": ("Circle",)}
+SURFACES = {"PLANE": ("Plane",), "CYLINDER": ("Cylinder",), "CONE": ("Cone",), "SPHERE": ("Sphere",), "TORUS": ("Toroid",)}
+
+
+def select_by_signature(shape, sigs, kind, tol=1e-4):
+    """Subelement names whose type, centre of mass and size match each signature."""
+    items = shape.Edges if kind == "edge" else shape.Faces
+    prefix = "Edge" if kind == "edge" else "Face"
+    names = []
+    for sig in sigs:
+        types = (CURVES if kind == "edge" else SURFACES).get(sig["geom"])
+        best, best_d = None, None
+        for i, it in enumerate(items, start=1):
+            geo = it.Curve if kind == "edge" else it.Surface
+            if types and type(geo).__name__ not in types:
+                continue
+            size = it.Length if kind == "edge" else it.Area
+            if abs(size - sig["size"]) > tol * max(1.0, sig["size"]):
+                continue
+            c = it.CenterOfMass
+            d = ((c.x - sig["center"][0]) ** 2 + (c.y - sig["center"][1]) ** 2 + (c.z - sig["center"][2]) ** 2) ** 0.5
+            if best_d is None or d < best_d:
+                best, best_d = f"{prefix}{i}", d
+        if best is None or best_d > 1e-3 or best in names:
+            fail(f"no {kind} in the FreeCAD model matches the named reference's {sig['geom']} at {sig['center']}")
+        names.append(best)
+    return names
+
+
 def mirror_plane(body, fid, plane, off):
     """Origin plane, or a datum plane moved along the plane's own axis (XZ's normal is -Y)."""
     base = origin(body, {"XY": "XY_Plane", "XZ": "XZ_Plane", "YZ": "YZ_Plane"}[plane])
@@ -412,7 +443,7 @@ def build():
                 feat.Ruled = bool(op.get("ruled"))
             elif kind == "Thickness":
                 doc.recompute()
-                faces = []
+                faces = select_by_signature(tip.Shape, op["face_signatures"], "face") if op.get("face_signatures") else []
                 for sel in op["faces"]:
                     found = select_faces(tip.Shape, sel["side"])
                     if len(found) != sel["expected_count"]:
@@ -429,7 +460,8 @@ def build():
                 feat = build_transform(doc, body, op, fid, kind)
             elif kind in ("Fillet", "Chamfer"):
                 doc.recompute()
-                edges = select_edges(tip.Shape, op["selector"])
+                sel = op["selector"]
+                edges = select_by_signature(tip.Shape, sel["signatures"], "edge") if sel.get("signatures") else select_edges(tip.Shape, sel)
                 if len(edges) != op["selector"]["expected_count"]:
                     fail(f"edge selector matched {len(edges)} edges, expected {op['selector']['expected_count']}", fid)
                 feat = body.newObject(f"PartDesign::{kind}", fid)
@@ -478,6 +510,9 @@ def finish(doc, body, out_fcstd, out_step):
     if bad:
         fail(f"objects failed to recompute: {bad}")
     shape = body.Shape
+    # Which subelements each selection holds after the (re)compute: the edit check compares them.
+    RESULT["selections"] = [{"id": f.Name, "subs": list(f.Base[1])} for f in body.Group
+                            if f.TypeId in ("PartDesign::Fillet", "PartDesign::Chamfer", "PartDesign::Thickness")]
     shape.exportStep(out_step)
     doc.saveAs(out_fcstd)
     bb = shape.BoundBox

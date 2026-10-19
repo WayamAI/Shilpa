@@ -18,7 +18,7 @@ from . import expr
 from .errors import ErrorCode, ShilpaError
 from .expr import Quantity
 from . import iso_holes, profile2d
-from .ir import HOLE_OPS, PATH_OPS, SKETCH_OPS, Param, Recipe
+from .ir import HOLE_OPS, PATH_OPS, SKETCH_OPS, NamedSelector, Param, Recipe
 
 LENGTH_TO_MM = {"mm": 1.0, "cm": 10.0, "m": 1000.0, "in": 25.4}
 ANGLE_TO_DEG = {"deg": 1.0, "rad": 180.0 / math.pi}
@@ -273,6 +273,29 @@ def _compile_hole_series(f, values: dict[str, float]) -> dict[str, Any]:
     return meta
 
 
+def _check_named_refs(f, seen: dict[str, str]) -> None:
+    """IR 1.2 named references: well formed, of the right kind, and naming earlier features only."""
+    from ..topology import refs
+
+    sels = [("edges", getattr(f, "edges", None), "edges"), ("entry_face", getattr(f, "entry_face", None), "faces")]
+    sels += [(f"open_faces.{i}", s, "faces") for i, s in enumerate(getattr(f, "open_faces", None) or [])]
+    for fname, sel, want in sels:
+        if not isinstance(sel, NamedSelector):
+            continue
+        try:
+            kind = refs.kind(sel.ref)
+            ids = refs.feature_ids(sel.ref)
+        except refs.RefSyntaxError as exc:
+            raise _schema_error(f"named reference: {exc}", f.id, fname)
+        if kind != want:
+            hint = " (use 'A.edges' or 'A&B' to select edges)" if want == "edges" else ""
+            raise _schema_error(f"named reference {sel.ref!r} selects {kind}, but {fname} needs {want}{hint}", f.id, fname)
+        unknown = sorted(i for i in ids if seen.get(i) != "body")
+        if unknown:
+            raise ShilpaError(ErrorCode.UNKNOWN_REFERENCE, f"named reference {sel.ref!r} names {unknown}, which are not "
+                              "earlier body features", feature_id=f.id, field=fname)
+
+
 def compile_recipe(recipe: Recipe | dict | str, capabilities: set[str] | None = None) -> CompiledRecipe:
     if not isinstance(recipe, Recipe):
         recipe = parse_recipe(recipe)
@@ -324,8 +347,9 @@ def compile_recipe(recipe: Recipe | dict | str, capabilities: set[str] | None = 
         meta: dict[str, Any] = {}
         segments = None
         edges = getattr(f, "edges", None)
-        if edges is not None and edges.diameter_ref:
+        if edges is not None and getattr(edges, "diameter_ref", None):
             values["edges.diameter"] = _eval_ref(edges.diameter_ref, params, f.id, "diameter_ref")
+        _check_named_refs(f, seen)
         if f.op == "stepped_shaft":
             for i, s in enumerate(f.sections):
                 values[f"sections.{i}.diameter"] = _eval_ref(s.diameter_ref, params, f.id, "diameter_ref")
