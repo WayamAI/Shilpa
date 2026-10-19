@@ -79,9 +79,8 @@ def test_iso_sets_agree_on_thread_designations():
 
 
 def test_bearing_data_from_the_table():
-    # bd_warehouse's deep-groove table is the miniature range (bore 3-10 mm); 6200 is its largest.
-    b = resolve("bearing.deep_groove", {"size": "M10-30-9"})
-    assert b.meta["designation"] == "6200"
+    b = resolve("bearing.deep_groove", {"designation": "6200"})  # in both tables: bd_warehouse's row wins
+    assert b.meta["designation"] == "6200" and b.meta["speed_limit_rpm"] > 0
     assert (b.meta["d"], b.meta["D"], b.meta["B"]) == (10.0, 30.0, 9.0)
     assert b.meta["dynamic_load_kN"] == pytest.approx(5.4) and b.meta["mass_g"] == pytest.approx(31.0)
     assert b.meta["mass_basis"] == "catalog"
@@ -89,6 +88,17 @@ def test_bearing_data_from_the_table():
     assert (bb.size.X, bb.size.Z) == pytest.approx((30, 9), abs=1e-6)
     t = resolve("bearing.tapered_roller", {})
     assert t.meta["standard"] == "ISO 355" and t.meta["B"] > 0
+
+
+def test_deep_groove_list_spans_miniature_to_40mm():
+    from shilpa.catalog import list_generators
+
+    spec = next(g for g in list_generators() if g["name"] == "bearing.deep_groove")
+    names = spec["params"]["properties"]["designation"]["enum"]
+    assert {"623", "608", "6204", "6208"} <= set(names)
+    big = resolve("bearing.deep_groove", {"designation": "6204", "seal": "2RS"})
+    assert big.meta["designation"] == "6204-2RS" and (big.meta["d"], big.meta["D"], big.meta["B"]) == (20, 47, 14)
+    assert big.meta["dynamic_load_kN"] == 13.5
 
 
 def test_o_ring_carries_its_gland():

@@ -247,8 +247,11 @@ export type CatalogPreview = {
   ports: CatalogPort[]; mesh: PartMesh; size: number[]; volume_mm3: number; timings_ms: Record<string, number>;
 };
 
+export type CatalogMatch = { generator: string; params: Record<string, unknown>; label: string; matched: string; score: number; summary: string };
+
 export const catalogApi = {
   list: () => req<Catalog>("GET", "/v1/catalog"),
+  lookup: (q: string) => req<{ query: string; matches: CatalogMatch[] }>("GET", `/v1/catalog/lookup?q=${encodeURIComponent(q)}`),
   preview: (generator: string, params: Record<string, unknown>) =>
     req<CatalogPreview>("POST", "/v1/catalog/preview", { generator, params }),
 };

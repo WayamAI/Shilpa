@@ -40,27 +40,30 @@ class Generator:
     summary: str
     standard: str
     mass_basis: str = "geometry"
+    listed: bool = True  # False: still resolvable (templates, saved specs) but not offered when browsing
 
 
 _REGISTRY: dict[str, Generator] = {}
 
 
-def generator(name: str, params: type[BaseModel], summary: str, standard: str, mass_basis: str = "geometry"):
+def generator(name: str, params: type[BaseModel], summary: str, standard: str, mass_basis: str = "geometry",
+              listed: bool = True):
     """Decorator registering a catalog generator."""
 
     def deco(fn: Callable[[Any], BuiltPart]):
         if name in _REGISTRY:
             raise ValueError(f"catalog generator {name!r} registered twice")
-        _REGISTRY[name] = Generator(name, params, fn, summary, standard, mass_basis)
+        _REGISTRY[name] = Generator(name, params, fn, summary, standard, mass_basis, listed)
         return fn
 
     return deco
 
 
-def list_generators() -> list[dict[str, Any]]:
+def list_generators(listed_only: bool = False) -> list[dict[str, Any]]:
     return [
-        {"name": g.name, "summary": g.summary, "standard": g.standard, "params": g.params.model_json_schema()}
-        for g in sorted(_REGISTRY.values(), key=lambda g: g.name)
+        {"name": g.name, "summary": g.summary, "standard": g.standard, "params": g.params.model_json_schema(),
+         "listed": g.listed}
+        for g in sorted(_REGISTRY.values(), key=lambda g: g.name) if g.listed or not listed_only
     ]
 
 

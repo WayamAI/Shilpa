@@ -1,0 +1,26 @@
+{
+  "iso_metric_holes.csv": {
+    "title": "ISO metric holes: coarse pitch, tap drill, clearance, counterbore and countersink",
+    "standards": ["ISO 261", "ISO 2306", "ISO 273", "DIN 974-1", "ISO 10642"],
+    "basis": "Coarse pitch per ISO 261; tap drill about d - P per ISO 2306; clearance fine/medium/coarse per ISO 273; counterbore for ISO 4762 heads per DIN 974-1 (head dk max plus clearance, depth = k plus 0.4-0.6 mm); 90 deg countersink at the theoretical ISO 10642 head diameter (no M18 in ISO 10642).",
+    "source": "Values encoded from the standards' published dimension tables; cross-checked against bd_warehouse's clearance_hole_sizes.csv and tap_hole_sizes.csv.",
+    "licence": "Dimensions are facts; the standard documents themselves are not reproduced.",
+    "units": "mm"
+  },
+  "iso4762_length_range.csv": {
+    "title": "ISO 4762 socket head cap screw nominal length range, M3-M12",
+    "standards": ["ISO 4762"],
+    "basis": "Shortest and longest commercial nominal length per size, as tabled by bd_warehouse.",
+    "source": "bd_warehouse socket_head_cap_parameters.csv (Apache-2.0), iso4762 short/long columns.",
+    "licence": "Apache-2.0 (bd_warehouse); dimensions are facts.",
+    "units": "mm"
+  },
+  "deep_groove_ball_bearings.csv": {
+    "title": "Single-row deep-groove ball bearings 608, 60xx and 62xx: boundary dimensions, mass, dynamic load rating",
+    "standards": ["ISO 15", "ISO 281"],
+    "basis": "Boundary dimensions d x D x B and minimum corner chamfer r_s per ISO 15; basic dynamic load rating C (for ISO 281 L10 life) and mass from the manufacturer's catalogue, rounded.",
+    "source": "SKF general catalogue values (rounded); 608, 6000 and 6200 cross-checked against bd_warehouse's bearing table.",
+    "licence": "Dimensions and ratings are published facts; no catalogue text or drawings reproduced.",
+    "units": "mm, g, kN"
+  }
+}

@@ -16,7 +16,9 @@ come from bd_warehouse's CSV tables, so nothing here retypes a dimension.
   own solid; the catalog needs one solid per part for interference and mass,
   so these are the d x D x B envelope with the corner chamfer (like
   ``deep_groove_ball_bearing``), centred on z = 0, with the table's load
-  ratings, speeds and mass.
+  ratings, speeds and mass. They are chosen by designation (``6204``,
+  ``7204 BECBP``); ``bearing.deep_groove`` merges bd_warehouse's miniature
+  range (3-10 mm bore) with Shilpa's 608 / 60xx / 62xx table (8-40 mm).
 * Seals, rings, keys: ISO 3601 O-rings (torus centred on z = 0, with the
   static and dynamic gland sizes), DIN 471 / 472 circlips (z in [0, s]) and
   DIN 6885 parallel keys (z in [0, h], length along X).
@@ -44,6 +46,7 @@ from bd_warehouse.shaft_key import ShaftKey
 from pydantic import Field, create_model, model_validator
 
 from . import generator
+from ..standards import table as standards_table
 from ..contracts.errors import ErrorCode, ShilpaError
 from ..contracts.ports import BuiltPart
 from ._geom import CatalogParams, port
@@ -369,33 +372,57 @@ def bearing_table(filename: str) -> dict[str, dict[str, dict[str, str]]]:
     return out
 
 
+def bearing_records(gen: str, filename: str, width_col: str) -> dict[str, dict[str, Any]]:
+    """designation -> envelope dimensions and catalogue data, from bd_warehouse's table (one record per maker
+    row) and, for plain deep-groove bearings, Shilpa's 8-40 mm table (``shilpa/standards``); sorted by size."""
+    recs: dict[str, dict[str, Any]] = {}
+    for size, makers in bearing_table(filename).items():
+        for maker, row in makers.items():
+            d, D, B = _num(row.get("d")), _num(row.get("D")), _num(row.get(width_col))
+            if None in (d, D, B):
+                continue
+            des = (row.get("Designation") or "").strip().lstrip("*").strip()
+            if des in ("", "–", "-"):  # the tables write a missing designation as a dash
+                des = f"{maker} {d:g}x{D:g}x{B:g}"
+            if des in recs:
+                des = f"{des} ({maker})"
+            mass = _num(row.get("mass")) or _num(row.get("kg"))
+            recs[des] = {"d": d, "D": D, "B": B, "r": _num(row.get("r12")) or 0.3,
+                         "mass_g": round(mass * 1000, 1) if mass else None,
+                         "C": _num(row.get("C")) if width_col == "B" else _num(row.get("Cl")),
+                         "C0": _num(row.get("C0") or row.get("Cl0")), "Pu": _num(row.get("Pu")),
+                         "speed_reference": _num(row.get("Speed-reference") or row.get("speed-reference")),
+                         "speed_limit": _num(row.get("Speed-limit") or row.get("speed-limit")),
+                         "maker": maker, "source": f"bd_warehouse {filename}"}
+    if gen == "bearing.deep_groove":
+        for row in standards_table("deep_groove_ball_bearings.csv"):
+            recs.setdefault(row["designation"], {
+                "d": float(row["d"]), "D": float(row["D"]), "B": float(row["B"]), "r": float(row["r_s_min"]),
+                "mass_g": float(row["mass_g"]), "C": row["dynamic_load_kN"], "C0": None, "Pu": None,
+                "speed_reference": None, "speed_limit": None, "maker": "SKF (rounded)",
+                "source": "shilpa/standards/data/deep_groove_ball_bearings.csv"})
+    return dict(sorted(recs.items(), key=lambda kv: (kv[1]["d"], kv[1]["D"], kv[1]["B"], kv[0])))
+
+
 def _make_bearing(gen: str, filename: str, summary: str, width_col: str):
-    table = bearing_table(filename)
-    sizes = list(table)
-    makers = sorted({m for s in table.values() for m in s})
-    prefer = next((s for s in sizes if s.startswith(("M20-", "M17-", "M15-"))), sizes[0])
-
-    def check(self):
-        if self.maker not in table[self.size]:
-            raise ValueError(f"{gen}: {self.size} has no {self.maker} data; makers: {sorted(table[self.size])}")
-        return self
-
-    params = create_model(
-        f"{gen.replace('.', '_').title().replace('_', '')}Params", __base__=CatalogParams,
-        __validators__={"_maker_has_size": model_validator(mode="after")(check)},
-        size=(_lit(sizes), prefer), maker=(_lit(makers), "SKT" if "SKT" in makers else makers[0]),
-        material=(str | None, None),
-    )
+    recs = bearing_records(gen, filename, width_col)
+    names = list(recs)
+    prefer = next((n for n in ("6204", "7204 BECBP", "NJ 204 ECP", "30204 J2") if n in recs), None) or next(
+        (n for n in names if recs[n]["d"] >= 20), names[-1])
+    standard = "ISO 355" if gen == "bearing.tapered_roller" else "ISO 15"
+    extra = {"seal": (Literal["open", "2RS", "2Z"], "open")} if gen == "bearing.deep_groove" else {}
+    params = create_model(f"{gen.replace('.', '_').title().replace('_', '')}Params", __base__=CatalogParams,
+                          designation=(_lit(names), prefer), material=(str | None, None), **extra)
 
     def build(p) -> BuiltPart:
-        row = table[p.size][p.maker]
-        d, D, B = _num(row.get("d")), _num(row.get("D")), _num(row.get(width_col))
-        r = _num(row.get("r12")) or 0.3
+        rec = recs[p.designation]
+        d, D, B = rec["d"], rec["D"], rec["B"]
         plane = bd.Plane.XY.offset(-B / 2)
         solid = bd.Solid.make_cylinder(D / 2, B, plane).cut(bd.Solid.make_cylinder(d / 2, B, plane))
-        r = min(r, (D - d) / 6, B / 4)
+        r = min(rec["r"], (D - d) / 6, B / 4)
         solid = solid.chamfer(r, None, list(solid.edges().filter_by(bd.GeomType.CIRCLE))).solid()
-        designation = (row.get("Designation") or p.size).strip().lstrip("*").strip()
+        seal = getattr(p, "seal", "open")
+        designation = p.designation + ("" if seal == "open" else f"-{seal}")
         dims = {"designation": designation, "d": d, "D": D, "B": B}
         ports = {
             "bore_axis": port("bore_axis", (0, 0, 0), (0, 0, 1), label="bore, fits a shaft", bore_d=d, fit="shaft",
@@ -405,20 +432,16 @@ def _make_bearing(gen: str, filename: str, summary: str, width_col: str):
             "face_a": port("face_a", (0, 0, -B / 2), (0, 0, -1), label="side face", **dims),
             "face_b": port("face_b", (0, 0, B / 2), (0, 0, 1), label="side face", **dims),
         }
-        mass = _num(row.get("mass")) or _num(row.get("kg"))
-        c, c0 = _num(row.get("C")) if width_col == "B" else _num(row.get("Cl")), _num(row.get("C0") or row.get("Cl0"))
-        meta = {"standard": "ISO 15" if gen != "bearing.tapered_roller" else "ISO 355", "size": f"{d:g}x{D:g}x{B:g}",
-                **dims, "dynamic_load_kN": c, "static_load_kN": c0, "fatigue_limit_kN": _num(row.get("Pu")),
-                "speed_reference_rpm": _num(row.get("Speed-reference") or row.get("speed-reference")),
-                "speed_limit_rpm": _num(row.get("Speed-limit") or row.get("speed-limit")),
-                "maker": p.maker, "provenance": "bd_warehouse table; envelope geometry (no rolling elements)"}
-        if mass:
-            meta.update(mass_g=round(mass * 1000, 1), mass_basis="catalog")
-        return BuiltPart(name=re.sub(r"[^a-z0-9]+", "_", f"{gen}_{p.size}".lower()).strip("_"), solid=solid,
+        meta = {"standard": standard, "size": f"{d:g}x{D:g}x{B:g}", **dims, "dynamic_load_kN": rec["C"],
+                "static_load_kN": rec["C0"], "fatigue_limit_kN": rec["Pu"],
+                "speed_reference_rpm": rec["speed_reference"], "speed_limit_rpm": rec["speed_limit"],
+                "maker": rec["maker"], "provenance": rec["source"] + "; envelope geometry (no rolling elements)"}
+        if rec["mass_g"]:
+            meta.update(mass_g=rec["mass_g"], mass_basis="catalog")
+        return BuiltPart(name=re.sub(r"[^a-z0-9]+", "_", f"{gen}_{designation}".lower()).strip("_"), solid=solid,
                          ports=ports, source="catalog", meta=meta)
 
-    generator(gen, params, summary, "ISO 15" if gen != "bearing.tapered_roller" else "ISO 355",
-              mass_basis="catalog")(build)
+    generator(gen, params, summary, standard, mass_basis="catalog")(build)
 
 
 for _g, _f, _s, _w in BEARINGS:

@@ -13,6 +13,7 @@ import {
   errText,
   type Catalog,
   type CatalogGenerator,
+  type CatalogMatch,
   type CatalogPreview,
   type SchemaProp,
 } from "@/lib/api";
@@ -163,6 +164,30 @@ function ParamField({
 
 // ---------------------------------------------------------------- page
 
+/** Typed-name matches ("M6x20 socket head", "6204-2RS"): one click opens the part with its sizes filled in. */
+function Suggestions({ matches, onPick }: { matches: CatalogMatch[]; onPick: (m: CatalogMatch) => void }) {
+  if (!matches.length) return null;
+  return (
+    <div className="mb-3" data-testid="catalog-matches">
+      <p className="mb-1 text-caption tracking-[0.08em] text-quaternary uppercase">Exact part</p>
+      <ul className="flex flex-col gap-1">
+        {matches.map((m) => (
+          <li key={`${m.generator}|${JSON.stringify(m.params)}`}>
+            <button
+              type="button"
+              onClick={() => onPick(m)}
+              className="w-full rounded-md border border-muted bg-raised px-2 py-1.5 text-left outline-none transition-colors duration-[180ms] hover:bg-raised-2 focus-visible:ring-2 focus-visible:ring-active"
+            >
+              <span className="block truncate text-body-sm text-primary">{m.label}</span>
+              <span className="block truncate text-caption text-quaternary">{m.summary}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 type Tab = "params" | "data" | "ports";
 
 const META_FIRST = ["designation", "standard", "size", "mass_g", "mass_basis", "provenance"];
@@ -179,6 +204,7 @@ export default function CatalogPage() {
   const [showPorts, setShowPorts] = useState(true);
   const [port, setPort] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [matches, setMatches] = useState<{ q: string; items: CatalogMatch[] }>({ q: "", items: [] });
   const latest = useRef("");
 
   useEffect(() => {
@@ -213,6 +239,20 @@ export default function CatalogPage() {
     return () => clearTimeout(timer);
   }, [gen, key, params]);
 
+  // Typed names resolve on the server (rule-based, no AI) after a short pause in typing.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) return;
+    const timer = setTimeout(() => {
+      catalogApi
+        .lookup(q)
+        .then((r) => setMatches({ q, items: r.matches }))
+        .catch(() => setMatches({ q, items: [] }));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query]);
+  const suggestions = matches.q === query.trim() ? matches.items : [];
+
   const busy = !!gen && result?.key !== key;
   const current = shown && gen && shown.generator === gen.name ? shown : null;
   const buildError = result?.key === key ? result.error : undefined;
@@ -233,6 +273,14 @@ export default function CatalogPage() {
   function pick(name: string) {
     setSelected(name);
     setPort(null);
+  }
+
+  function applyMatch(m: CatalogMatch) {
+    const draftFrom: Draft = {};
+    for (const [k, v] of Object.entries(m.params)) draftFrom[k] = typeof v === "boolean" ? v : show(v);
+    setDrafts((d) => ({ ...d, [m.generator]: draftFrom }));
+    pick(m.generator);
+    setTab("params");
   }
 
   async function download() {
@@ -263,7 +311,9 @@ export default function CatalogPage() {
         {error ? <p className="mb-3 text-body-sm text-error">{error}</p> : null}
         <div className="flex min-h-0 flex-col gap-4 xl:h-[calc(100vh-190px)] xl:flex-row">
           {/* Narrow screens pick from a grouped list so the 3D view stays near the top. */}
-          <div className="xl:hidden">
+          <div className="flex flex-col gap-2 xl:hidden">
+            <TextInput aria-label="Type a part" placeholder="Type a part: M6x20 socket head, 6204-2RS…" value={query} onChange={(e) => setQuery(e.target.value)} className="!h-10 text-body-sm" />
+            <Suggestions matches={suggestions} onPick={applyMatch} />
             <Select
               aria-label="Part"
               value={selected ?? ""}
@@ -288,8 +338,15 @@ export default function CatalogPage() {
             <Panel title="Parts">
               <div className="relative mb-3">
                 <Search size={14} strokeWidth={1.75} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 icon-quaternary" aria-hidden />
-                <TextInput aria-label="Search parts" placeholder="Search parts" value={query} onChange={(e) => setQuery(e.target.value)} className="!h-9 pl-8 text-body-sm" />
+                <TextInput
+                  aria-label="Search parts"
+                  placeholder="Search, or type M6x20 socket head"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="!h-9 pl-8 text-body-sm"
+                />
               </div>
+              <Suggestions matches={suggestions} onPick={applyMatch} />
               {!catalog ? <EmptyState title="Loading the catalogue…" /> : null}
               <nav aria-label="Catalogue parts" className="flex flex-col gap-4" data-testid="catalog-list">
                 {groups.map(({ family, items }) => (

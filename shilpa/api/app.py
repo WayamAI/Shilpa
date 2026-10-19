@@ -168,6 +168,14 @@ def catalog(p: Principal = Depends(principal)):
     return browse()
 
 
+@app.get("/v1/catalog/lookup")
+def catalog_lookup(q: str = "", p: Principal = Depends(principal)):
+    """Typed part names ("M6x20 socket head", "6204-2RS", "DIN 125 M8") to catalog parts, rule-based."""
+    from ..catalog.designations import lookup
+
+    return {"query": q, "matches": lookup(q[:200]) if q.strip() else []}
+
+
 @app.post("/v1/catalog/preview")
 def catalog_preview(body: CatalogPartIn, p: Principal = Depends(principal)):
     """Build one catalog part now (no job: these build in about a second) and return its mesh, ports and data."""

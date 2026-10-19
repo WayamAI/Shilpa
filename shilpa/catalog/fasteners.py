@@ -25,18 +25,17 @@ from bd_warehouse.fastener import HexNut, PlainWasher, SocketHeadCapScrew
 from pydantic import Field, model_validator
 
 from . import generator
+from ..standards import by, table
 from ..contracts.ports import BuiltPart
 from ._geom import CatalogParams, port
 
 Size = Literal["M3", "M4", "M5", "M6", "M8", "M10", "M12"]
-PITCH = {"M3": 0.5, "M4": 0.7, "M5": 0.8, "M6": 1.0, "M8": 1.25, "M10": 1.5, "M12": 1.75}
-# ISO 273 clearance holes (fine / medium / coarse), mm.
-CLEARANCE = {
-    "M3": (3.2, 3.4, 3.6), "M4": (4.3, 4.5, 4.8), "M5": (5.3, 5.5, 5.8), "M6": (6.4, 6.6, 7.0),
-    "M8": (8.4, 9.0, 10.0), "M10": (10.5, 11.0, 12.0), "M12": (13.0, 13.5, 14.5),
-}
-# ISO 4762 nominal length range per size (as tabled by bd_warehouse), mm.
-LENGTH_RANGE = {"M3": (5, 30), "M4": (6, 40), "M5": (8, 50), "M6": (8, 60), "M8": (10, 80), "M10": (16, 100), "M12": (20, 120)}
+# Coarse pitch and ISO 273 clearance holes (fine / medium / coarse), and the ISO 4762 nominal length range per
+# size, from shilpa/standards/data (iso_metric_holes.csv, iso4762_length_range.csv), mm.
+_HOLES = by("iso_metric_holes.csv", "size")
+PITCH = {s: float(_HOLES[s]["pitch"]) for s in Size.__args__}
+CLEARANCE = {s: tuple(float(_HOLES[s][f"clearance_{k}"]) for k in ("fine", "medium", "coarse")) for s in Size.__args__}
+LENGTH_RANGE = {r["size"]: (r["length_min"], r["length_max"]) for r in table("iso4762_length_range.csv")}
 
 
 def _thread(size: str) -> str:
@@ -60,7 +59,8 @@ class ScrewParams(CatalogParams):
         return self
 
 
-@generator("iso4762_socket_head_cap_screw", ScrewParams, "Socket head cap screw, ISO 4762", "ISO 4762")
+# The M3-M12 set the product templates use; browsing offers the screw.* / nut.* / washer.* types instead.
+@generator("iso4762_socket_head_cap_screw", ScrewParams, "Socket head cap screw, ISO 4762", "ISO 4762", listed=False)
 def socket_head_cap_screw(p: ScrewParams) -> BuiltPart:
     s = SocketHeadCapScrew(f"{p.size}-{PITCH[p.size]:g}", p.length, "iso4762", simple=True)
     d = float(p.size[1:])
@@ -94,7 +94,7 @@ class NutParams(CatalogParams):
     size: Size = "M6"
 
 
-@generator("iso4032_hex_nut", NutParams, "Hex nut style 1, ISO 4032", "ISO 4032")
+@generator("iso4032_hex_nut", NutParams, "Hex nut style 1, ISO 4032", "ISO 4032", listed=False)
 def hex_nut(p: NutParams) -> BuiltPart:
     n = HexNut(f"{p.size}-{PITCH[p.size]:g}", "iso4032", simple=True)
     h = round(n.nut_thickness, 3)
@@ -117,7 +117,7 @@ class WasherParams(CatalogParams):
     size: Size = "M6"
 
 
-@generator("iso7089_washer", WasherParams, "Plain washer, normal series, ISO 7089", "ISO 7089")
+@generator("iso7089_washer", WasherParams, "Plain washer, normal series, ISO 7089", "ISO 7089", listed=False)
 def plain_washer(p: WasherParams) -> BuiltPart:
     w = PlainWasher(p.size, "iso7089")
     bb = w.bounding_box()

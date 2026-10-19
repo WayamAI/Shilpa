@@ -32,7 +32,6 @@ FAMILIES = [  # (name prefix, family title), first match wins
     ("key.", "Seals, circlips and keys"),
     ("gear.", "Gears"),
     ("vslot.", "V-slot extrusion"),
-    ("iso", "Template fastener set (M3-M12)"),
     ("bike.", "Bicycle parts"),
 ]
 
@@ -43,7 +42,7 @@ def family(name: str) -> str:
 
 def browse() -> dict:
     order = {title: k for k, (_, title) in enumerate(FAMILIES)}
-    gens = [{**g, "family": family(g["name"])} for g in list_generators()]
+    gens = [{**g, "family": family(g["name"])} for g in list_generators(listed_only=True)]
     gens.sort(key=lambda g: (order.get(g["family"], len(order)), g["name"]))
     return {"families": list(dict.fromkeys(t for _, t in FAMILIES)), "generators": gens, "materials": sorted(DENSITY_G_CM3)}
 

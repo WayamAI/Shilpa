@@ -59,3 +59,20 @@ test("screws come from the standards' tables, lengths included", async ({ page }
   await expect(page.getByText(/ISO 4762 M8-1.25 x 25/).first()).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: info.outputPath("catalog-screw.png") });
 });
+
+test("typed part names open the exact part", async ({ page }, info) => {
+  await page.goto("/catalog");
+  await page.getByLabel("Search parts").fill("6204-2RS");
+  const matches = page.getByTestId("catalog-matches").filter({ visible: true }); // the phone copy is hidden
+  await matches.getByRole("button", { name: /6204-2RS/ }).click();
+  await expect(page.getByText(/47 × 47 × 14 mm/)).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("tab", { name: "Data" }).click();
+  await expect(page.getByText("6204-2RS").filter({ visible: true }).first()).toBeVisible();
+
+  await page.getByLabel("Search parts").fill("DIN 912 M10x40");
+  await matches.getByRole("button", { name: /ISO 4762 M10-1.5 x 40/ }).click();
+  await page.getByRole("tab", { name: "Parameters" }).click();
+  await expect(page.getByRole("spinbutton", { name: "Length" })).toHaveValue("40");
+  await expect(page.getByText("ISO 4762 M10-1.5 x 40").filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: info.outputPath("catalog-lookup.png") });
+});

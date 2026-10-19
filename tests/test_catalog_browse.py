@@ -55,3 +55,14 @@ def test_step_download():
                    headers=H)
     assert r.status_code == 200 and r.content.startswith(b"ISO-10303-21")
     assert r.headers["content-disposition"].endswith('6204.step"')
+
+
+def test_lookup_endpoint_and_hidden_generators():
+    with client() as c:
+        r = c.get("/v1/catalog/lookup", params={"q": "M6x20 socket head"}, headers=H).json()
+        assert r["matches"][0]["generator"] == "screw.socket_head" and r["matches"][0]["label"] == "ISO 4762 M6-1 x 20"
+        assert c.get("/v1/catalog/lookup", params={"q": ""}, headers=H).json()["matches"] == []
+        names = {g["name"] for g in c.get("/v1/catalog", headers=H).json()["generators"]}
+        # The template set stays resolvable but is not offered when browsing.
+        assert "iso4762_socket_head_cap_screw" not in names and "screw.socket_head" in names
+        assert c.post("/v1/catalog/preview", json={"generator": "iso4762_socket_head_cap_screw"}, headers=H).status_code == 200
