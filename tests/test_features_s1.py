@@ -71,7 +71,7 @@ def plate(*extra, w=80, d=40, t=8, **params):
 def test_schema_versions_and_feature_cap():
     old = compile_recipe(BLUEPRINT_PLATE, CAPABILITIES)
     assert old.recipe.schema_version == "1.0"  # 1.0 recipes are still accepted unchanged
-    assert compile_recipe({k: v for k, v in BLUEPRINT_PLATE.items() if k != "schema_version"}).recipe.schema_version == "1.1"
+    assert compile_recipe({k: v for k, v in BLUEPRINT_PLATE.items() if k != "schema_version"}).recipe.schema_version == "1.2"
     sketches = [{"id": f"s{i}", "op": "circle", "diameter_ref": "d"} for i in range(MAX_FEATURES - 1)]
     ok = {"parameters": {"d": 10, "h": 5}, "features": sketches + [{"id": "body", "op": "extrude", "profile_ref": "s0", "distance_ref": "h"}]}
     assert MAX_FEATURES == 200 and len(compile_recipe(ok).features) == 200
@@ -106,7 +106,7 @@ def test_plan_roundtrip_strips_nested_nulls():
         for seg in f.get("segments", []):
             seg.update({k: seg.get(k) for k in ("mid_x_ref", "mid_y_ref", "radius_ref", "clockwise")})
     back = to_recipe({**plan, "change_summary": None})
-    assert back["schema_version"] == "1.1"
+    assert back["schema_version"] == "1.2"
     assert compile_recipe(back, CAPABILITIES).output_id == "tube"
     assert all(None not in s.values() for f in back["features"] for s in f.get("segments", []))
 

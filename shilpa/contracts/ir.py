@@ -1,4 +1,4 @@
-"""Shilpa modeling IR, schema version 1.1 (blueprint section 8; 1.0 recipes stay valid).
+"""Shilpa modeling IR, schema version 1.2 (blueprint section 8; 1.0 and 1.1 recipes stay valid).
 
 The IR is the contract between the planner and every CAD adapter. Every numeric
 field is a ``*_ref`` string that names a parameter or is a restricted expression
@@ -15,6 +15,12 @@ the plane along its normal.
 
 Version 1.1 adds general profiles and slots, paths and helices, revolve, sweep, loft,
 shell, mirror, body patterns and the counterbore / countersink / tapped hole series.
+
+Version 1.2 adds ``NamedSelector``: a persistent topology reference such as
+``hole_1.wall&plate.top`` (feature id + role, see ``shilpa/topology/naming.py``),
+accepted wherever edges or faces are selected (fillet and chamfer edges, shell open
+faces, a hole series' ``entry_face``). Heuristic selectors keep working unchanged; the
+minor version moves because a 1.1 consumer cannot execute a named reference.
 """
 
 from __future__ import annotations
@@ -23,7 +29,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-SCHEMA_VERSION = "1.1"
+SCHEMA_VERSION = "1.2"
 MAX_FEATURES = 200
 
 FeatureId = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
@@ -63,6 +69,22 @@ class Param(_Strict):
 class Frame(_Strict):
     origin: tuple[float, float, float] = (0.0, 0.0, 0.0)
     normal: tuple[float, float, float] = (0.0, 0.0, 1.0)
+
+
+class NamedSelector(_Strict):
+    """Persistent topology reference: the entities a feature created, by role (IR 1.2).
+
+    ``ref`` names faces as ``<feature id>.<role>`` (``extrude_1.top``, ``hole_1.wall``,
+    ``pocket_2.floor``, ``fillet_3.face[0]``); a name selects every face it prefixes, so
+    ``hole_1.wall`` is every hole wall of a pattern. ``A.edges`` selects the edges bounding
+    faces A, ``A&B`` the edges shared by faces A and B, and commas take a union:
+    ``"hole_1.wall&plate.top"`` is every hole's entry edge, whatever the hole count.
+    ``expected_count`` is optional: a named reference already pins down intent, so it may
+    resolve to more entities after an edit (a count +1); give it to forbid that.
+    """
+
+    ref: Ref
+    expected_count: int | None = Field(default=None, ge=1, le=500)
 
 
 # ---------------------------------------------------------------- sketches
@@ -260,6 +282,10 @@ class _HoleSeries(_Strict):
     csk_diameter_ref: Ref | None = None
     csk_angle_ref: Ref | None = None  # included angle, default 90 deg
     thread_depth_ref: Ref | None = None  # tapped: usable thread length (metadata)
+    # IR 1.2: enter a named planar face (e.g. the top of a lower step) instead of a bounding-box side.
+    # The face must be flat and normal to X, Y or Z; ``face`` is then ignored and centres use that
+    # face's (u, v) coordinates as above.
+    entry_face: NamedSelector | None = None
 
 
 class Hole(_HoleSeries):
@@ -337,7 +363,7 @@ class Shell(_Strict):
     op: Literal["shell"]
     body_ref: FeatureId
     thickness_ref: Ref
-    open_faces: list[FaceSelector] = Field(min_length=1, max_length=6)
+    open_faces: list[FaceSelector | NamedSelector] = Field(min_length=1, max_length=6)
     direction: Literal["inward", "outward"] = "inward"
 
 
@@ -406,7 +432,7 @@ class Fillet(_Strict):
     op: Literal["fillet"]
     body_ref: FeatureId
     radius_ref: Ref
-    edges: EdgeSelector
+    edges: EdgeSelector | NamedSelector
 
 
 class Chamfer(_Strict):
@@ -414,7 +440,7 @@ class Chamfer(_Strict):
     op: Literal["chamfer"]
     body_ref: FeatureId
     distance_ref: Ref
-    edges: EdgeSelector
+    edges: EdgeSelector | NamedSelector
 
 
 FEATURE_TYPES = (
@@ -472,7 +498,7 @@ class Assumption(_Strict):
 
 
 class Recipe(_Strict):
-    schema_version: Literal["1.0", "1.1"] = SCHEMA_VERSION
+    schema_version: Literal["1.0", "1.1", "1.2"] = SCHEMA_VERSION
     name: str | None = None
     intent: Literal["engineering_cad"] = "engineering_cad"
     units: LengthUnit = "mm"
