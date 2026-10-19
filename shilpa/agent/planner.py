@@ -353,6 +353,50 @@ def repair_recipe(recipe: dict, error: dict, feature_results: list | None, budge
     return _plan_call(user, budget, "repair")
 
 
+# Fields whose change alters which way stated dimensions are measured (a shell grown outward makes a
+# "50 x 50 box with 30 mm walls" 110 x 110), so a repair may not change them either.
+DIRECTION_FIELDS = {"shell": ("direction",), "extrude": ("direction",)}
+
+
+def check_repair(original: dict, repaired: dict) -> None:
+    """A repair must not change how stated dimensions reach the geometry.
+
+    For every feature the repair keeps (same id and op), each field the original plan fed straight
+    from a user- or drawing-stated parameter must still evaluate to the same value, and shells and
+    extrudes keep their direction. A repair that can only build by moving holes inward, growing a
+    wall outward or shrinking a stated size has changed the request: the job stops and reports it
+    instead of publishing a different part. ``check_requirements`` alone cannot see this, because the
+    changed plan still references every stated value (``edge_distance + corner_radius / 2``).
+    """
+    strip = {k: v for k, v in original.items() if not k.startswith("_")}
+    orig = compile_recipe(strip, CAPABILITIES)
+    rep = compile_recipe({k: v for k, v in repaired.items() if not k.startswith("_")}, CAPABILITIES)
+    stated = {n for n, p in (strip.get("parameters") or {}).items()
+              if isinstance(p, dict) and p.get("source") in ("user", "drawing")}
+    rep_by_id = {cf.id: cf for cf in rep.features}
+    changed = []
+    for cf in orig.features:
+        r = rep_by_id.get(cf.id)
+        if r is None or r.op != cf.op:
+            continue
+        spec_o, spec_r = cf.spec.model_dump(), r.spec.model_dump()
+        for field, expr in spec_o.items():
+            if not (field.endswith("_ref") and isinstance(expr, str) and expr.strip() in stated):
+                continue
+            before, after = cf.values.get(field), r.values.get(field)
+            if before is not None and (after is None or abs(after - before) > 1e-6 * max(1.0, abs(before))):
+                shown = "removed" if after is None else f"{after:g}"
+                changed.append(f"{cf.id}.{field[:-4]} was {expr.strip()} = {before:g}, the repair makes it {shown}")
+        for field in DIRECTION_FIELDS.get(cf.op, ()):
+            if spec_o.get(field) != spec_r.get(field):
+                changed.append(f"{cf.id}.{field} was {spec_o.get(field)}, the repair makes it {spec_r.get(field)}")
+    if changed:
+        raise ShilpaError(ErrorCode.REQUIREMENT_NOT_MET,
+                          "the repair changed stated dimensions instead of fixing the plan: " + "; ".join(changed)
+                          + ". The request may not be buildable as stated.",
+                          details={"changed": changed})
+
+
 def edit_recipe(recipe: dict, instruction: str, budget: Budget, feedback: str | None = None) -> dict:
     user = (
         "Apply the engineer's edit to this recipe and return the full updated recipe. Keep parameter names and "

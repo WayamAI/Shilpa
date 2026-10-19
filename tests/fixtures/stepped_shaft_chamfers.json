@@ -1,0 +1,120 @@
+{
+ "schema_version": "1.2",
+ "name": "Stepped shaft 200 mm long, 20 mm diameter with 16 mm step and 1 mm end chamfers",
+ "intent": "engineering_cad",
+ "units": "mm",
+ "parameters": {
+  "shaft_length": {
+   "value": 200.0,
+   "kind": "length",
+   "unit": "mm",
+   "critical": true,
+   "source": "user"
+  },
+  "shaft_diameter": {
+   "value": 20.0,
+   "kind": "length",
+   "unit": "mm",
+   "critical": true,
+   "source": "user"
+  },
+  "step_diameter": {
+   "value": 16.0,
+   "kind": "length",
+   "unit": "mm",
+   "critical": true,
+   "source": "user"
+  },
+  "step_length": {
+   "value": 10.0,
+   "kind": "length",
+   "unit": "mm",
+   "critical": true,
+   "source": "user"
+  },
+  "chamfer_size": {
+   "value": 1.0,
+   "kind": "length",
+   "unit": "mm",
+   "critical": true,
+   "source": "user"
+  }
+ },
+ "frame": {
+  "origin": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "normal": [
+   0.0,
+   0.0,
+   1.0
+  ]
+ },
+ "features": [
+  {
+   "id": "shaft",
+   "op": "stepped_shaft",
+   "sections": [
+    {
+     "diameter_ref": "step_diameter",
+     "length_ref": "step_length"
+    },
+    {
+     "diameter_ref": "shaft_diameter",
+     "length_ref": "shaft_length - step_length"
+    }
+   ]
+  },
+  {
+   "id": "chamfer_step_end",
+   "op": "chamfer",
+   "body_ref": "shaft",
+   "distance_ref": "chamfer_size",
+   "edges": {
+    "direction": "perpendicular_z",
+    "location": "bottom",
+    "curve": "circle",
+    "boundary": "outer",
+    "diameter_ref": "step_diameter",
+    "expected_count": 1
+   }
+  },
+  {
+   "id": "chamfer_main_end",
+   "op": "chamfer",
+   "body_ref": "chamfer_step_end",
+   "distance_ref": "chamfer_size",
+   "edges": {
+    "direction": "perpendicular_z",
+    "location": "top",
+    "curve": "circle",
+    "boundary": "outer",
+    "diameter_ref": "shaft_diameter",
+    "expected_count": 1
+   }
+  }
+ ],
+ "assertions": {
+  "solid_count": 1,
+  "valid_brep": true,
+  "bbox_ref": [
+   "shaft_diameter",
+   "shaft_diameter",
+   "shaft_length"
+  ],
+  "holes": []
+ },
+ "exports": [
+  "STEP",
+  "STL",
+  "GLB"
+ ],
+ "assumptions": [
+  {
+   "parameter": "chamfer_size",
+   "reason": "Chamfers are assumed to be 45 degrees with the stated 1 mm leg size."
+  }
+ ]
+}

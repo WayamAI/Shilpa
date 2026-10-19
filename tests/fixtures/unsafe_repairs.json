@@ -1,0 +1,418 @@
+{
+ "L051": {
+  "original": {
+   "schema_version": "1.2",
+   "name": "Rounded plate 50x50x5 with four 8 mm through holes",
+   "intent": "engineering_cad",
+   "units": "mm",
+   "parameters": {
+    "width": {
+     "value": 50.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "length": {
+     "value": 50.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "thickness": {
+     "value": 5.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "corner_radius": {
+     "value": 10.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "hole_diameter": {
+     "value": 8.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "edge_distance": {
+     "value": 5.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    }
+   },
+   "frame": {
+    "origin": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "features": [
+    {
+     "id": "base_profile",
+     "op": "centered_rectangle",
+     "plane": "XY",
+     "width_ref": "width",
+     "height_ref": "length",
+     "corner_radius_ref": "corner_radius"
+    },
+    {
+     "id": "base_solid",
+     "op": "extrude",
+     "profile_ref": "base_profile",
+     "distance_ref": "thickness",
+     "direction": "positive_z"
+    },
+    {
+     "id": "mount_holes",
+     "op": "corner_hole_pattern",
+     "body_ref": "base_solid",
+     "diameter_ref": "hole_diameter",
+     "mode": "through_all",
+     "face": "top",
+     "hole_type": "simple",
+     "fit": "medium",
+     "edge_offset_ref": "edge_distance"
+    }
+   ],
+   "assertions": {
+    "solid_count": 1,
+    "valid_brep": true,
+    "bbox_ref": [
+     "width",
+     "length",
+     "thickness"
+    ],
+    "holes": []
+   },
+   "exports": [
+    "STEP",
+    "STL",
+    "GLB"
+   ],
+   "assumptions": []
+  },
+  "repaired": {
+   "schema_version": "1.2",
+   "name": "Rounded corner plate 50x50x5 with four 8 mm through holes",
+   "intent": "engineering_cad",
+   "units": "mm",
+   "parameters": {
+    "width": {
+     "value": 50.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "length": {
+     "value": 50.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "thickness": {
+     "value": 5.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "corner_radius": {
+     "value": 10.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "hole_diameter": {
+     "value": 8.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "edge_distance": {
+     "value": 5.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    }
+   },
+   "frame": {
+    "origin": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "features": [
+    {
+     "id": "base_profile",
+     "op": "centered_rectangle",
+     "plane": "XY",
+     "width_ref": "width",
+     "height_ref": "length",
+     "corner_radius_ref": "corner_radius"
+    },
+    {
+     "id": "base_solid",
+     "op": "extrude",
+     "profile_ref": "base_profile",
+     "distance_ref": "thickness",
+     "direction": "positive_z"
+    },
+    {
+     "id": "mount_holes",
+     "op": "corner_hole_pattern",
+     "body_ref": "base_solid",
+     "diameter_ref": "hole_diameter",
+     "mode": "through_all",
+     "face": "top",
+     "hole_type": "simple",
+     "fit": "medium",
+     "edge_offset_ref": "edge_distance + corner_radius / 10"
+    }
+   ],
+   "assertions": {
+    "solid_count": 1,
+    "valid_brep": true,
+    "bbox_ref": [
+     "width",
+     "length",
+     "thickness"
+    ],
+    "holes": []
+   },
+   "exports": [
+    "STEP",
+    "STL",
+    "GLB"
+   ],
+   "assumptions": [
+    {
+     "parameter": "edge_offset_ref",
+     "reason": "Increased effective inset so each 8 mm hole footprint stays fully on the rounded top face near the R10 corners."
+    }
+   ]
+  }
+ },
+ "L050": {
+  "original": {
+   "schema_version": "1.2",
+   "name": "Open-top box 50x50x30 with 30 mm walls",
+   "intent": "engineering_cad",
+   "units": "mm",
+   "parameters": {
+    "width": {
+     "value": 50.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "depth": {
+     "value": 50.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "height": {
+     "value": 30.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "wall_thickness": {
+     "value": 30.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    }
+   },
+   "frame": {
+    "origin": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "features": [
+    {
+     "id": "outline",
+     "op": "centered_rectangle",
+     "plane": "XY",
+     "width_ref": "width",
+     "height_ref": "depth"
+    },
+    {
+     "id": "box",
+     "op": "extrude",
+     "profile_ref": "outline",
+     "distance_ref": "height",
+     "direction": "positive_z"
+    },
+    {
+     "id": "shelled",
+     "op": "shell",
+     "body_ref": "box",
+     "thickness_ref": "wall_thickness",
+     "open_faces": [
+      {
+       "side": "top",
+       "expected_count": 1
+      }
+     ],
+     "direction": "inward"
+    }
+   ],
+   "assertions": {
+    "solid_count": 1,
+    "valid_brep": true,
+    "bbox_ref": [
+     "width",
+     "depth",
+     "height"
+    ],
+    "holes": []
+   },
+   "exports": [
+    "STEP",
+    "STL",
+    "GLB"
+   ],
+   "assumptions": [
+    {
+     "parameter": "wall_thickness",
+     "reason": "Floor thickness equals the stated wall thickness (single shell thickness)."
+    },
+    {
+     "parameter": "width",
+     "reason": "The stated 50 x 50 x 30 mm dimensions are the outer overall size of the box."
+    }
+   ]
+  },
+  "repaired": {
+   "schema_version": "1.2",
+   "name": "Open-top box 50 x 50 x 30 mm",
+   "intent": "engineering_cad",
+   "units": "mm",
+   "parameters": {
+    "width": {
+     "value": 50.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "depth": {
+     "value": 50.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "height": {
+     "value": 30.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    },
+    "wall_thickness": {
+     "value": 30.0,
+     "kind": "length",
+     "unit": "mm",
+     "critical": true,
+     "source": "user"
+    }
+   },
+   "frame": {
+    "origin": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "normal": [
+     0.0,
+     0.0,
+     1.0
+    ]
+   },
+   "features": [
+    {
+     "id": "outline",
+     "op": "centered_rectangle",
+     "plane": "XY",
+     "width_ref": "width",
+     "height_ref": "depth"
+    },
+    {
+     "id": "box",
+     "op": "extrude",
+     "profile_ref": "outline",
+     "distance_ref": "height",
+     "direction": "positive_z"
+    },
+    {
+     "id": "shelled",
+     "op": "shell",
+     "body_ref": "box",
+     "thickness_ref": "wall_thickness",
+     "open_faces": [
+      {
+       "side": "top",
+       "expected_count": 1
+      }
+     ],
+     "direction": "outward"
+    }
+   ],
+   "assertions": {
+    "solid_count": 1,
+    "valid_brep": true,
+    "holes": []
+   },
+   "exports": [
+    "STEP",
+    "STL",
+    "GLB"
+   ],
+   "assumptions": [
+    {
+     "parameter": "wall_thickness",
+     "reason": "Wall thickness equals box height, so an inward shell leaves no floor; using an outward shell keeps the user-specified wall thickness and produces a hollow open-top solid."
+    }
+   ]
+  }
+ }
+}

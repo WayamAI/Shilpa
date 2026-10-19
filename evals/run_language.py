@@ -243,7 +243,7 @@ def main() -> int:
     rows.sort(key=lambda r: r["id"])
     summary = summarize(rows)
     summary["elapsed_s"] = round(time.time() - t0, 1)
-    summary["deployment"] = os.getenv("AZURE_OPENAI_DEPLOYMENT") or _env_deployment()
+    summary["deployment"] = _model_label()
     OUT.mkdir(parents=True, exist_ok=True)
     name = f"language_report{('_' + args.tag) if args.tag else ''}.json"
     (OUT / name).write_text(json.dumps({"summary": summary, "tasks": rows}, indent=2, default=str), encoding="utf-8")
@@ -252,11 +252,20 @@ def main() -> int:
     return 0
 
 
-def _env_deployment() -> str:
+def _model_label() -> str:
+    """The model the stack used: the environment wins over .env, as in shilpa.settings."""
+    env = {}
     for line in (ROOT / ".env").read_text(encoding="utf-8").splitlines():
-        if line.startswith("AZURE_OPENAI_DEPLOYMENT="):
-            return line.split("=", 1)[1]
-    return ""
+        if "=" in line and not line.lstrip().startswith("#"):
+            k, v = line.split("=", 1)
+            env[k.strip()] = v.strip()
+
+    def get(name: str, default: str = "") -> str:
+        return os.getenv(name) or env.get(name, default)
+
+    if get("SHILPA_LLM_PROVIDER", "azure").lower() == "ollama":
+        return f"ollama:{get('OLLAMA_MODEL', 'beam')} (vision {get('OLLAMA_VISION_MODEL', 'kimi-k3')})"
+    return f"azure:{get('AZURE_OPENAI_DEPLOYMENT')}"
 
 
 if __name__ == "__main__":

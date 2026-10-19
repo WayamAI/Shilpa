@@ -720,18 +720,41 @@ def select_edges(part: bd.Part, sel: EdgeSelector, diameter: float | None = None
             continue
         if sel.location == "between" and (any(abs(z - zt) < 1e-6 for z in zs) or any(abs(z - zb) < 1e-6 for z in zs)):
             continue
-        on_box = min(abs(mid.X - bb.min.X), abs(mid.X - bb.max.X), abs(mid.Y - bb.min.Y), abs(mid.Y - bb.max.Y)) < 1e-6
-        if gt_name == "CIRCLE" and not on_box:
-            # A full circle's midpoint may sit off the box; test its radius against the extent instead.
-            rad = e.radius
-            c = e.arc_center
-            on_box = abs(c.X - bb.center().X) < 1e-6 and abs(rad - bb.size.X / 2) < 1e-6
-        if sel.boundary == "outer" and not on_box:
-            continue
-        if sel.boundary == "inner" and on_box:
-            continue
+        if sel.boundary != "any":
+            outer = _circle_is_outer(part, e) if gt_name == "CIRCLE" else None
+            if outer is None:  # lines, and circles with no curved neighbour: on the part's bounding box
+                outer = min(abs(mid.X - bb.min.X), abs(mid.X - bb.max.X), abs(mid.Y - bb.min.Y),
+                            abs(mid.Y - bb.max.Y)) < 1e-6
+                if gt_name == "CIRCLE" and not outer:
+                    # A full circle's midpoint may sit off the box; test its radius against the extent instead.
+                    outer = abs(e.arc_center.X - bb.center().X) < 1e-6 and abs(e.radius - bb.size.X / 2) < 1e-6
+            if (sel.boundary == "outer") != outer:
+                continue
         out.append(e)
     return out
+
+
+def _circle_is_outer(part, edge) -> bool | None:
+    """Whether a circular edge bounds the outside of the part (a shaft step, a disc rim) or a hole or bore.
+
+    Decided by the curved face it borders: a convex cylinder or cone (its outward normal points away
+    from the circle's centre) is outside, a concave one (pointing toward it) is a hole. None when the
+    edge borders no cylinder or cone. The bounding box alone gets stepped shafts wrong: a smaller step
+    is inside the box yet plainly an outer edge.
+    """
+    c = edge.arc_center
+    for f in part.faces():
+        if getattr(f.geom_type, "name", str(f.geom_type)).upper() not in ("CYLINDER", "CONE"):
+            continue
+        if not any(edge.is_same(fe) for fe in f.edges()):
+            continue
+        p = f.center()
+        n = f.normal_at(p)
+        radial = bd.Vector(p.X - c.X, p.Y - c.Y, 0)
+        if radial.length < 1e-9:
+            continue
+        return n.dot(radial) > 0
+    return None
 
 
 def _resolve_selector(part, sel: EdgeSelector, fid: str, diameter: float | None = None):

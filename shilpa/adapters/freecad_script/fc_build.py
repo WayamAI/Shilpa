@@ -277,17 +277,36 @@ def select_edges(shape, sel):
             continue
         if loc == "between" and (any(abs(z - zt) < 1e-6 for z in zs) or any(abs(z - zb) < 1e-6 for z in zs)):
             continue
-        on_box = min(abs(mid.x - bb.XMin), abs(mid.x - bb.XMax), abs(mid.y - bb.YMin), abs(mid.y - bb.YMax)) < 1e-6
-        if is_circle and not on_box:
-            c = e.Curve.Center
-            on_box = abs(c.x - bb.Center.x) < 1e-6 and abs(e.Curve.Radius - bb.XLength / 2) < 1e-6
         b = sel.get("boundary", "any")
-        if b == "outer" and not on_box:
-            continue
-        if b == "inner" and on_box:
-            continue
+        if b != "any":
+            on_box = _circle_is_outer(shape, e) if is_circle else None
+            if on_box is None:  # lines, and circles with no curved neighbour: on the bounding box
+                on_box = min(abs(mid.x - bb.XMin), abs(mid.x - bb.XMax), abs(mid.y - bb.YMin), abs(mid.y - bb.YMax)) < 1e-6
+                if is_circle and not on_box:
+                    c = e.Curve.Center
+                    on_box = abs(c.x - bb.Center.x) < 1e-6 and abs(e.Curve.Radius - bb.XLength / 2) < 1e-6
+            if (b == "outer") != on_box:
+                continue
         names.append(f"Edge{i}")
     return names
+
+
+def _circle_is_outer(shape, edge):
+    """Mirrors Shilpa's rule: a circle on a convex cylinder or cone is outside, on a concave one a hole."""
+    c = edge.Curve.Center
+    for f in shape.Faces:
+        if type(f.Surface).__name__ not in ("Cylinder", "Cone"):
+            continue
+        if not any(edge.isSame(fe) for fe in f.Edges):
+            continue
+        p = f.CenterOfMass
+        u, v = f.Surface.parameter(p)
+        n = f.normalAt(u, v)
+        rx, ry = p.x - c.x, p.y - c.y
+        if abs(rx) + abs(ry) < 1e-9:
+            continue
+        return n.x * rx + n.y * ry > 0
+    return None
 
 
 # ------------------------------------------------------------------ face selection (mirrors Shilpa's side selector)

@@ -104,6 +104,26 @@ def test_service_error_never_echoes_the_key(ollama):
     assert KEY not in e.value.info.message and "401" in e.value.info.message
 
 
+def test_one_retry_on_a_dropped_connection_or_server_error(ollama, monkeypatch):
+    import httpx
+
+    queue, sent = ollama
+    monkeypatch.setattr(llm.time, "sleep", lambda s: None)
+    queue += [FakeResponse(503, "busy"), reply('{"part": "plate", "width_mm": 120}')]
+    assert call()["part"] == "plate" and len(sent) == 2
+
+    calls = {"n": 0}
+
+    def flaky(url, json=None, timeout=None, headers=None):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise httpx.RemoteProtocolError("peer closed connection")
+        return reply('{"part": "shaft", "width_mm": null}')
+
+    monkeypatch.setattr(httpx, "post", flaky)
+    assert call()["part"] == "shaft" and calls["n"] == 2
+
+
 def test_kill_switch_blocks_ollama(monkeypatch):
     s = dataclasses.replace(llm.settings, llm_provider="ollama", llm_mode="off", ollama_api_key=KEY)
     monkeypatch.setattr(llm, "settings", s)
@@ -116,6 +136,19 @@ def test_kill_switch_blocks_ollama(monkeypatch):
     monkeypatch.setattr(httpx, "post", boom)
     with pytest.raises(llm.PlannerDisabled):
         call()
+
+
+def test_images_go_to_the_vision_model(ollama, monkeypatch):
+    queue, sent = ollama
+    monkeypatch.setattr(llm, "settings", dataclasses.replace(llm.settings, ollama_vision_model="fake-vision"))
+    queue.append(reply('{"part": "plate", "width_mm": 120}'))
+    llm.call_structured(system="Read.", user=[{"type": "text", "text": "p1"},
+                                             {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUJD"}}],
+                        schema_name="req", schema=SCHEMA, budget=budget())
+    assert sent[0]["json"]["model"] == "fake-vision"
+    queue.append(reply('{"part": "plate", "width_mm": 120}'))
+    call()
+    assert sent[1]["json"]["model"] == "fake-model"
 
 
 def test_images_become_ollama_images():

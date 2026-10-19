@@ -207,21 +207,36 @@ def _ollama_messages(system: str, user: str | list, schema: dict) -> list[dict]:
     return [{"role": "system", "content": system + OLLAMA_SCHEMA_RULES + json.dumps(schema)}, msg]
 
 
+def _ollama_model(messages: list[dict]) -> str:
+    """The vision model for requests that carry images, else the text model."""
+    has_images = any(m.get("images") for m in messages)
+    return (settings.ollama_vision_model or settings.ollama_model) if has_images else settings.ollama_model
+
+
 def _ollama_chat(messages: list[dict], schema: dict, max_out: int, timeout: float) -> dict:
     import httpx
 
     ensure_enabled()
     if not settings.llm_configured:
         raise ShilpaError(ErrorCode.INTERNAL, "Ollama Cloud is not configured: set OLLAMA_API_KEY and OLLAMA_MODEL in .env")
-    body = {"model": settings.ollama_model, "messages": messages, "stream": False, "format": schema, "think": False,
+    body = {"model": _ollama_model(messages), "messages": messages, "stream": False, "format": schema, "think": False,
             "options": {"temperature": 0, "num_predict": max_out}}
-    try:
-        r = httpx.post(f"{settings.ollama_base_url}/api/chat", json=body, timeout=timeout,
-                       headers={"Authorization": f"Bearer {settings.ollama_api_key}"})
-    except httpx.TimeoutException:
-        raise ShilpaError(ErrorCode.MODEL_TIMEOUT, f"model call timed out after {timeout:g} s")
-    except httpx.HTTPError as exc:
-        raise ShilpaError(ErrorCode.INTERNAL, f"model service unreachable: {type(exc).__name__}")
+    headers = {"Authorization": f"Bearer {settings.ollama_api_key}"}
+    r = None
+    for attempt in (1, 2):  # one retry for a dropped connection, rate limit or server error; none for timeouts
+        try:
+            r = httpx.post(f"{settings.ollama_base_url}/api/chat", json=body, timeout=timeout, headers=headers)
+        except httpx.TimeoutException:
+            raise ShilpaError(ErrorCode.MODEL_TIMEOUT, f"model call timed out after {timeout:g} s")
+        except httpx.HTTPError as exc:
+            if attempt == 2:
+                raise ShilpaError(ErrorCode.INTERNAL, f"model service unreachable: {type(exc).__name__}")
+            time.sleep(2)
+            continue
+        if r.status_code in (429, 500, 502, 503, 504) and attempt == 1:
+            time.sleep(2)
+            continue
+        break
     if r.status_code != 200:
         detail = r.text[:200].replace(settings.ollama_api_key, "***") if settings.ollama_api_key else r.text[:200]
         raise ShilpaError(ErrorCode.INTERNAL, f"model service error {r.status_code}: {detail}")
@@ -245,7 +260,7 @@ def _call_ollama(system: str, user: str | list, schema: dict, budget: Budget, ma
         budget.used_output += out_tok
         budget.calls.append({"purpose": purpose + (" (repair)" if attempt == 2 else ""), "input_tokens": in_tok,
                              "output_tokens": out_tok, "ms": round((time.time() - t0) * 1000),
-                             "model": d.get("model") or settings.ollama_model})
+                             "model": d.get("model") or _ollama_model(messages)})
         content = (d.get("message") or {}).get("content") or ""
         if d.get("done_reason") == "length":
             raise ShilpaError(ErrorCode.MODEL_TRUNCATED, "model output was truncated; no partial plan is accepted")

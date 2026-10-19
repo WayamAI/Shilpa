@@ -44,7 +44,9 @@ class Settings:
     llm_provider: str = os.getenv("SHILPA_LLM_PROVIDER", "azure").strip().lower()
     ollama_api_key: str = os.getenv("OLLAMA_API_KEY", "")
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "https://ollama.com").rstrip("/")
-    ollama_model: str = os.getenv("OLLAMA_MODEL", "deepseek-v4.1-flash")
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "beam")  # best on evals/screen_models.py and the G2 holdout
+    # Requests with images (drawings) go here: the text model may not accept images (beam does not).
+    ollama_vision_model: str = os.getenv("OLLAMA_VISION_MODEL", "kimi-k3")  # 26/26 on evals/run_drawings.py, fastest
     ollama_timeout_s: float = float(os.getenv("OLLAMA_TIMEOUT_S", 120))
     # Kill switch for every model call: SHILPA_LLM=off|on. Defaults to off when no service is configured,
     # so a checkout without credentials can never reach a paid API by accident.

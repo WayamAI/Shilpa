@@ -431,7 +431,8 @@ class JobIn(BaseModel):
 def _job_out(job: Job) -> dict:
     return {"id": job.id, "project_id": job.project_id, "kind": job.kind, "state": job.state, "state_revision": job.state_revision,
             "model_id": job.model_id, "base_version_id": job.base_version_id, "result_version_id": job.result_version_id,
-            "error": job.error, "cancel_requested": job.cancel_requested, "budget_used": job.budget_used,
+            "error": job.error, "cancel_requested": job.cancel_requested,
+            "budget_used": {k: v for k, v in (job.budget_used or {}).items() if not k.startswith("_")},
             "input": {k: v for k, v in (job.input or {}).items() if k not in ("recipe", "spec")},
             "created_at": job.created_at.isoformat(), "updated_at": job.updated_at.isoformat()}
 

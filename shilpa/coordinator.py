@@ -24,6 +24,8 @@ log = logging.getLogger("shilpa.coordinator")
 
 # Static errors that mean the planner wrote a bad recipe (not that the user asked for one).
 PLANNER_FIXABLE = {ErrorCode.INVALID_PARAMETER, ErrorCode.UNIT_MISMATCH, ErrorCode.REFERENCE_CYCLE}
+# The job's first valid plan, kept in budget_used (internal, hidden by the API) for check_repair.
+BASELINE_KEY = "_baseline_recipe"
 
 
 def _budget(job: Job) -> Budget:
@@ -153,6 +155,7 @@ def handle_plan(msg: dict) -> None:
     current = snapshot["recipe"]
     first_summary = None
     feedback: str | None = None
+    repaired = False
 
     while True:
         try:
@@ -176,11 +179,17 @@ def handle_plan(msg: dict) -> None:
                                       details={"last_error": pending_error})
                 used["repair_calls"] = used.get("repair_calls", 0) + 1
                 recipe = planner.repair_recipe(current, pending_error, snapshot["last_features"], budget)
+                repaired = True
+                if snapshot["kind"] == "generate":
+                    # Against the first valid plan, kept on the job, so repeated repairs cannot drift.
+                    planner.check_repair(used.get(BASELINE_KEY) or current, recipe)
             # The user-facing summary describes the edit, not later internal repairs.
             first_summary = first_summary or recipe.get("_change_summary")
             recipe = planner.check_recipe(recipe)
             if snapshot["spec"] and snapshot["kind"] == "generate":
                 planner.check_requirements(recipe, snapshot["spec"])
+                if not repaired and BASELINE_KEY not in used:
+                    used[BASELINE_KEY] = {k: v for k, v in recipe.items() if not k.startswith("_")}
             break
         except ShilpaError as exc:
             # A plan that fails static checks, or malformed model output, is retried within
