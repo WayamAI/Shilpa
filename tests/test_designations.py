@@ -63,6 +63,14 @@ from shilpa.catalog.designations import lookup
     ("8 mm shaft collar", "shaft.collar", {"d": 8}),
     ("ISO 2338 4x16", "pin.dowel", {"d": 4, "length": 16.0, "standard": "ISO 2338"}),
     ("compression spring 1 x 10 x 30", "spring.compression", {"wire_d": 1.0, "mean_d": 10.0, "free_length": 30.0}),
+    ("IPE 200 x 3000", "section.i_beam", {"designation": "IPE 200", "length": 3000.0}),
+    ("HEB200 6 m", "section.i_beam", {"designation": "HEB 200", "length": 6000.0}),
+    ("UPN 100", "section.channel", {"designation": "UPN 100"}),
+    ("L 50x50x5 x 1200", "section.angle", {"designation": "L 50x5", "length": 1200.0}),
+    ("SHS 40x40x3 x 1000", "section.square_tube", {"designation": "SHS 40x40x3", "length": 1000.0}),
+    ("box section 80x40x4", "section.rect_tube", {"designation": "RHS 80x40x4"}),
+    ("chs 114.3 x 5 x 600", "section.round_tube", {"designation": "CHS 114.3x5", "length": 600.0}),
+    ("flat bar 40x5 x 500", "section.flat_bar", {"width": 40.0, "thickness": 5.0, "length": 500.0}),
     ("t-nut m5", "vslot.tnut", {"thread": "M5"}),
 ])
 def test_lookup(text, gen, params):
@@ -77,7 +85,7 @@ def test_lookup(text, gen, params):
 
 
 @pytest.mark.parametrize("text", ["M6x21 socket head", "bracket with 4 holes", "1/4-20 x 1\" socket head cap screw",
-                                  "", "hello", "NPS 14 weld neck flange"])
+                                  "", "hello", "NPS 14 weld neck flange", "ipe 210", "L 50x5x5"])
 def test_no_match_for_non_standard_or_unrelated(text):
     assert lookup(text) == []
 

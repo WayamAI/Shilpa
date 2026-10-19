@@ -36,6 +36,7 @@ FAMILIES = [  # (name prefix, family title), first match wins
     ("seal.", "Seals, circlips and keys"),
     ("ring.", "Seals, circlips and keys"),
     ("key.", "Seals, circlips and keys"),
+    ("section.", "Structural sections"),
     ("gear.", "Gears"),
     ("drive.", "Chain and worm drives"),
     ("pipe.", "Pipes and flanges"),

@@ -71,6 +71,38 @@
     "licence": "Dimensions are facts; the standard document is not reproduced.",
     "units": "mm"
   },
+  "en10365_beams.csv": {
+    "title": "Hot-rolled I and H sections IPE, HEA and HEB",
+    "standards": ["EN 10365", "EN 10034 (tolerances)"],
+    "basis": "Height h, flange width b, web thickness tw, flange thickness tf and root radius r per the European section tables.",
+    "source": "EN 10365 dimension tables as published by steel suppliers (ArcelorMittal and others). Area and second moments in the parts are computed from this geometry and checked against the published values in the tests.",
+    "licence": "Dimensions are facts; the standard document is not reproduced.",
+    "units": "mm"
+  },
+  "en10365_channels.csv": {
+    "title": "Hot-rolled channels UPN (taper flange)",
+    "standards": ["EN 10365", "DIN 1026-1"],
+    "basis": "Height h, flange width b, web thickness tw, flange thickness tf half-way along the flange and root radius r; the flange inner face is drawn with its 8 % taper, toe radii are not modelled.",
+    "source": "EN 10365 / DIN 1026-1 channel tables as published by steel suppliers.",
+    "licence": "Dimensions are facts; the standard documents are not reproduced.",
+    "units": "mm"
+  },
+  "en10056_angles.csv": {
+    "title": "Hot-rolled equal-leg angles",
+    "standards": ["EN 10056-1"],
+    "basis": "Leg length a, thickness t and root radius r1 (toe radii not modelled).",
+    "source": "EN 10056-1 angle tables as published by steel suppliers; root radii rounded and approximate for the smallest sizes.",
+    "licence": "Dimensions are facts; the standard document is not reproduced.",
+    "units": "mm"
+  },
+  "en10219_hollow.csv": {
+    "title": "Cold-formed structural hollow sections SHS, RHS and CHS",
+    "standards": ["EN 10219-2"],
+    "basis": "Outside dimensions h x b (CHS: outside diameter) and wall t; square and rectangular corners use the EN 10219-2 outer radius 2t (t <= 6), 2.5t (t <= 10), else 3t. A common size range, not every listed size.",
+    "source": "EN 10219-2 size tables as published by steel suppliers.",
+    "licence": "Dimensions are facts; the standard document is not reproduced.",
+    "units": "mm"
+  },
   "iso8734_dowels.csv": {
     "title": "Parallel dowel pins ISO 8734 (hardened) and ISO 2338 (unhardened): diameters and length ranges",
     "standards": ["ISO 8734", "ISO 2338"],

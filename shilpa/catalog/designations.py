@@ -26,6 +26,9 @@ part-type words):
   block``, ``HGR20 rail 1000``, ``SFU1605 x 500``, ``SFU1605 nut``, ``LM8UU``,
   ``8 mm linear shaft 300``, ``UCP204``, ``DIN 705 20``, ``dowel 6 x 20``,
   ``compression spring 1 x 10 x 30``).
+* Structural sections (``IPE 200 x 3000``, ``HEB200 6 m``, ``UPN 100``,
+  ``L50x5``, ``SHS 40x40x3 x 1000``, ``box section 80x40x4``, ``CHS 48.3x3.2``,
+  ``flat bar 40x5 x 500``, ``round bar 20``).
 
 Each match is validated against the generator's parameter model (nothing is
 built) and comes back as ``{generator, params, label, matched, score}``, best
@@ -636,8 +639,67 @@ def _small_parts(text: str) -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- structural sections
+
+def _member_length(rest: str) -> float | None:
+    """A member length after the section name: "x 3000", "3000 mm", "3 m", "L=2500"."""
+    if m := re.search(r"(?:[x×*]|l\s*=|length)\s*" + NUM + r"\s*(mm|m)?\b", rest):
+        return _f(m.group(1)) * (1000 if m.group(2) == "m" else 1)
+    if m := re.search(r"\b" + NUM + r"\s*(mm|m)\b", rest):
+        return _f(m.group(1)) * (1000 if m.group(2) == "m" else 1)
+    return None
+
+
+def _num_text(x: str) -> str:
+    return f"{_f(x):g}"
+
+
+def _sections(text: str) -> list[dict]:
+    hits = []
+    if m := re.search(r"\b(ipe|hea|heb)\s*(\d{2,3})\b", text):
+        hits.append(("section.i_beam", f"{m.group(1).upper()} {m.group(2)}", m))
+    elif m := re.search(r"\bupn\s*(\d{2,3})\b", text):
+        hits.append(("section.channel", f"UPN {m.group(1)}", m))
+    elif m := re.search(r"\b(shs|rhs)\s*" + NUM + r"\s*[x×*]\s*" + NUM + r"\s*[x×*]\s*" + NUM, text):
+        hits.append((f"section.{'square' if m.group(1) == 'shs' else 'rect'}_tube",
+                     f"{m.group(1).upper()} {_num_text(m.group(2))}x{_num_text(m.group(3))}x{_num_text(m.group(4))}", m))
+    elif m := re.search(r"(?:box\s*section|square\s*tube|rectangular\s*tube|\btube\b)\s*" + NUM + r"\s*[x×*]\s*" + NUM +
+                        r"\s*[x×*]\s*" + NUM, text):
+        shape = "SHS" if _f(m.group(1)) == _f(m.group(2)) else "RHS"
+        hits.append((f"section.{'square' if shape == 'SHS' else 'rect'}_tube",
+                     f"{shape} {_num_text(m.group(1))}x{_num_text(m.group(2))}x{_num_text(m.group(3))}", m))
+    elif m := re.search(r"\bchs\s*" + NUM + r"\s*[x×*]\s*" + NUM, text):
+        hits.append(("section.round_tube", f"CHS {_num_text(m.group(1))}x{_num_text(m.group(2))}", m))
+    elif m := re.search(r"(?:\bl\s*|angle\s*)(\d+)\s*[x×*]\s*(?:(\d+)\s*[x×*]\s*)?(\d+)\b", text):
+        if m.group(2) is None or m.group(2) == m.group(1):
+            hits.append(("section.angle", f"L {m.group(1)}x{m.group(3)}", m))
+    out = []
+    for gen, des, m in hits:
+        params: dict[str, Any] = {"designation": des}
+        if length := _member_length(text[m.end():]):
+            params["length"] = length
+        hit = _match(gen, params, des + (f" x {params['length']:g} mm" if "length" in params else ""), m.group(0), 0.9)
+        if hit:
+            out.append(hit)
+    if m := re.search(r"flat\s*(?:bar|steel)?\s*" + NUM + r"\s*[x×*]\s*" + NUM, text):
+        params = {"width": _f(m.group(1)), "thickness": _f(m.group(2))}
+        if length := _member_length(text[m.end():]):
+            params["length"] = length
+        hit = _match("section.flat_bar", params, f"flat bar {m.group(1)}x{m.group(2)}", m.group(0), 0.85)
+        if hit:
+            out.append(hit)
+    if m := re.search(r"round\s*(?:bar|steel|stock)\s*(?:d\s*|ø\s*)?" + NUM, text):
+        params = {"diameter": _f(m.group(1))}
+        if length := _member_length(text[m.end():]):
+            params["length"] = length
+        hit = _match("section.round_bar", params, f"round bar {m.group(1)}", m.group(0), 0.85)
+        if hit:
+            out.append(hit)
+    return out
+
+
 RULES = (_screws, _nuts_and_washers, _bearings, _o_rings, _circlips, _keys, _gears, _vslot, _pipes, _flanges,
-         _drives, _openbuilds, _belts, _linear, _small_parts)
+         _drives, _openbuilds, _belts, _linear, _small_parts, _sections)
 
 
 def lookup(text: str, limit: int = 5) -> list[dict]:
