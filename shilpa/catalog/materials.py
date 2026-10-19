@@ -20,11 +20,12 @@ DENSITY_G_CM3: dict[str, float] = {
     "bronze": 8.80,
     "carbon_fibre": 1.55,  # cured CFRP laminate
     "nylon": 1.15,
+    "acetal": 1.41,  # POM (Delrin)
     "rubber": 1.20,
     "polyurethane": 1.20,
 }
 
-ALIASES = {"aluminum": "aluminium", "carbon": "carbon_fibre", "cfrp": "carbon_fibre", "4130": "chromoly", "ss": "stainless"}
+ALIASES = {"aluminum": "aluminium", "carbon": "carbon_fibre", "cfrp": "carbon_fibre", "4130": "chromoly", "ss": "stainless", "pom": "acetal", "delrin": "acetal"}
 
 
 def density(material: str) -> float:

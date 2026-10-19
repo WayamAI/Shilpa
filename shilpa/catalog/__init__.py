@@ -89,4 +89,4 @@ def resolve(generator: str, params: dict[str, Any] | None = None) -> BuiltPart:
 
 
 # Registration side effects.
-from . import bearings, bicycle, fasteners  # noqa: E402,F401
+from . import bearings, bicycle, fasteners, gears, vslot  # noqa: E402,F401

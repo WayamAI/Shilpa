@@ -94,6 +94,19 @@ wheels = [
 ]
 
 [[package]]
+name = "bd-vslot"
+version = "0.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "build123d" },
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f1/76/5186eca214bb6c47b9f54f607f797cb4361690b3e2e439bc9c68a954cdc0/bd_vslot-0.0.2.tar.gz", hash = "sha256:8966ec5f118e67ab05cfd8da2d870231cc47d6371df9415f38da1194db6b197f", size = 7826, upload-time = "2026-01-03T03:50:56.248Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/39/4c/b90c552ff4922f8a7504c59a57966cb55f86a547f3fb611ba0c220a51b97/bd_vslot-0.0.2-py3-none-any.whl", hash = "sha256:0a6697e662cbaac919e08de4e2ec5e02feae74544b2577b0e0f348d381c00ac8", size = 9406, upload-time = "2026-01-03T03:50:55.22Z" },
+]
+
+[[package]]
 name = "bd-warehouse"
 version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1372,6 +1385,20 @@ wheels = [
 ]
 
 [[package]]
+name = "py-gearworks"
+version = "0.0.24"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "build123d" },
+    { name = "numpy" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a6/80/7bd2b82b8244a7d4223dbc3c0ed560b4fcccc47e5038ef73d8b2153077db/py_gearworks-0.0.24.tar.gz", hash = "sha256:a8d3e44d9e91b45438c3c0b5ca5b886226fef31939fa8073eb11830e8a384768", size = 1038752, upload-time = "2026-09-24T21:43:45.002Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/67/15/8247c62b33d15c10790727367d1296ddf881fde670197d156d39b9004bc3/py_gearworks-0.0.24-py3-none-any.whl", hash = "sha256:c16ae7eb03ad8701373b655e34163648cc288b1740456304db2623a70c36d9b3", size = 86148, upload-time = "2026-09-24T21:43:43.433Z" },
+]
+
+[[package]]
 name = "py-lib3mf"
 version = "2.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1797,12 +1824,14 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "azure-identity" },
+    { name = "bd-vslot" },
     { name = "bd-warehouse" },
     { name = "build123d" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "openai" },
     { name = "pillow" },
+    { name = "py-gearworks" },
     { name = "pydantic" },
     { name = "pymupdf" },
     { name = "python-dotenv" },
@@ -1821,12 +1850,14 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "azure-identity", specifier = ">=1.26.0" },
+    { name = "bd-vslot", specifier = ">=0.0.2" },
     { name = "bd-warehouse", specifier = ">=0.4.0" },
     { name = "build123d", specifier = "==0.13.0" },
     { name = "fastapi", specifier = ">=0.143.3" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "openai", specifier = ">=3.35.1" },
     { name = "pillow", specifier = ">=13.0.0" },
+    { name = "py-gearworks", specifier = ">=0.0.24" },
     { name = "pydantic", specifier = ">=2.14.1" },
     { name = "pymupdf", specifier = ">=1.28.2" },
     { name = "python-dotenv", specifier = ">=1.2.4" },

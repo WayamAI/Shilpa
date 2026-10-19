@@ -46,8 +46,11 @@ JOINT_DOF: dict[str, int] = {"fixed": 0, "revolute": 1, "slider": 1, "cylindrica
 OPPOSED_BY_DEFAULT = {"fixed", "planar", "ball"}
 # Joints whose range the swept-motion check samples, and which value the limits bound.
 SWEPT = {"revolute": "angle", "slider": "offset", "cylindrical": "angle", "screw": "angle"}
-# Contract keys that must differ rather than agree (a male thread mates a female one).
-COMPLEMENTARY_KEYS = {"gender"}
+# Contract keys that must differ rather than agree (a male thread mates a female one; a
+# right-hand helical gear meshes with a left-hand one).
+COMPLEMENTARY_KEYS = {"gender", "mesh_hand"}
+# Keys that tell the port validator how to check a port's own geometry, not what it mates with.
+VALIDATOR_KEYS = {"kind", "straddle"}
 CONTRACT_REL_TOL = 1e-6
 
 _ID = r"^[a-z][a-z0-9_]{0,63}$"
@@ -258,7 +261,7 @@ def declared_ports(spec: AssemblySpec) -> dict[str, dict[str, Port] | None]:
 def contracts_compatible(a: dict[str, Any], b: dict[str, Any]) -> list[str]:
     """Shared contract keys that disagree. Numbers compare with a relative tolerance, strings case-insensitively."""
     bad = []
-    for key in sorted(set(a) & set(b)):
+    for key in sorted((set(a) & set(b)) - VALIDATOR_KEYS):
         va, vb = a[key], b[key]
         if key in COMPLEMENTARY_KEYS:
             if str(va).lower() == str(vb).lower():
