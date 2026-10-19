@@ -151,6 +151,17 @@ def test_point_port_inside_and_outside():
     assert not far.passed and far.actual["distance_to_solid"] == pytest.approx(7.5)
 
 
+def test_straddle_point_between_two_rods():
+    rods = bd.Solid.make_box(40, 4, 4, bd.Plane(origin=(-20, 8, -2))).fuse(bd.Solid.make_box(40, 4, 4, bd.Plane(origin=(-20, -12, -2))))
+    port = Port(name="rail_clamp", label="rail clamp centre", contract={"straddle": 10.0}, x=(1, 0, 0))
+    plain = Port(name="rail_clamp", label="rail clamp centre", x=(1, 0, 0))
+    wide = Port(name="rail_clamp", label="rail clamp centre", contract={"straddle": 20.0}, x=(1, 0, 0))
+    assert check_port(_part(rods, port), port).passed
+    assert not check_port(_part(rods, plain), plain).passed  # the centre itself is in the gap
+    c = check_port(_part(rods, wide), wide)
+    assert not c.passed and c.actual["straddle_distances"] == [pytest.approx(8.0), pytest.approx(8.0)]
+
+
 def test_kind_override_and_missing_solid():
     port = Port(name="datum", origin=(0, 0, 2.5))
     assert check_port(_part(_box(), port), port, kind="face").passed
@@ -160,29 +171,13 @@ def test_kind_override_and_missing_solid():
 
 # ---------------------------------------------------------------- real parts
 
-# Declared ports that do not sit on their geometry today. These are findings
-# about the generators, not validator bugs; the owning modules are left as
-# they are. A fix there just shrinks this set (the test asserts a subset), but
-# any new mismatch fails.
-EXPECTED_MISMATCHES = {
-    # Pedal threads are not modelled: the crank arms are plain boxes.
-    ("bike.crankset", "pedal_left"),
-    ("bike.crankset", "pedal_right"),
-    # Ports sit on the ring centre plane (chainline convention), 1 mm inboard of the 2 mm ring's outer face.
-    ("bike.crankset", "chainring_1"),
-    ("bike.crankset", "chainring_2"),
-    # Ports sit on the flange centre plane (flange offset convention), 1.5 mm inboard of the 3 mm flange's outer face.
-    ("bike.hub", "flange_left"),
-    ("bike.hub", "flange_right"),
-    # Rails are not modelled; the clamp centre is 30 mm below the shell centre, about 11 mm clear of the envelope.
-    ("bike.saddle", "rail_clamp"),
-    # The tyre envelope is trimmed clear of the rim: smallest coaxial diameter is 634, not the 622 BSD.
-    ("bike.tyre", "rim_seat"),
-    # bd_warehouse simple=True models the shank at the thread minor diameter (4.917), not nominal 6.
-    ("iso4762_socket_head_cap_screw", "thread_axis"),
-    # The down tube breaks through the head-tube bottom plane, splitting the lower cup seat annulus.
-    ("bike_frame", "head_tube_bottom"),
-}
+# Declared ports that do not sit on their geometry today (findings about the
+# generators, not validator bugs). Empty: the ten first found were fixed in the
+# generators (pedal-eye bores, chainring centre planes as references, hub
+# flange ports on the outer faces, saddle rails, tyre bead band at the BSD,
+# nominal-diameter screw shank, down tube clear of the head-tube bottom). Any
+# new mismatch fails.
+EXPECTED_MISMATCHES: set[tuple[str, str]] = set()
 
 
 def _real_parts():

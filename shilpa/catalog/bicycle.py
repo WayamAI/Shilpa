@@ -26,7 +26,8 @@ against a specific product before they gate a design):
   559 (26"). Hook flange height 6 mm is approx.
 * Tyres: ISO 5775 / ETRTO width-BSD designation (e.g. 28-622). Envelope is a
   torus with section height = width, which is approx (real casings are 5-10 %
-  lower than wide), trimmed to clear the rim flanges.
+  lower than wide), trimmed to clear the rim flanges, plus a bead band at the
+  BSD between the flanges (inner diameter = BSD).
 * Seatposts 27.2 / 30.9 / 31.6 mm and bar clamp 31.8 mm (also 25.4, 35.0):
   de-facto industry sizes. 22.2 mm flat-bar grip diameter. Pedal thread
   9/16" x 20 TPI (ISO 4210), left-hand on the left crank.
@@ -220,8 +221,12 @@ def hub(p: HubParams) -> BuiltPart:
         [port("axle", (0, 0, 0), (0, 0, 1), label="axle axis, z to non-drive side", **c),
          port("dropout_left", (0, 0, old / 2), (0, 0, 1), label="non-drive locknut face", **c),
          port("dropout_right", (0, 0, -old / 2), (0, 0, -1), label="drive locknut face", **c),
-         port("flange_left", (0, 0, fl), (0, 0, 1), label="non-drive spoke flange", flange_d=p.flange_d, offset=fl),
-         port("flange_right", (0, 0, -fr), (0, 0, -1), label="drive spoke flange", flange_d=p.flange_d, offset=fr)],
+         # Flange ports sit on the flange's outer face (where spoke heads bear), a real contact face; the
+         # contract keeps ``offset`` to the flange centre plane, the convention spoke calculators use.
+         port("flange_left", (0, 0, fl + ft / 2), (0, 0, 1), label="non-drive spoke flange outer face",
+              flange_d=p.flange_d, offset=fl, flange_thickness=ft),
+         port("flange_right", (0, 0, -fr - ft / 2), (0, 0, -1), label="drive spoke flange outer face",
+              flange_d=p.flange_d, offset=fr, flange_thickness=ft)],
         standard="hub OLD", size=p.axle, designation=f"{'rear' if rear else 'front'} hub {p.axle}",
         flange_spacing=fl + fr, approx=["flange_d", "flange_offsets", "body_d"],
     )
@@ -266,20 +271,27 @@ class TyreParams(CatalogParams):
     bsd: int = Field(622, gt=200, lt=800)
     width: float = Field(28.0, ge=16, le=80)  # ETRTO nominal section width
     rim_flange_height: float = Field(6.0, ge=0)
+    rim_inner_width: float = Field(19.0, gt=0)  # bead-to-bead width inside the rim flanges (rim ``inner_width``)
 
 
 @generator("bike.tyre", TyreParams, "Tyre envelope: torus of ETRTO width on an ISO 5775 BSD, trimmed clear of the rim",
            "ISO 5775 / ETRTO", mass_basis="envelope")
 def tyre(p: TyreParams) -> BuiltPart:
+    """The torus is trimmed clear of the rim flanges; a bead band fills the rim well between the flanges,
+    from the bead-seat diameter (inner diameter = BSD) up to the flange tops, so the tyre touches the rim's
+    bead seat and flange inner faces without overlapping them."""
     w, r = p.width, p.bsd / 2
     torus = bd.Solid.make_torus(r + w / 2, w / 2)
     clear = bd.Solid.make_cylinder(r + p.rim_flange_height, w + 2, bd.Plane.XY.offset(-(w + 2) / 2))
     solid = torus.cut(clear).solid()
+    if p.rim_flange_height > 0:
+        half = min(p.rim_inner_width, w) / 2
+        solid = fuse(solid, ring(r, r + p.rim_flange_height, -half, half))
     etrto = f"{w:g}-{p.bsd}"
     return _part(
         f"tyre_{w:g}_{p.bsd}", solid,
-        [port("rim_seat", (0, 0, 0), (0, 0, 1), label="wheel axis; seats on a rim with the same BSD",
-              etrto=etrto, bsd=p.bsd, width=w)],
+        [port("rim_seat", (0, 0, 0), (0, 0, 1), label="wheel axis; bead seats on a rim with the same BSD",
+              etrto=etrto, bsd=p.bsd, width=w, rim_inner_width=p.rim_inner_width)],
         standard="ISO 5775 / ETRTO", size=etrto, designation=f"ETRTO {etrto}",
         outer_diameter=p.bsd + 2 * w, approx=["section height = width"],
     )
@@ -383,6 +395,8 @@ def stem(p: StemParams) -> BuiltPart:
 
 
 CHAIN_PITCH = 12.7
+PEDAL_THREAD_D = 9 / 16 * 25.4  # 9/16" x 20 TPI pedal thread, major diameter 14.2875 mm (ISO 4210)
+PEDAL_EYE_R = 12.0  # pedal-eye boss radius at the crank arm end (approx)
 
 
 def pitch_diameter(teeth: int, pitch: float = CHAIN_PITCH) -> float:
@@ -436,17 +450,27 @@ def crankset(p: CranksetParams) -> BuiltPart:
     hw = p.arm_width / 2
 
     def arm(sign: float) -> bd.Solid:
-        x0, x1 = (-15.0, L + 12.0) if sign > 0 else (-(L + 12.0), 15.0)
+        # Box from behind the spindle to the pedal axis, then a round pedal-eye boss (radius PEDAL_EYE_R, so
+        # the arm still reaches L + 12) with the pedal thread bored through it as a plain major-diameter hole.
+        x0, x1 = (-15.0, L) if sign > 0 else (-L, 15.0)
         z0 = -q if sign > 0 else q - t
-        return bd.Solid.make_box(x1 - x0, 2 * hw, t, bd.Plane(origin=(x0, -hw, z0)))
+        xp = L if sign > 0 else -L
+        body = bd.Solid.make_box(x1 - x0, 2 * hw, t, bd.Plane(origin=(x0, -hw, z0)))
+        eye = bd.Solid.make_cylinder(PEDAL_EYE_R, t, bd.Plane(origin=(xp, 0, z0)))
+        bore = bd.Solid.make_cylinder(PEDAL_THREAD_D / 2, t, bd.Plane(origin=(xp, 0, z0)))
+        return fuse(body, eye).cut(bore).solid()
 
     solid = fuse(spindle, spider, *rings, arm(1), arm(-1))
+    pedal = {"bore_d": round(PEDAL_THREAD_D, 3)}
     ports = [port("spindle", (0, 0, 0), (0, 0, 1), label="spindle axis, z to non-drive side", spindle_d=p.spindle_d),
-             port("pedal_left", (-L, 0, q), (0, 0, 1), label="left pedal thread", pedal_thread="9/16x20TPI LH"),
-             port("pedal_right", (L, 0, -q), (0, 0, -1), label="right pedal thread", pedal_thread="9/16x20TPI RH")]
+             port("pedal_left", (-L, 0, q), (0, 0, 1), label="left pedal thread", pedal_thread="9/16x20TPI LH", **pedal),
+             port("pedal_right", (L, 0, -q), (0, 0, -1), label="right pedal thread", pedal_thread="9/16x20TPI RH", **pedal)]
     for k, (tn, z, pd) in enumerate(zip(p.teeth, zs, pds), 1):
-        ports.append(port(f"chainring_{k}", (0, 0, z), (0, 0, -1), label=f"{tn}T chainring plane",
-                          teeth=tn, pitch_d=round(pd, 3), chainline=round(-z, 3), chain_pitch=CHAIN_PITCH))
+        # The chainline convention measures to the ring's centre plane, which has no face of its own: a
+        # reference ("point" kind) on the spindle axis, with the 2 mm ring's faces at z +- 1.
+        ports.append(port(f"chainring_{k}", (0, 0, z), (0, 0, -1), label=f"{tn}T chainring centre plane (chainline reference)",
+                          kind="point", teeth=tn, pitch_d=round(pd, 3), chainline=round(-z, 3), chain_pitch=CHAIN_PITCH,
+                          ring_thickness=2.0))
     rings_txt = "/".join(str(tn) for tn in reversed(p.teeth))
     return _part(
         f"crankset_{L:g}_{rings_txt.replace('/', '_')}", solid, ports,
@@ -459,13 +483,34 @@ class SaddleParams(CatalogParams):
     length: float = Field(270.0, gt=150)
     width: float = Field(140.0, gt=80)
     height: float = Field(45.0, gt=10)  # shell + padding envelope thickness
-    rail_drop: float = Field(30.0, gt=0)  # rail clamp point below the shell centre
+    rail_drop: float = Field(30.0, gt=0)  # rail clamp point (rail axes) below the shell centre
+    rail_d: float = Field(7.0, gt=0)  # 7 mm round rails (the common standard)
+    rail_spacing: float = Field(43.0, gt=10)  # rail centre-to-centre in the clamp zone (approx)
+    clamp_zone: tuple[float, float] = (-35.0, 35.0)  # straight rail length usable by the post clamp, along X
+
+    @model_validator(mode="after")
+    def _rails_fit(self):
+        if self.rail_spacing + self.rail_d >= 0.5 * self.width:
+            raise ValueError("saddle rails too far apart for the shell width")
+        # The straight rail runs 10 mm past each clamp-zone end before rising to anchors at -0.33 L and +0.3 L.
+        lo, hi = self.clamp_zone
+        if lo >= hi or lo - 10 <= -0.33 * self.length or hi + 10 >= 0.3 * self.length:
+            raise ValueError("saddle clamp_zone must be increasing, within -0.33 L + 10 and 0.3 L - 10 mm")
+        return self
 
 
-@generator("bike.saddle", SaddleParams, "Saddle as a lofted envelope (freeform approximation)", "none",
+def _rod(a, b, r: float) -> bd.Solid:
+    d = bd.Vector(*b) - bd.Vector(*a)
+    return bd.Solid.make_cylinder(r, d.length, bd.Plane(origin=a, z_dir=d))
+
+
+@generator("bike.saddle", SaddleParams, "Saddle as a lofted envelope (freeform approximation) on two round rails", "none",
            mass_basis="envelope")
 def saddle(p: SaddleParams) -> BuiltPart:
-    """Nose toward +X. Ellipse sections lofted along X; rails are not modelled."""
+    """Nose toward +X. Ellipse sections lofted along X, plus two round rails: straight and parallel at
+    ``rail_drop`` below the shell centre over the clamp zone (and 10 mm beyond each end), then rising into
+    the shell, converging toward the nose. The ``rail_clamp`` port is the clamp centre midway between the
+    rail axes: a reference point with rail material on either side of it (``straddle``)."""
     # (x fraction of length, half-width fraction, half-height fraction, centre z mm)
     stations = [(-0.5, 0.75, 0.5, 6.0), (-0.35, 1.0, 1.0, 3.0), (-0.1, 0.8, 0.9, 0.0),
                 (0.15, 0.42, 0.75, 0.0), (0.4, 0.24, 0.6, 1.0), (0.5, 0.18, 0.5, 2.0)]
@@ -473,11 +518,22 @@ def saddle(p: SaddleParams) -> BuiltPart:
     for fx, fw, fh, zc in stations:
         pl = bd.Plane(origin=(fx * p.length, 0, zc), x_dir=(0, 1, 0), z_dir=(1, 0, 0))
         wires.append(bd.Wire([bd.Edge.make_ellipse(fw * p.width / 2, fh * p.height / 2, pl)]))
-    solid = bd.Solid.make_loft(wires)
+    shell = bd.Solid.make_loft(wires)
+    rr, half, zr = p.rail_d / 2, p.rail_spacing / 2, -p.rail_drop
+    x0, x1 = p.clamp_zone[0] - 10, p.clamp_zone[1] + 10
+    rails = []
+    for s in (1.0, -1.0):
+        # Ends anchored inside the shell, near its centre height: rear wide, nose narrow (approx).
+        pts = [(-0.33 * p.length, s * min(half + 6, 0.35 * p.width), 0.0), (x0, s * half, zr), (x1, s * half, zr),
+               (0.3 * p.length, s * min(half * 0.4, 0.1 * p.width), 0.0)]
+        rails += [_rod(a, b, rr) for a, b in zip(pts, pts[1:])]
+        rails += [bd.Solid.make_sphere(rr).moved(bd.Location(c)) for c in pts[1:3]]
+    solid = fuse(shell, *rails)
     return _part(
         "saddle_envelope", solid,
-        [port("rail_clamp", (0, 0, -p.rail_drop), (0, 0, -1), x=(1, 0, 0), label="rail clamp centre, z toward the post",
-              rails="7mm round", clamp_zone_mm=[-35, 35])],
+        [port("rail_clamp", (0, 0, zr), (0, 0, -1), x=(1, 0, 0), label="rail clamp centre, z toward the post",
+              kind="point", straddle=half, rails=f"{p.rail_d:g}mm round", rail_spacing=p.rail_spacing,
+              clamp_zone_mm=list(p.clamp_zone))],
         standard="none", size=f"{p.length:g}x{p.width:g}", designation=f"saddle envelope {p.length:g} x {p.width:g}",
         freeform_approx=True,
     )

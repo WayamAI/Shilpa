@@ -393,8 +393,8 @@ def assembly_from_skeleton(sk: dict[str, SkeletonParam], name: str = "bicycle") 
     sa = math.radians(v["seat_angle"])
     steer_top = v["lower_stack"] + v["head_tube_length"] + v["upper_stack"] + v["spacer_stack"]
     stem_stack = 40.0
-    tyre = {"bsd": int(v["wheel_bsd"]), "width": v["tyre_width"], "rim_flange_height": 6.0}
     rim_inner = 19.0 if v["tyre_width"] < 32 else 23.0 if v["tyre_width"] < 45 else 25.0
+    tyre = {"bsd": int(v["wheel_bsd"]), "width": v["tyre_width"], "rim_flange_height": 6.0, "rim_inner_width": rim_inner}
     fork_params = {"a2c": v["fork_a2c"], "offset": v["fork_offset"], "steerer_length": steer_top + stem_stack - 3.0,
                    "axle": v["front_axle"], "blade_spread": v["fork_blade_spread"], "material": v["material"],
                    "dropout_thickness": 16.0, "blade_end_outset": 2.0}
