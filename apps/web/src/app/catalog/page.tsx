@@ -385,7 +385,13 @@ export default function CatalogPage() {
           {/* Centre: title row and viewport (Paper 03 Part detail). */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <h2 className="min-w-0 truncate text-xl">{gen ? gen.summary : "Preview"}</h2>
+              <div className="flex min-w-0 flex-col">
+                <h2 className="min-w-0 truncate text-xl">{gen ? gen.summary : "Preview"}</h2>
+                {/* The exact part these parameters build (e.g. "ISO 4762 M6-1 x 16"). */}
+                {current?.meta.designation ? (
+                  <p className="truncate text-sm text-body tabular">{String(current.meta.designation)}</p>
+                ) : null}
+              </div>
               {gen ? (
                 <>
                   <Badge tone="neutral">{gen.standard}</Badge>

@@ -10,7 +10,7 @@ async function newProject(page: Page, name: string) {
   await page.getByLabel("New project name").fill(name);
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
-  await expect(page.getByRole("heading", { level: 2, name })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
 }
 
 /** Click something that enqueues a job, then wait for that new job (not an earlier one) to succeed. */
