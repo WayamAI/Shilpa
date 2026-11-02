@@ -91,12 +91,12 @@ export function Conversation({
   async function upload(file: File) {
     setSending(true);
     const note = text.trim();
-    say({ kind: "user", text: `Drawing: ${file.name}${note ? ` — ${note}` : ""}` });
+    say({ kind: "user", text: `Drawing: ${file.name}${note ? ` · ${note}` : ""}` });
     try {
       const up = await uploadDrawing(projectId, file);
       say({
         kind: "system",
-        text: `Reading ${up.filename} — ${up.pages.length} page${up.pages.length === 1 ? "" : "s"}, ${up.has_text_layer ? "text layer" : "scanned image"}.`,
+        text: `Reading ${up.filename}: ${up.pages.length} page${up.pages.length === 1 ? "" : "s"}, ${up.has_text_layer ? "text layer" : "scanned image"}.`,
       });
       setText("");
       say({ kind: "spec", spec: await api.specFromUpload(projectId, up.id, note) });
@@ -153,7 +153,7 @@ export function Conversation({
             {/* eslint-disable-next-line @next/next/no-img-element -- static decorative webp */}
             <img src="/imagery/sh-card-28-greeting-128.webp" alt="" width={48} height={48} className="size-12" />
             {editTarget ? (
-              <p>Describe a change — “make it 100 mm wide and keep the holes 10 mm from the edges” — or edit parameters in the inspector.</p>
+              <p>Describe a change, such as “make it 100 mm wide and keep the holes 10 mm from the edges”, or edit parameters in the inspector.</p>
             ) : (
               <>
                 <p>
@@ -206,9 +206,9 @@ export function Conversation({
             aria-label={editTarget ? "Describe an edit" : "Describe a part"}
             placeholder={
               plannerDisabled
-                ? "AI planner is disabled — describe a request to see how it is routed, or pick a starter"
+                ? "AI planner is disabled. Describe a request to see how it is routed, or pick a starter"
                 : !llm
-                ? "Azure OpenAI is not configured — reference parts still work"
+                ? "Azure OpenAI is not configured. Reference parts still work"
                 : editTarget
                   ? "Describe an edit…"
                   : "Mounting plate 80 × 40 × 8 mm with four Ø6 through holes 10 mm from the edges"
@@ -392,7 +392,7 @@ function SpecCard({
           </tbody>
         </table>
 
-        {r.units_source === "project default" ? <p className="mt-2 text-xs text-muted-text">Units not stated — using the project default (mm).</p> : null}
+        {r.units_source === "project default" ? <p className="mt-2 text-xs text-muted-text">Units not stated, so the project default (mm) is used.</p> : null}
 
         {r.assumptions && r.assumptions.length > 0 ? (
           <details className="mt-2 group">
@@ -452,7 +452,7 @@ function SpecCard({
               Generate CAD
             </Button>
           ) : null}
-          {started ? <span className="text-xs text-muted-text">Sent to the CAD workers — progress below.</span> : null}
+          {started ? <span className="text-xs text-muted-text">Sent to the CAD workers. Progress is below.</span> : null}
         </div>
       </div>
       {reviewOpen && isDrawing ? (
@@ -480,7 +480,7 @@ const EVENT_TEXT: Record<string, (d: Record<string, unknown>) => string> = {
       ? `Building the ${String(d.kind).replace("_", "-")}${d.instances ? ` · ${d.instances} instances` : ""}`
       : `Building attempt ${d.attempt}${d.mode === "repair" ? " with a repaired plan" : ""}`,
   "attempt.started": () => "Geometry worker running",
-  "attempt.failed": (d) => `Attempt ${d.attempt} failed: ${(d.error as { message?: string })?.message ?? "error"} — repairing`,
+  "attempt.failed": (d) => `Attempt ${d.attempt} failed: ${(d.error as { message?: string })?.message ?? "error"}. Repairing`,
   "state.succeeded": (d) => (d.format ? `${d.format} file created and verified` : `Published version ${d.number}`),
   "state.failed": (d) => `Failed: ${(d.error as { message?: string })?.message ?? "unknown error"}`,
   "state.cancelled": () => "Cancelled",

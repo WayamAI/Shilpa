@@ -6,7 +6,7 @@ Read this before exploring. It exists so you don't have to rediscover it.
 
 ## Design system (Beam × Clay)
 
-- Source of truth: Paper file `01M6DGJW2NF077S079TSKYDF4E` ("Shilpa — Product UI (Beam × Clay)"). Pages: `p-2-0` Foundations (`1Y5-0`), `p-1-0` Core flow (shell `1-0`, home `1X-0`, library `3R-0`, part detail `5L-0`, import `7F-0`, composer `99-0`/`159-0`/`1C7-0`, save `ER-0`, sign-in `1TD-0`, modals `1UN-0`, states `1W3-0`), `p-3-0` Language, `p-4-0` Mobile (`2CH-0`, `2FN-0`). Take values from `get_jsx`/`get_computed_styles`, never from screenshots.
+- Source of truth: Paper file `01M6DGJW2NF077S079TSKYDF4E` ("Shilpa, Product UI (Beam × Clay)"). Pages: `p-2-0` Foundations (`1Y5-0`), `p-1-0` Core flow (shell `1-0`, home `1X-0`, library `3R-0`, part detail `5L-0`, import `7F-0`, composer `99-0`/`159-0`/`1C7-0`, save `ER-0`, sign-in `1TD-0`, modals `1UN-0`, states `1W3-0`), `p-3-0` Language, `p-4-0` Mobile (`2CH-0`, `2FN-0`). Take values from `get_jsx`/`get_computed_styles`, never from screenshots.
 - Tokens: `src/styles/tokens.css` only (Tailwind v4 `@theme static`). Defaults are cleared, so only Shilpa tokens resolve. Never put a hex value in a component.
   - Neutrals: `bg` `surface` `surface-2` `line` `line-strong` `ink` `body` `muted` `stage`.
   - Hues: `action` `pass` `fail` `consent` `ai` `basic` `complex`, each with a `-soft` tint.

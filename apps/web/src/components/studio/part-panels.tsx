@@ -99,7 +99,7 @@ export function ParamsPanel({
           <ul className="flex flex-col gap-1.5">
             {version.recipe.assumptions.map((a) => (
               <li key={a.parameter} className="text-xs text-muted-text">
-                <span className="text-body">{humanize(a.parameter)}</span> — {a.reason}
+                <span className="text-body">{humanize(a.parameter)}</span>: {a.reason}
               </li>
             ))}
           </ul>
@@ -195,7 +195,7 @@ export function checkLabel(name: string): string {
 function fmt(v: unknown): string {
   if (Array.isArray(v)) return v.map(fmt).join(", ");
   if (typeof v === "number") return String(+v.toFixed(4));
-  if (v === null || v === undefined) return "—";
+  if (v === null || v === undefined) return "None";
   return String(v);
 }
 
@@ -327,7 +327,7 @@ const LABELS: Record<string, [string, string]> = {
   FCSTD: ["FreeCAD", "Native parametric features, Params sheet"],
   STL: ["STL", "Mesh in millimetres, for printing"],
   GLB: ["GLB", "Preview mesh in metres"],
-  RECIPE: ["Recipe", "Shilpa IR (JSON) — replayable"],
+  RECIPE: ["Recipe", "Shilpa IR (JSON), replayable"],
   VALIDATION: ["Validation report", "All checks (JSON)"],
   STL_UNITS: ["STL units", "Units and tessellation sidecar"],
 };

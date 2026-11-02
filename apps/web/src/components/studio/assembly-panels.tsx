@@ -49,7 +49,7 @@ export function PartsTree({
     <div>
       <p className="mb-2 text-xs text-body">
         {viewer.instances.length} part{viewer.instances.length === 1 ? "" : "s"} · {viewer.mates.length} mate{viewer.mates.length === 1 ? "" : "s"} ·
-        DOF {viewer.dof.computed ?? "—"}
+        DOF {viewer.dof.computed ?? "None"}
       </p>
       <ul role="tree" aria-label="Parts" data-testid="parts-tree" className="flex flex-col gap-0.5">
         {rows.map(({ inst, depth, via }) => {
@@ -147,10 +147,10 @@ export function BomTable({ viewer, onSelect }: { viewer: Viewer; onSelect: (id: 
                   {withMass
                     ? line.mass_g !== null && line.mass_g !== undefined
                       ? line.mass_g.toLocaleString(undefined, { maximumFractionDigits: 0 })
-                      : "—"
+                      : "None"
                     : line.volume_mm3 !== null
                       ? line.volume_mm3.toLocaleString(undefined, { maximumFractionDigits: 1 })
-                      : "—"}
+                      : "None"}
                 </td>
               </tr>
             ))}

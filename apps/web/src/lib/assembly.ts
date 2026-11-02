@@ -130,7 +130,7 @@ export function fmtValue(v: unknown): string {
     return v.map(fmtValue).join(", ");
   }
   if (typeof v === "number") return String(+v.toFixed(4));
-  if (v === null || v === undefined) return "—";
+  if (v === null || v === undefined) return "None";
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
 }

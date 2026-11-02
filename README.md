@@ -31,7 +31,7 @@ This repository runs **entirely on your machine**. The only cloud dependency is 
 | Blob Storage | `var/blobs/` with the blueprint key layout | `shilpa/storage.py` interface |
 | Container Apps Jobs | CAD worker process + credential-free geometry subprocess | container image |
 | Entra ID | dev bearer tokens `dev:<email>` for seeded users | JWT validation in `shilpa/api/auth.py` |
-| **Azure OpenAI** | **Azure OpenAI** | — |
+| **Azure OpenAI** | **Azure OpenAI** | Same service |
 
 ## Setup
 
@@ -84,7 +84,7 @@ approved reference parts (backlog B002).
 ## Studio (apps/web)
 
 Next.js 16 (App Router, Turbopack) with React 19 and Tailwind v4, built on the **Beam × Clay design
-system** from the Paper file "Shilpa — Product UI (Beam × Clay)". Tokens live in
+system** from the Paper file "Shilpa, Product UI (Beam × Clay)". Tokens live in
 `src/styles/tokens.css` (one Tailwind v4 `@theme`, light only, AA text shades); primitives are in
 `src/components/ui` (button, field, custom select, badges, overlays, tabs, empty states) with a
 development-only gallery at `/dev/ui`. Screens: sign-in, home, library (real thumbnails), composer

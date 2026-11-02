@@ -31,14 +31,14 @@ export default function SystemPage() {
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
             <Metric
               label="Planner"
-              value={health ? (health.llm_configured ? "Online" : plannerOff ? "Disabled" : "Off") : "—"}
+              value={health ? (health.llm_configured ? "Online" : plannerOff ? "Disabled" : "Off") : "…"}
               hint={plannerOff ? "SHILPA_LLM=off · no model calls" : (health?.llm_deployment ?? "Azure OpenAI not configured")}
             />
             <Metric label="Model calls" value={llm ? String(llm.events) : "0"} hint={llm ? `${(llm.input_tokens / 1000).toFixed(1)}k in · ${(llm.output_tokens / 1000).toFixed(1)}k out` : undefined} />
             <Metric label="CAD compute" value={cpu ? `${Math.round(cpu.cpu_seconds)}s` : "0s"} hint={cpu ? `${cpu.events} geometry runs` : undefined} />
             <Metric
               label="Job success"
-              value={total ? `${Math.round(((jobs.succeeded ?? 0) / total) * 100)}%` : "—"}
+              value={total ? `${Math.round(((jobs.succeeded ?? 0) / total) * 100)}%` : "…"}
               hint={total ? `${jobs.succeeded ?? 0} of ${total} jobs` : "no jobs yet"}
             />
           </div>

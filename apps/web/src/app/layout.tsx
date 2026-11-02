@@ -10,7 +10,7 @@ import "./globals.css";
 const interTight = Inter_Tight({ variable: "--font-inter-tight", subsets: ["latin"], weight: ["400", "600"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Shilpa — AI CAD Studio",
+  title: "Shilpa · AI CAD Studio",
   description: "Engineering CAD from requests and drawings, with validated geometry.",
   icons: { icon: "/brand/shilpa-mark-64.webp", apple: "/brand/shilpa-mark-128.webp" },
 };

@@ -57,7 +57,7 @@ AKS, Redis and a second orchestration engine are deliberately out (blueprint §5
 | 2 | **Cloud adapters**: Postgres driver and pooling, `AzureBlobStore`, Service Bus queue backend, both selected by settings with the local ones as default | agent | Unit tests with Azurite and emulator; existing tests unchanged on defaults |
 | 3 | **Hosting guards and identity**: `SHILPA_ENV`, no-Ollama guard, Entra JWT validation, LLM cache in Postgres, `/v1/health/live` and `/v1/health/ready`, structured logs with redaction, OpenTelemetry hook | agent | Tests for each guard; dev mode unchanged |
 | 4 | **Infrastructure**: Bicep modules (network, ACR, Key Vault, identities and roles, Postgres, Storage, Service Bus, Log Analytics + App Insights, Container Apps env, apps, jobs, Azure OpenAI account and deployments, budgets) and per-environment parameters | agent | `az bicep build` and `what-if` clean against a dev subscription **[Verify]** |
-| 5 | **Pipeline**: Azure DevOps YAML — lint, typecheck, pytest, golden corpus, e2e, secret scan, image build, SBOM, vulnerability scan, push by digest, deploy dev, smoke, promote | agent | Dry-run on a branch |
+| 5 | **Pipeline**: Azure DevOps YAML: lint, typecheck, pytest, golden corpus, e2e, secret scan, image build, SBOM, vulnerability scan, push by digest, deploy dev, smoke, promote | agent | Dry-run on a branch |
 | 6 | Studio sign-in with MSAL (Entra) replacing dev identities in hosted environments | next | e2e against staging |
 | 7 | Compose API (interpret/apply), import pipeline, needs-you inbox | product | spec P0 to P2 exit criteria |
 

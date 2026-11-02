@@ -80,13 +80,13 @@ export function DrawingReview({
           <span className="text-xs text-body">
             {reviewed
               ? spec.status === "ready"
-                ? "Reviewed — ready to generate."
+                ? "Reviewed and ready to generate."
                 : r.status_reason
               : "Check each value against the sheet, correct anything misread, then confirm."}
           </span>
           {canWrite && !reviewed ? (
             <Button variant="primary" disabled={busy} onClick={confirm}>
-              {r.conflicts.length > 0 ? "Values corrected — confirm" : "Confirm values"}
+              {r.conflicts.length > 0 ? "Confirm corrected values" : "Confirm values"}
             </Button>
           ) : (
             <Button onClick={onClose}>Close</Button>

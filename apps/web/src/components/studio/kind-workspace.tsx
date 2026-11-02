@@ -72,7 +72,7 @@ function AssemblyWorkspace({ version, versions, canWrite, busy, freecadAvailable
     if (id) setHighlight(null);
   };
 
-  const sizeFact = viewer?.size ? viewer.size.map((v) => +v.toFixed(0)).join("×") : "—";
+  const sizeFact = viewer?.size ? viewer.size.map((v) => +v.toFixed(0)).join("×") : "None";
   return (
     <WorkspaceLayout
       footer={footer}
@@ -80,7 +80,7 @@ function AssemblyWorkspace({ version, versions, canWrite, busy, freecadAvailable
         <Facts
           items={[
             { label: "Size mm", value: sizeFact },
-            { label: "Parts", value: viewer?.instances.length ?? "—" },
+            { label: "Parts", value: viewer?.instances.length ?? "None" },
             { label: "Version", value: `v${version.number}` },
           ]}
         />
@@ -161,8 +161,8 @@ function SheetMetalWorkspace({ version, versions, canWrite, busy, freecadAvailab
       facts={
         <Facts
           items={[
-            { label: "Flat mm", value: viewer?.flat ? viewer.flat.size.map((v) => +v.toFixed(0)).join("×") : "—" },
-            { label: "Bends", value: viewer?.flat?.bends.length ?? "—" },
+            { label: "Flat mm", value: viewer?.flat ? viewer.flat.size.map((v) => +v.toFixed(0)).join("×") : "None" },
+            { label: "Bends", value: viewer?.flat?.bends.length ?? "None" },
             { label: "Version", value: `v${version.number}` },
           ]}
         />

@@ -264,8 +264,8 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
               version ? (
                 <Facts
                   items={[
-                    { label: "Size mm", value: size ? size.map((v) => +v.toFixed(0)).join("×") : "—" },
-                    { label: "Checks", value: version.validation ? (version.validation.passed ? "Passed" : "Failed") : "—" },
+                    { label: "Size mm", value: size ? size.map((v) => +v.toFixed(0)).join("×") : "None" },
+                    { label: "Checks", value: version.validation ? (version.validation.passed ? "Passed" : "Failed") : "Not run" },
                     { label: "Version", value: `v${version.number}` },
                   ]}
                 />
