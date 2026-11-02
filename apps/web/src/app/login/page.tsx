@@ -54,7 +54,7 @@ export default function LoginPage() {
                 name="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="h-11 w-full rounded-full border border-line bg-surface-2 text-sm text-ink outline-none focus-visible:border-line-strong focus-visible:ring-2 focus-visible:ring-line-strong"
+                className="h-11 w-full rounded-full border border-line bg-surface-2 text-sm text-ink outline-none"
               >
                 {DEV_USERS.map((u) => (
                   <option key={u.email} value={u.email}>

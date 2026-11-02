@@ -249,7 +249,7 @@ export function Conversation({
                   value=""
                   disabled={busy}
                   onChange={(e) => runExample(e.target.value)}
-                  className="h-8 max-w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs font-semibold text-muted-text outline-none focus-visible:ring-2 focus-visible:ring-line-strong"
+                  className="h-8 max-w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs font-semibold text-muted-text outline-none"
                 >
                   <option value="">Reference parts…</option>
                   {examples.map((x) => (
@@ -264,7 +264,7 @@ export function Conversation({
                     value=""
                     disabled={busy}
                     onChange={(e) => runStarter(e.target.value)}
-                    className="h-8 w-full max-w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs font-semibold text-muted-text outline-none focus-visible:ring-2 focus-visible:ring-line-strong"
+                    className="h-8 w-full max-w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs font-semibold text-muted-text outline-none"
                   >
                     <option value="">{starters.products?.length ? "Assemblies, sheet metal, products…" : "Assemblies and sheet metal…"}</option>
                     <optgroup label="Reference assemblies">
@@ -390,7 +390,7 @@ function SpecCard({
 
         {r.assumptions && r.assumptions.length > 0 ? (
           <details className="mt-2 group">
-            <summary className="cursor-pointer text-xs text-muted-text outline-none hover:text-body focus-visible:ring-2 focus-visible:ring-line-strong">
+            <summary className="cursor-pointer text-xs text-muted-text outline-none hover:text-body">
               {r.assumptions.length} assumed convention{r.assumptions.length === 1 ? "" : "s"}
             </summary>
             <ul className="mt-1.5 flex list-disc flex-col gap-1 pl-4 text-xs text-muted-text">

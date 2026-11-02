@@ -46,7 +46,7 @@ export function Button({
       {...props}
       className={[
         "inline-flex shrink-0 items-center justify-center rounded-full outline-none",
-        "transition-colors duration-[180ms] focus-visible:ring-2 focus-visible:ring-line-strong",
+        "transition-colors duration-base",
         "disabled:cursor-not-allowed",
         BUTTON_VARIANT[variant],
         BUTTON_SIZE[size],
@@ -71,7 +71,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       {...props}
-      className={`flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted outline-none transition-colors duration-[180ms] hover:bg-surface-2 hover:text-body focus-visible:ring-2 focus-visible:ring-line-strong disabled:opacity-50 ${className}`}
+      className={`flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted outline-none transition-colors duration-base hover:bg-surface-2 hover:text-body disabled:opacity-50 ${className}`}
     >
       {children}
     </button>
@@ -81,7 +81,7 @@ export function IconButton({
 // --- fields -----------------------------------------------------------------
 
 const FIELD =
-  "w-full rounded-full border border-line bg-surface-2 px-4 text-sm text-ink outline-none placeholder:text-muted-text transition-colors duration-[180ms] focus-visible:border-line-strong focus-visible:ring-2 focus-visible:ring-line-strong disabled:text-muted-text";
+  "w-full rounded-full border border-line bg-surface-2 px-4 text-sm text-ink outline-none placeholder:text-muted-text transition-colors duration-base disabled:text-muted-text";
 
 /** Caption label above a control (Chronos sign-in pattern). */
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -106,7 +106,7 @@ export function NumberInput({ className = "", ...props }: ComponentPropsWithoutR
       step="any"
       inputMode="decimal"
       {...props}
-      className={`h-8 w-24 rounded-full border border-line bg-surface-2 px-3 text-right text-xs tabular text-ink outline-none transition-colors duration-[180ms] focus-visible:border-line-strong focus-visible:ring-2 focus-visible:ring-line-strong disabled:bg-transparent disabled:text-body ${className}`}
+      className={`h-8 w-24 rounded-full border border-line bg-surface-2 px-3 text-right text-xs tabular text-ink outline-none transition-colors duration-base disabled:bg-transparent disabled:text-body ${className}`}
     />
   );
 }
@@ -115,7 +115,7 @@ export function Textarea({ className = "", ...props }: ComponentPropsWithoutRef<
   return (
     <textarea
       {...props}
-      className={`min-h-[84px] w-full resize-none rounded-2xl border border-line bg-surface-2 px-4 py-3 text-sm text-ink outline-none placeholder:text-muted-text transition-colors duration-[180ms] focus-visible:border-line-strong focus-visible:ring-2 focus-visible:ring-line-strong disabled:text-muted-text ${className}`}
+      className={`min-h-[84px] w-full resize-none rounded-2xl border border-line bg-surface-2 px-4 py-3 text-sm text-ink outline-none placeholder:text-muted-text transition-colors duration-base disabled:text-muted-text ${className}`}
     />
   );
 }
@@ -151,7 +151,7 @@ export function Tabs<T extends string>({
             onClick={() => onChange(tab.id)}
             className={[
               "h-7 min-w-0 flex-auto truncate rounded-full px-2 text-xs font-semibold outline-none",
-              "transition-colors duration-[180ms] focus-visible:ring-2 focus-visible:ring-line-strong",
+              "transition-colors duration-base",
               selected ? "bg-action text-on-action" : "text-muted-text hover:bg-surface-2 hover:text-body",
             ].join(" ")}
           >

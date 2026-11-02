@@ -24,7 +24,7 @@ const PartViewer = dynamic(() => import("@/components/studio/part-viewer"), {
 });
 
 const SELECT =
-  "h-8 w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs text-ink outline-none focus-visible:ring-2 focus-visible:ring-line-strong";
+  "h-8 w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs text-ink outline-none";
 
 // ---------------------------------------------------------------- schema helpers
 
@@ -176,7 +176,7 @@ function Suggestions({ matches, onPick }: { matches: CatalogMatch[]; onPick: (m:
             <button
               type="button"
               onClick={() => onPick(m)}
-              className="w-full rounded-md border border-line bg-surface px-2 py-1.5 text-left outline-none transition-colors duration-[180ms] hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-line-strong"
+              className="w-full rounded-md border border-line bg-surface px-2 py-1.5 text-left outline-none transition-colors duration-base hover:bg-surface-2"
             >
               <span className="block truncate text-xs text-ink">{m.label}</span>
               <span className="block truncate text-xs text-muted-text">{m.summary}</span>
@@ -318,7 +318,7 @@ export default function CatalogPage() {
               aria-label="Part"
               value={selected ?? ""}
               onChange={(e) => pick(e.target.value)}
-              className="h-10 w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs text-ink outline-none focus-visible:ring-2 focus-visible:ring-line-strong"
+              className="h-10 w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs text-ink outline-none"
             >
               {(catalog?.families ?? []).map((f) => (
                 <optgroup key={f} label={f}>
@@ -361,7 +361,7 @@ export default function CatalogPage() {
                             type="button"
                             onClick={() => pick(g.name)}
                             aria-current={g.name === selected ? "true" : undefined}
-                            className={`w-full rounded-md px-2 py-1.5 text-left outline-none transition-colors duration-[180ms] focus-visible:ring-2 focus-visible:ring-line-strong ${
+                            className={`w-full rounded-md px-2 py-1.5 text-left outline-none transition-colors duration-base ${
                               g.name === selected ? "bg-surface-2 text-ink" : "text-body hover:bg-surface"
                             }`}
                           >
@@ -465,7 +465,7 @@ export default function CatalogPage() {
                         type="button"
                         onClick={() => setPort(port === p.name ? null : p.name)}
                         aria-pressed={port === p.name}
-                        className={`w-full border-b border-line px-1 py-2 text-left outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-line-strong ${
+                        className={`w-full border-b border-line px-1 py-2 text-left outline-none last:border-b-0 ${
                           port === p.name ? "bg-surface-2" : "hover:bg-surface"
                         }`}
                       >

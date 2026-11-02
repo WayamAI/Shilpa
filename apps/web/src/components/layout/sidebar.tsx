@@ -32,7 +32,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
       data-expanded={showExpanded}
       className={[
         "flex h-full shrink-0 flex-col border-r border-line bg-bg",
-        "transition-[width,transform] duration-200 ease-out",
+        "transition-[width,transform] duration-base ease-out",
         "fixed inset-y-0 left-0 z-50 lg:relative lg:z-30 lg:translate-x-0",
         showExpanded ? "w-[252px]" : "w-[68px]",
         open ? "translate-x-0" : "-translate-x-full pointer-events-none lg:pointer-events-auto lg:translate-x-0",
@@ -81,7 +81,7 @@ export function SidebarMenuButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label="Open navigation"
-      className="flex size-8 items-center justify-center rounded-full bg-surface-2 text-muted outline-none transition-colors duration-[180ms] hover:bg-surface-2 hover:text-body focus-visible:ring-2 focus-visible:ring-line-strong lg:hidden"
+      className="flex size-8 items-center justify-center rounded-full bg-surface-2 text-muted outline-none transition-colors duration-base hover:bg-surface-2 hover:text-body lg:hidden"
     >
       <Menu size={16} strokeWidth={1.75} aria-hidden />
     </button>

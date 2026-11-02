@@ -102,7 +102,7 @@ export default function ProjectsPage() {
             title={projects ? `All projects · ${projects.length}` : "All projects"}
             padded={false}
             action={
-              <label className="flex h-8 items-center gap-2 rounded-full border border-line bg-surface-2 px-3 text-xs font-semibold text-muted-text focus-within:ring-2 focus-within:ring-line-strong">
+              <label className="flex h-8 items-center gap-2 rounded-full border border-line bg-surface-2 px-3 text-xs font-semibold text-muted-text focus-within:shadow-[var(--focus-ring)]">
                 <Search size={13} strokeWidth={1.75} aria-hidden />
                 <input
                   aria-label="Search projects"
@@ -127,7 +127,7 @@ export default function ProjectsPage() {
                 <li key={p.id} className="border-b border-line last:border-b-0">
                   <Link
                     href={`/projects/${p.id}`}
-                    className="group flex items-center justify-between gap-4 px-4 py-3 outline-none transition-colors duration-[150ms] hover:bg-surface focus-visible:bg-surface"
+                    className="group flex items-center justify-between gap-4 px-4 py-3 outline-none transition-colors duration-fast hover:bg-surface focus-visible:bg-surface"
                   >
                     <span className="flex min-w-0 items-center gap-3">
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted">

@@ -237,12 +237,12 @@ export function VersionsPanel({
           <li key={v.id}>
             <div
               className={[
-                "rounded-lg border px-3 py-2.5 transition-colors duration-[150ms]",
+                "rounded-lg border px-3 py-2.5 transition-colors duration-fast",
                 active ? "border-line-strong bg-surface" : "border-line hover:bg-surface",
               ].join(" ")}
             >
               <div className="flex items-center justify-between gap-2">
-                <button type="button" onClick={() => onOpen(v.id)} className="flex min-w-0 items-baseline gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-line-strong">
+                <button type="button" onClick={() => onOpen(v.id)} className="flex min-w-0 items-baseline gap-2 text-left outline-none">
                   <span className="text-md font-semibold text-ink">v{v.number}</span>
                   {i === 0 ? <StatusBadge tone="info">latest</StatusBadge> : null}
                   <span className="truncate text-xs text-muted-text">{new Date(v.created_at).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}</span>

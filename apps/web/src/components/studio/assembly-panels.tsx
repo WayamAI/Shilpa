@@ -65,7 +65,7 @@ export function PartsTree({
                 onBlur={() => onHover(null)}
                 onClick={() => onSelect(active ? null : inst.id)}
                 className={[
-                  "flex w-full min-w-0 items-center gap-2 rounded-lg border py-1.5 pr-2 text-left outline-none transition-colors duration-[150ms] focus-visible:ring-2 focus-visible:ring-line-strong",
+                  "flex w-full min-w-0 items-center gap-2 rounded-lg border py-1.5 pr-2 text-left outline-none transition-colors duration-fast",
                   active ? "border-line-strong bg-surface" : hovered === inst.id ? "border-line bg-surface" : "border-transparent hover:bg-surface",
                 ].join(" ")}
                 style={{ paddingLeft: `${8 + Math.min(depth, 6) * 14}px` }}
@@ -231,7 +231,7 @@ export function ChecksPanel({
                     onClick={() => onHighlight(active ? null : { ids: c.instances, tone: c.passed ? "pass" : "clash", label: c.name })}
                     title={clickable ? `Highlight ${c.instances.join(", ")}` : (c.note ?? "")}
                     className={[
-                      "flex w-full items-start justify-between gap-3 rounded-lg border px-2.5 py-2 text-left outline-none transition-colors duration-[150ms] focus-visible:ring-2 focus-visible:ring-line-strong",
+                      "flex w-full items-start justify-between gap-3 rounded-lg border px-2.5 py-2 text-left outline-none transition-colors duration-fast",
                       active
                         ? "border-line-strong bg-surface"
                         : c.passed

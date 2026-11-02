@@ -26,7 +26,7 @@ export function Logo({
   const frame = `flex min-w-0 items-center gap-2.5 ${className}`;
   if (!href) return <span className={frame}>{mark}</span>;
   return (
-    <Link href={href} aria-label="Shilpa home" className={`${frame} outline-none focus-visible:ring-2 focus-visible:ring-line-strong`}>
+    <Link href={href} aria-label="Shilpa home" className={`${frame} outline-none`}>
       {mark}
     </Link>
   );

@@ -150,7 +150,7 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
           <Link
             href="/projects"
             aria-label="All projects"
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted outline-none transition-colors duration-[180ms] hover:bg-surface-2 hover:text-body focus-visible:ring-2 focus-visible:ring-line-strong"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted outline-none transition-colors duration-base hover:bg-surface-2 hover:text-body"
           >
             <ArrowLeft size={15} strokeWidth={1.75} aria-hidden />
           </Link>
@@ -193,7 +193,7 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
                 setModelId(e.target.value);
                 loadModel(e.target.value).catch((err) => setError(errText(err)));
               }}
-              className="h-8 max-w-[260px] rounded-full border border-line bg-surface-2 text-xs font-semibold text-body outline-none focus-visible:ring-2 focus-visible:ring-line-strong"
+              className="h-8 max-w-[260px] rounded-full border border-line bg-surface-2 text-xs font-semibold text-body outline-none"
             >
               {!modelId ? <option value="">New part</option> : null}
               {project.models.map((m) => (

@@ -124,7 +124,7 @@ export function DrawingReview({
                     onMouseEnter={() => setHover(d.name)}
                     onMouseLeave={() => setHover(null)}
                     className={[
-                      "absolute -m-[3px] box-content rounded-[3px] border-2 p-[3px] transition-colors duration-[120ms]",
+                      "absolute -m-[3px] box-content rounded-[3px] border-2 p-[3px] transition-colors duration-fast",
                       warn ? "border-consent" : "border-pass",
                       hover === d.name ? "bg-consent-soft" : "bg-transparent",
                     ].join(" ")}
@@ -163,7 +163,7 @@ export function DrawingReview({
                   key={d.name}
                   onMouseEnter={() => setHover(d.name)}
                   onMouseLeave={() => setHover(null)}
-                  className={`border-b border-line align-top transition-colors duration-[120ms] ${hover === d.name ? "bg-surface" : ""}`}
+                  className={`border-b border-line align-top transition-colors duration-fast ${hover === d.name ? "bg-surface" : ""}`}
                 >
                   <td className="px-4 py-2.5">
                     <label htmlFor={`dv-${d.name}`} className="block text-xs text-body capitalize">

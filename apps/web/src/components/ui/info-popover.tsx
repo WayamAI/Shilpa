@@ -42,7 +42,7 @@ export function InfoPopover({
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex size-7 items-center justify-center rounded-full text-muted-text outline-none transition-colors duration-[150ms] hover:bg-surface hover:text-body focus-visible:ring-2 focus-visible:ring-line-strong"
+        className="inline-flex size-7 items-center justify-center rounded-full text-muted-text outline-none transition-colors duration-fast hover:bg-surface hover:text-body"
       >
         <Info size={15} strokeWidth={1.75} aria-hidden />
       </button>

@@ -305,7 +305,7 @@ export function BarList({
                 type="button"
                 onClick={() => onSelect(row.id)}
                 aria-pressed={selected}
-                className="block w-full rounded-md px-1.5 py-1 text-left transition-colors duration-[150ms] hover:bg-surface"
+                className="block w-full rounded-md px-1.5 py-1 text-left transition-colors duration-fast hover:bg-surface"
               >
                 {content}
               </button>
