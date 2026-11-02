@@ -31,7 +31,7 @@ export default function LoginPage() {
     setError(null);
     setBusy(true);
     writeSession(match.email);
-    router.replace("/projects");
+    router.replace("/home");
   }
 
   return (

@@ -18,7 +18,7 @@ export function proxy(request: NextRequest) {
 
   if (session && (isLogin || pathname === "/")) {
     const url = request.nextUrl.clone();
-    url.pathname = "/projects";
+    url.pathname = "/home";
     url.search = "";
     return NextResponse.redirect(url);
   }

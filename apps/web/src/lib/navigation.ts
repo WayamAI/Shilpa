@@ -9,7 +9,7 @@ export type NavItem = { id: string; href: string; label: string; icon: NavIcon; 
 
 /** Rail order from Paper · 00 Shell template. */
 export const NAV_ITEMS: NavItem[] = [
-  { id: "home", href: "/", label: "Home", icon: HomeIcon, planned: true },
+  { id: "home", href: "/home", label: "Home", icon: HomeIcon },
   { id: "library", href: "/library", label: "Library", icon: LibraryIcon },
   { id: "compose", href: "/compose", label: "Compose", icon: ComposeIcon },
   { id: "imports", href: "/imports", label: "Imports", icon: ImportIcon, planned: true },

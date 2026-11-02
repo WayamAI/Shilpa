@@ -17,7 +17,7 @@ export function Mark({ size = 24 }: { size?: 24 | 26 | 32 | 48 }) {
 }
 
 /** Mark plus the 15px semibold wordmark (Paper rail header). */
-export function Logo({ href = "/projects", className = "" }: { href?: string | false; className?: string }) {
+export function Logo({ href = "/home", className = "" }: { href?: string | false; className?: string }) {
   const body = (
     <>
       <Mark />
@@ -26,7 +26,7 @@ export function Logo({ href = "/projects", className = "" }: { href?: string | f
   );
   const frame = `flex min-w-0 items-center gap-[9px] rounded-sm ${className}`;
   return href ? (
-    <Link href={href} className={frame} aria-label="Shilpa, go to projects">
+    <Link href={href} className={frame} aria-label="Shilpa, go to home">
       {body}
     </Link>
   ) : (

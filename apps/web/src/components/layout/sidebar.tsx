@@ -136,7 +136,7 @@ export function AccountMenu({ placement = "top-start" as const }: { placement?: 
   function switchTo(email: string) {
     writeSession(email);
     refresh();
-    router.push("/projects");
+    router.push("/home");
     router.refresh();
   }
 

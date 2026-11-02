@@ -7,7 +7,7 @@ test("the form is prefilled with the dev engineer and Continue signs in", async 
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await expect(page.getByLabel("Work email")).toHaveValue("dev@wayam.local");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page).toHaveURL(/\/home$/);
 });
 
 test("an unknown email shows an inline error and stays on sign-in", async ({ page }) => {
@@ -41,10 +41,9 @@ test("there is no theme toggle any more", async ({ page }) => {
 test("the rail lists the new navigation and marks planned items", async ({ page }) => {
   await signIn(page);
   const nav = page.getByRole("complementary", { name: "Sidebar" }).getByRole("navigation", { name: "Primary" });
-  for (const name of ["Library", "Compose", "Projects"]) {
+  for (const name of ["Home", "Library", "Compose", "Projects"]) {
     await expect(nav.getByRole("link", { name })).toBeVisible();
   }
-  await expect(nav.getByRole("link", { name: "Home" })).toHaveCount(0); // planned: no link
   await expect(nav).toContainText("Planned");
   await expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("aria-current", "page");
   await page.getByRole("link", { name: "Settings" }).click();
