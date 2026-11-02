@@ -67,7 +67,8 @@ def test_missing_blob_is_404_not_500(azure_stack):
     container, _ = azure_stack
     with TestClient(app) as client:
         with tx() as s:
-            art = s.query(Artifact).filter(Artifact.format == "STEP").first()
+            # Only artifacts this fake container holds: other tests publish to local storage.
+            art = next(a for a in s.query(Artifact).filter(Artifact.format == "STEP") if a.blob_key in container.data)
             art_id, key = art.id, art.blob_key
         container.data.pop(key)
         assert client.get(f"/v1/artifacts/{art_id}/download", headers=DEV).status_code == 404

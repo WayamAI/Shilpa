@@ -248,6 +248,43 @@ class AuditEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
+class Composition(Base):
+    """A composition (Shilpa Composition Language): an assembly built step by step from prompts."""
+
+    __tablename__ = "compositions"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id"), index=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    model_id: Mapped[str | None] = mapped_column(String(36), nullable=True)  # the assembly model, after the first apply
+    head_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_by: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class CompositionStep(Base):
+    """One applied prompt. Append only: rows are never deleted or reordered; only ``status`` moves forward
+    (pending -> applied | failed) when the assembly job ends."""
+
+    __tablename__ = "composition_steps"
+    __table_args__ = (UniqueConstraint("composition_id", "number"), UniqueConstraint("job_id"))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id"), index=True)
+    composition_id: Mapped[str] = mapped_column(ForeignKey("compositions.id"), index=True)
+    number: Mapped[int] = mapped_column(Integer)
+    prompt: Mapped[str] = mapped_column(Text)
+    ir: Mapped[dict] = mapped_column(JSON)  # {"steps": [...]} the IR steps this prompt added
+    interpretation: Mapped[dict] = mapped_column(JSON)  # the card the user confirmed
+    spec_hash: Mapped[str] = mapped_column(String(64))
+    base_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"))
+    status: Mapped[str] = mapped_column(String(16))  # pending | applied | failed
+    result_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_by: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 settings.var_dir.mkdir(parents=True, exist_ok=True)
 
 

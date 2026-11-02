@@ -1,0 +1,877 @@
+{
+  "$defs": {
+    "Assumption": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "maxLength": 120,
+          "title": "Field",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 500,
+          "title": "Reason",
+          "type": "string"
+        },
+        "value": {
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "field",
+        "reason"
+      ],
+      "title": "Assumption",
+      "type": "object"
+    },
+    "Clarify": {
+      "additionalProperties": false,
+      "properties": {
+        "blocking": {
+          "default": true,
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/ClarifyOption"
+          },
+          "maxItems": 8,
+          "title": "Options",
+          "type": "array"
+        },
+        "question": {
+          "maxLength": 500,
+          "title": "Question",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question"
+      ],
+      "title": "Clarify",
+      "type": "object"
+    },
+    "ClarifyOption": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "maxLength": 200,
+          "title": "Label",
+          "type": "string"
+        },
+        "patch": {
+          "items": {
+            "$ref": "#/$defs/Patch"
+          },
+          "title": "Patch",
+          "type": "array"
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "title": "ClarifyOption",
+      "type": "object"
+    },
+    "Direction": {
+      "additionalProperties": false,
+      "description": "Exactly one of the four forms.",
+      "properties": {
+        "along": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Ref"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "away_from": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Ref"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "normal_of": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Ref"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "world": {
+          "anyOf": [
+            {
+              "enum": [
+                "+X",
+                "-X",
+                "+Y",
+                "-Y",
+                "+Z",
+                "-Z"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "World"
+        }
+      },
+      "title": "Direction",
+      "type": "object"
+    },
+    "MateSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "angle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Qty"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "flip": {
+          "default": false,
+          "title": "Flip",
+          "type": "boolean"
+        },
+        "intent": {
+          "anyOf": [
+            {
+              "enum": [
+                "welded",
+                "bolted",
+                "press_fit",
+                "clearance",
+                "contact"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Intent"
+        },
+        "kind": {
+          "enum": [
+            "coincident",
+            "coaxial",
+            "parallel",
+            "perpendicular",
+            "tangent",
+            "fixed",
+            "revolute",
+            "slider",
+            "cylindrical",
+            "ball",
+            "planar",
+            "screw"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "limits": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Qty"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limits"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "MateSpec",
+      "type": "object"
+    },
+    "Offset": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Direction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "distance": {
+          "$ref": "#/$defs/Qty"
+        },
+        "from": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Ref"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "distance"
+      ],
+      "title": "Offset",
+      "type": "object"
+    },
+    "Patch": {
+      "additionalProperties": false,
+      "description": "One deterministic edit an answer applies: set fields on a step, acknowledge a warning, or add a step.",
+      "properties": {
+        "acknowledge": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Acknowledge"
+        },
+        "append_step": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Append Step"
+        },
+        "set": {
+          "additionalProperties": true,
+          "title": "Set",
+          "type": "object"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step"
+        }
+      },
+      "title": "Patch",
+      "type": "object"
+    },
+    "Predicate": {
+      "additionalProperties": false,
+      "description": "One filter term: ``diameter ≈ 6.4 mm``, ``kind = through``, ``on @plate.face.top``.",
+      "properties": {
+        "attr": {
+          "enum": [
+            "diameter",
+            "depth",
+            "length",
+            "area",
+            "x",
+            "y",
+            "z",
+            "normal",
+            "kind",
+            "thread",
+            "on"
+          ],
+          "title": "Attr",
+          "type": "string"
+        },
+        "op": {
+          "default": "=",
+          "enum": [
+            "=",
+            "<",
+            ">",
+            "<=",
+            ">=",
+            "≈"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "tol": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tol"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "enum": [
+                "mm",
+                "cm",
+                "m",
+                "in",
+                "ft",
+                "deg",
+                "rad"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "attr",
+        "value"
+      ],
+      "title": "Predicate",
+      "type": "object"
+    },
+    "Qty": {
+      "additionalProperties": false,
+      "properties": {
+        "as_typed": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Typed"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mm"
+        },
+        "provenance": {
+          "default": "user",
+          "enum": [
+            "user",
+            "assumed",
+            "derived",
+            "default"
+          ],
+          "title": "Provenance",
+          "type": "string"
+        },
+        "unit": {
+          "default": "mm",
+          "enum": [
+            "mm",
+            "cm",
+            "m",
+            "in",
+            "ft",
+            "deg",
+            "rad"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Qty",
+      "type": "object"
+    },
+    "Ref": {
+      "additionalProperties": false,
+      "description": "A resolved reference. ``mention`` links it to the prompt's mention table (m1, m2 ...).",
+      "properties": {
+        "feature_uid": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Feature Uid"
+        },
+        "generator": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generator"
+        },
+        "instance": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instance"
+        },
+        "item": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Item"
+        },
+        "mention": {
+          "anyOf": [
+            {
+              "maxLength": 16,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mention"
+        },
+        "params": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Params"
+        },
+        "selector": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Selector"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source": {
+          "anyOf": [
+            {
+              "enum": [
+                "catalog",
+                "native",
+                "instance"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
+        "text": {
+          "maxLength": 300,
+          "title": "Text",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Ref",
+      "type": "object"
+    },
+    "Selector": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_count": {
+          "anyOf": [
+            {
+              "maximum": 500,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Count"
+        },
+        "filter": {
+          "items": {
+            "$ref": "#/$defs/Predicate"
+          },
+          "maxItems": 8,
+          "title": "Filter",
+          "type": "array"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        }
+      },
+      "title": "Selector",
+      "type": "object"
+    },
+    "Step": {
+      "additionalProperties": false,
+      "properties": {
+        "acknowledged": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Acknowledged",
+          "type": "array"
+        },
+        "anchor": {
+          "anyOf": [
+            {
+              "enum": [
+                "origin",
+                "center",
+                "port",
+                "bbox_min",
+                "bbox_max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Anchor"
+        },
+        "assumptions": {
+          "items": {
+            "$ref": "#/$defs/Assumption"
+          },
+          "title": "Assumptions",
+          "type": "array"
+        },
+        "clarify": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Clarify"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "id": {
+          "pattern": "^s[0-9]{1,4}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "mate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MateSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "offset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Offset"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "op": {
+          "enum": [
+            "add",
+            "ground",
+            "place",
+            "mate",
+            "insert",
+            "fasten",
+            "pattern",
+            "mirror",
+            "repeat",
+            "constraint",
+            "replace",
+            "remove",
+            "promote",
+            "clarify"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "prompt": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quantity"
+        },
+        "seat": {
+          "anyOf": [
+            {
+              "enum": [
+                "entry",
+                "exit",
+                "mid",
+                "flush_top",
+                "flush_bottom"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seat"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Ref"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_port": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Port"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Ref"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "title": "Step",
+      "type": "object"
+    }
+  },
+  "$id": "shilpa/composition-ir/0.1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "base_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Base Version"
+    },
+    "composition_id": {
+      "title": "Composition Id",
+      "type": "string"
+    },
+    "ir_version": {
+      "const": "0.1",
+      "default": "0.1",
+      "title": "Ir Version",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/Step"
+      },
+      "maxItems": 500,
+      "title": "Steps",
+      "type": "array"
+    },
+    "units": {
+      "const": "mm",
+      "default": "mm",
+      "title": "Units",
+      "type": "string"
+    }
+  },
+  "required": [
+    "composition_id"
+  ],
+  "title": "CompositionIR",
+  "type": "object"
+}
