@@ -18,8 +18,8 @@ test("needs you shows real items or the empty state, and lists planned kinds", a
   const empty = page.getByText("Nothing needs you", { exact: true });
   await expect(real.or(empty)).toBeVisible();
   const planned = page.getByRole("list", { name: "Planned items" });
-  await expect(planned.getByRole("listitem")).toHaveCount(3);
-  await expect(planned.getByText("Planned")).toHaveCount(3);
+  await expect(planned.getByRole("listitem")).toHaveCount(2);
+  await expect(planned.getByText("Planned")).toHaveCount(2);
 });
 
 test("recent complex parts shows rows or an empty state", async ({ page }) => {

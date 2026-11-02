@@ -12,6 +12,7 @@ import { useSession } from "@/context/session-context";
 import { NeedsYou } from "./needs-you";
 import { RecentParts } from "./recent-parts";
 import { useHome } from "./use-home";
+import { useNeedsYou } from "./use-needs-you";
 
 function firstName(name: string | undefined, email: string | undefined): string | null {
   const n = name?.trim().split(/\s+/)[0] || email?.split("@")[0];
@@ -23,6 +24,7 @@ export function HomeScreen() {
   const { me } = useSession();
   const [attempt, setAttempt] = useState(0);
   const home = useHome(me?.user_id, attempt);
+  const inbox = useNeedsYou(attempt);
   const loading = home.status === "loading";
   const who = firstName(me?.name, me?.email);
 
@@ -73,7 +75,7 @@ export function HomeScreen() {
           </div>
         ) : (
           <>
-            <NeedsYou jobs={home.status === "ready" ? home.data.failedJobs : []} loading={loading} />
+            <NeedsYou state={inbox} onRetry={() => setAttempt((n) => n + 1)} />
             <RecentParts parts={home.status === "ready" ? home.data.complexParts : []} loading={loading} />
           </>
         )}

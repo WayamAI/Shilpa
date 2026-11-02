@@ -66,6 +66,8 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="Shilpa API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3100", "http://127.0.0.1:3100"],
                    allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
+from .inbox import router as _inbox_router; app.include_router(_inbox_router)  # noqa: E402,E702  needs-you inbox
+from .compose import router as _compose_router; app.include_router(_compose_router)  # noqa: E402,E702  compositions
 
 
 def _err(status: int, code: str, message: str, **extra) -> HTTPException:

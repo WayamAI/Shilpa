@@ -90,6 +90,24 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
     [loadModel, loadProject, say],
   );
 
+  /* ?spec=<id> deep link from the Needs you inbox: show that specification's
+     card in the thread so its questions can be answered here. */
+  useEffect(() => {
+    const specId = new URLSearchParams(window.location.search).get("spec");
+    if (!specId) return;
+    let cancelled = false;
+    api
+      .spec(specId)
+      .then((spec) => {
+        if (cancelled) return;
+        setChat((c) => (c.some((x) => x.kind === "spec" && x.spec.id === spec.id) ? c : [...c, { kind: "spec", spec }]));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const onSpecUpdate = useCallback((spec: Spec) => setChat((c) => c.map((x) => (x.kind === "spec" && x.spec.id === spec.id ? { kind: "spec", spec } : x))), []);
 
   const headId = versions[0]?.id ?? null;

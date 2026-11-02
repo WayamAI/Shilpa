@@ -5,8 +5,6 @@ import { useEffect, useState } from "react";
 import { api, errText, type Job, type ModelSummary, type ProjectDetail } from "@/lib/api";
 import { loadLibrary, type LibraryItem } from "@/lib/library";
 
-/** Failed jobs older than this are history, not something waiting on you. */
-export const FAILED_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_PROJECTS = 25;
 
 export type HomeJob = Job & { projectName: string };
@@ -17,8 +15,6 @@ export type HomeData = {
   /** Library item count (catalog parts plus your own models); null if the library failed to load. */
   libraryCount: number | null;
   jobsSucceeded: number | null;
-  /** Real "needs you" items: recently failed jobs, newest first. */
-  failedJobs: HomeJob[];
   /** Assemblies and products, newest first. */
   complexParts: HomeModel[];
 };
@@ -55,11 +51,7 @@ export function useHome(userId: string | undefined, attempt: number): HomeState 
 
 function assemble(projectCount: number, details: ProjectDetail[], library: LibraryItem[] | null, jobsSucceeded: number | null): HomeData {
   const thumbs = new Map((library ?? []).map((i) => [i.id, i.thumb]));
-  const now = Date.now();
   const jobs: HomeJob[] = details.flatMap((d) => d.recent_jobs.map((j) => ({ ...j, projectName: d.name })));
-  const failedJobs = jobs
-    .filter((j) => j.state === "failed" && now - Date.parse(j.updated_at) < FAILED_WINDOW_MS)
-    .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
   const complexParts = details
     .flatMap((d) => d.models.filter((m) => m.kind === "assembly" || m.kind === "product").map((m) => ({ m, d })))
     .map(({ m, d }): HomeModel => {
@@ -67,7 +59,7 @@ function assemble(projectCount: number, details: ProjectDetail[], library: Libra
       return { ...m, projectName: d.name, thumb: thumbs.get(`model:${m.id}`) ?? null, latestJob: latest };
     })
     .sort((a, b) => Date.parse(b.latestJob?.updated_at ?? b.created_at) - Date.parse(a.latestJob?.updated_at ?? a.created_at));
-  return { projects: projectCount, libraryCount: library?.length ?? null, jobsSucceeded, failedJobs, complexParts };
+  return { projects: projectCount, libraryCount: library?.length ?? null, jobsSucceeded, complexParts };
 }
 
 /** "4m ago", "1h ago", "Yesterday", "Oct 30". */

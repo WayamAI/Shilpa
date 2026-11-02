@@ -23,7 +23,7 @@ export const SETTINGS_ITEM: NavItem = { id: "settings", href: "/system", label: 
 export const TAB_ITEMS: NavItem[] = [
   NAV_ITEMS[0],
   NAV_ITEMS[1],
-  { id: "needs-you", href: "/needs-you", label: "Needs you", icon: NeedsYouIcon, planned: true },
+  { id: "needs-you", href: "/needs-you", label: "Needs you", icon: NeedsYouIcon },
 ];
 
 const ALL = [...NAV_ITEMS, SETTINGS_ITEM];

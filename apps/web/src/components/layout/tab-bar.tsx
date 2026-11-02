@@ -7,7 +7,7 @@ import { TAB_ITEMS, navItemForPath } from "@/lib/navigation";
 
 /**
  * Phone tab bar (Paper · 03 Mobile): three slots, 22px glyph over an 11px
- * label, active in action orange. Planned slots are visible but inert.
+ * label, active in action orange. Planned slots (none today) are visible but inert.
  * Inactive labels use muted-text: Paper's muted is 3.24:1 at 11px.
  */
 export function TabBar() {

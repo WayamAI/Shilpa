@@ -1,8 +1,10 @@
 "use client";
 
 import { Menu as MenuIcon } from "lucide-react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useNeedsYou } from "@/components/home/use-needs-you";
 import { IconButton } from "@/components/ui";
 import { navItemForPath } from "@/lib/navigation";
 
@@ -50,11 +52,26 @@ export function MobileHeader({ onMenu, title }: { onMenu: () => void; title?: st
   );
 }
 
-/** [Planned] Needs-you inbox. Shown disabled so the layout matches Paper. */
+/** Link to the Needs you inbox, with a count badge when something is waiting. Refetches on navigation. */
 function NeedsYouBell() {
+  const pathname = usePathname();
+  const state = useNeedsYou(0, pathname);
+  const count = state.status === "ready" ? state.items.length : 0;
   return (
-    <IconButton label="Needs you (planned)" disabled className="disabled:opacity-100">
-      <NeedsYouIcon className="text-muted" />
-    </IconButton>
+    <Link
+      href="/needs-you"
+      aria-label={count > 0 ? `Needs you, ${count} waiting` : "Needs you"}
+      className="relative inline-flex size-8.5 shrink-0 items-center justify-center rounded-md text-muted transition-colors duration-fast hover:bg-surface-2 hover:text-ink"
+    >
+      <NeedsYouIcon />
+      {count > 0 ? (
+        <span
+          aria-hidden
+          className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-action px-1 text-caption font-semibold text-on-action tabular"
+        >
+          {count > 99 ? "99+" : count}
+        </span>
+      ) : null}
+    </Link>
   );
 }

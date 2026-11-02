@@ -35,6 +35,13 @@ export type Job = {
   budget_used: Record<string, number>; input: Record<string, unknown>; created_at: string; updated_at: string;
   attempts?: Attempt[];
 };
+export type NeedsYouKind = "clarification" | "drawing_review" | "failed_build";
+export type NeedsYouItem = {
+  id: string; kind: NeedsYouKind; project_id: string; project_name: string; model_id: string | null; model_name: string | null;
+  title: string; detail: string; created_at: string; can_act: boolean;
+  link: { project_id: string; open: "specification" | "job"; specification_id: string | null; job_id: string | null };
+};
+export type NeedsYou = { count: number; items: NeedsYouItem[] };
 export type ProjectDetail = Project & { models: ModelSummary[]; recent_jobs: Job[] };
 
 export type Param = { value?: number | null; expr?: string | null; kind?: string; unit?: string | null; source?: string };
@@ -172,6 +179,7 @@ export const api = {
   health: () => req<Health>("GET", "/v1/health"),
   me: () => req<Me>("GET", "/v1/me"),
   usage: () => req<Usage>("GET", "/v1/usage"),
+  needsYou: () => req<NeedsYou>("GET", "/v1/needs-you"),
   projects: () => req<Project[]>("GET", "/v1/projects"),
   createProject: (name: string) => req<Project>("POST", "/v1/projects", { name }),
   project: (id: string) => req<ProjectDetail>("GET", `/v1/projects/${id}`),
@@ -179,6 +187,7 @@ export const api = {
   createSpec: (projectId: string, prompt: string) => req<Spec>("POST", `/v1/projects/${projectId}/specifications`, { prompt }),
   specFromUpload: (projectId: string, upload_id: string, prompt?: string) =>
     req<Spec>("POST", `/v1/projects/${projectId}/specifications`, { upload_id, prompt: prompt || null }),
+  spec: (id: string) => req<Spec>("GET", `/v1/specifications/${id}`),
   answerSpec: (id: string, revision: number, answers: Record<string, number>, resolved_conflicts = false, confirm_drawing = false) =>
     req<Spec>("PATCH", `/v1/specifications/${id}`, { revision, answers, resolved_conflicts, confirm_drawing }),
   runSpec: (projectId: string, specification_id: string) =>
