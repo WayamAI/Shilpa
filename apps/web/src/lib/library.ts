@@ -35,12 +35,16 @@ const NATIVE_THUMB = "/imagery/sh-card-05-native-part-128.webp";
 const COMPLEX_THUMB = "/imagery/sh-card-02-complex-part-128.webp";
 
 /** Catalog thumbnails are real renders of each generator at default parameters
-    (tools/render_catalog_thumbs.py); index.json lists which ones exist. */
+    (scripts/render_catalog_thumbs.py); index.json lists which ones exist.
+    Model thumbnails are renders of a model's head version, named
+    <model_id>-v<n>, so a newer version without one falls back to the icon
+    (scripts/render_model_thumbs.py). */
 const THUMB_DIR = "/thumbs/catalog";
+const MODEL_THUMB_DIR = "/thumbs/models";
 
-async function loadRendered(): Promise<Set<string>> {
+async function loadRendered(dir: string): Promise<Set<string>> {
   try {
-    const res = await fetch(`${THUMB_DIR}/index.json`);
+    const res = await fetch(`${dir}/index.json`);
     return res.ok ? new Set((await res.json()) as string[]) : new Set();
   } catch {
     return new Set();
@@ -68,9 +72,11 @@ function fromGenerator(g: CatalogGenerator, rendered: Set<string>): LibraryItem 
 
 const KIND_LABEL: Record<string, string> = { part: "Part", sheet_metal: "Sheet metal", assembly: "Assembly", product: "Product" };
 
-function fromModel(m: ModelSummary, project: Project): LibraryItem {
+function fromModel(m: ModelSummary, project: Project, rendered: Set<string>): LibraryItem {
   const complex = m.kind === "assembly" || m.kind === "product";
   const what = KIND_LABEL[m.kind ?? "part"] ?? "Part";
+  const file = `${m.id}-v${m.head_number}`;
+  const own = m.head_number != null && rendered.has(file);
   return {
     id: `model:${m.id}`,
     name: m.name,
@@ -81,16 +87,21 @@ function fromModel(m: ModelSummary, project: Project): LibraryItem {
     family: what,
     version: m.head_number,
     href: `/projects/${project.id}`,
-    thumb: complex ? COMPLEX_THUMB : NATIVE_THUMB,
-    thumbKind: "icon",
+    thumb: own ? `${MODEL_THUMB_DIR}/${file}.webp` : complex ? COMPLEX_THUMB : NATIVE_THUMB,
+    thumbKind: own ? "render" : "icon",
     haystack: [m.name, what, project.name].join(" ").toLowerCase(),
   };
 }
 
 export async function loadLibrary(): Promise<LibraryItem[]> {
-  const [catalog, projects, rendered] = await Promise.all([catalogApi.list(), api.projects(), loadRendered()]);
+  const [catalog, projects, rendered, modelRendered] = await Promise.all([
+    catalogApi.list(),
+    api.projects(),
+    loadRendered(THUMB_DIR),
+    loadRendered(MODEL_THUMB_DIR),
+  ]);
   const details = await Promise.all(projects.filter((p) => p.model_count > 0).map((p) => api.project(p.id)));
-  const models = details.flatMap((d) => d.models.map((m) => fromModel(m, d)));
+  const models = details.flatMap((d) => d.models.map((m) => fromModel(m, d, modelRendered)));
   const parts = catalog.generators.filter((g) => g.listed !== false).map((g) => fromGenerator(g, rendered));
   /* Your own models first, then the catalog. */
   return [...models, ...parts];
