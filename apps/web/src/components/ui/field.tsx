@@ -19,7 +19,7 @@ import {
  */
 
 export const FIELD_BASE =
-  "min-w-0 rounded-md border border-line bg-bg text-sm text-ink placeholder:text-muted-text transition-[border-color,box-shadow] duration-fast ease-out hover:border-line-strong focus-visible:border-action disabled:bg-surface disabled:text-muted-text disabled:hover:border-line aria-invalid:border-fail aria-invalid:focus-visible:shadow-[0_0_0_2px_var(--color-bg),0_0_0_4px_var(--color-fail)]";
+  "min-w-0 rounded-md border border-line bg-bg text-sm text-ink placeholder:text-muted-text transition-[border-color,box-shadow] duration-fast ease-out hover:border-line-strong focus-visible:border-action focus-visible:shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-action)_18%,transparent)] disabled:bg-surface disabled:text-muted-text disabled:hover:border-line aria-invalid:border-fail aria-invalid:focus-visible:shadow-[0_0_0_2px_var(--color-bg),0_0_0_4px_var(--color-fail)]";
 
 type FieldChild = ReactElement<{ id?: string; "aria-describedby"?: string; "aria-invalid"?: boolean }>;
 
@@ -65,11 +65,12 @@ export function Field({
   );
 }
 
-export const TextInput = forwardRef<HTMLInputElement, ComponentPropsWithoutRef<"input">>(function TextInput(
-  { className = "", ...props },
+export const TextInput = forwardRef<HTMLInputElement, Omit<ComponentPropsWithoutRef<"input">, "size"> & { size?: "md" | "lg" }>(function TextInput(
+  { className = "", size = "md", ...props },
   ref,
 ) {
-  return <input ref={ref} {...props} className={`h-8.5 w-full px-2.5 ${FIELD_BASE} ${className}`} />;
+  const box = size === "lg" ? "h-10 px-3 text-md" : "h-8.5 px-2.5";
+  return <input ref={ref} {...props} className={`${box} w-full ${FIELD_BASE} ${className}`} />;
 });
 
 /** Dense numeric cell: numbers right-aligned, tabular. */

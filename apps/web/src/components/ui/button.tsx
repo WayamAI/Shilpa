@@ -9,7 +9,7 @@ import { Spinner } from "./feedback";
  */
 
 export type ButtonVariant = "primary" | "secondary" | "dark" | "ghost" | "danger";
-export type ButtonSize = "md" | "sm";
+export type ButtonSize = "lg" | "md" | "sm";
 
 const VARIANT: Record<ButtonVariant, string> = {
   primary:
@@ -22,6 +22,7 @@ const VARIANT: Record<ButtonVariant, string> = {
 };
 
 const SIZE: Record<ButtonSize, string> = {
+  lg: "h-[42px] gap-2 px-4 text-md",
   md: "h-8.5 gap-2 px-3.5 text-sm",
   sm: "h-7 gap-1.5 px-2.5 text-xs",
 };
@@ -75,7 +76,7 @@ export const IconButton = forwardRef<
       {...props}
       className={[
         BUTTON_BASE,
-        size === "md" ? "size-8.5" : "size-7",
+        size === "sm" ? "size-7" : "size-8.5",
         "text-body hover:bg-surface-2 hover:text-ink active:bg-line aria-pressed:bg-surface-2 aria-pressed:text-ink",
         className,
       ].join(" ")}

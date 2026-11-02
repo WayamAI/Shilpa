@@ -66,6 +66,7 @@
   --radius-panel: 10px; /* Paper tables and sidebar status card */
   --radius-lg: 12px;
   --radius-xl: 14px; /* Paper dialogs and state cards */
+  --radius-2xl: 16px; /* Paper sign-in hero image */
   --radius-full: 999px;
   --shadow-action: 0 1px 2px #b53e0740;
   --shadow-popover: 0 12px 32px #1018281f, 0 2px 6px #10182814;
@@ -97,6 +98,8 @@
   --text-heading--line-height: 22px;
   --text-title: 18px; /* Paper dialog title */
   --text-title--line-height: 22px;
+  --text-lede: 16px; /* Paper sign-in lede */
+  --text-lede--line-height: 24px;
   --text-xl: 20px;
   --text-xl--line-height: 24px;
   --text-xl--letter-spacing: -0.01em;
@@ -106,9 +109,16 @@
   --text-2xl: 28px;
   --text-2xl--line-height: 34px;
   --text-2xl--letter-spacing: -0.02em;
+  --text-headline: 26px; /* Paper sign-in title */
+  --text-headline--line-height: 32px;
+  --text-headline--letter-spacing: -0.02em;
   --text-3xl: 40px;
   --text-3xl--line-height: 44px;
   --text-3xl--letter-spacing: -0.02em;
+
+  --text-display: 44px; /* Paper sign-in statement */
+  --text-display--line-height: 50px;
+  --text-display--letter-spacing: -0.025em;
 
   --tracking-tight: -0.02em;
 }
