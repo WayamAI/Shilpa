@@ -313,14 +313,28 @@ def run_once() -> bool:
     return True
 
 
-def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+def main(argv: list[str] | None = None) -> int:
+    """``--once`` processes at most one message and returns 0 (also when the queue is empty); used by the Container Apps Job."""
+    import argparse
+
+    from .. import settings as cfg
+    from ..logging_setup import configure_logging
+
+    ap = argparse.ArgumentParser(prog="shilpa.workers.cad")
+    ap.add_argument("--once", action="store_true", help="process at most one message, then exit 0")
+    args = ap.parse_args(argv)
+    cfg.enforce_startup()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")  # local: as before
+    configure_logging(cfg.hosting.env, cfg.hosting.log_level)  # hosted: JSON + redaction replace it
     init_db()
-    log.info("cad worker %s started", WORKER_ID)
+    log.info("cad worker %s started%s", WORKER_ID, " (single run)" if args.once else "")
+    if args.once:
+        run_once()
+        return 0
     while True:
         if not run_once():
             time.sleep(0.3)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

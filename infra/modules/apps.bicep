@@ -47,9 +47,9 @@ param webMaxReplicas int = 3
 param apiMinReplicas int = 1
 param apiMaxReplicas int = 3
 param workerMaxExecutions int = 3
-@description('shilpa/api/app.py serves /v1/health today (the image HEALTHCHECK uses it). Point these at /v1/health/live and /v1/health/ready when step 3 lands them.')
-param apiLivenessPath string = '/v1/health'
-param apiReadinessPath string = '/v1/health'
+@description('Liveness has no dependencies; readiness checks the database, blob store and queue (shilpa/health.py).')
+param apiLivenessPath string = '/v1/health/live'
+param apiReadinessPath string = '/v1/health/ready'
 
 var placeholder = 'mcr.microsoft.com/k8se/quickstart:latest'
 var webBootstrap = empty(webImage)
@@ -245,9 +245,8 @@ resource worker 'Microsoft.App/jobs@2025-07-01' = {
         {
           name: 'cad-worker'
           image: backendBootstrap ? placeholder : backendImage
-          // [Assumption] shilpa.workers.cad.main() loops forever; a job execution must process one message and exit,
-          // so this calls run_once() (exists today). Replace with a `--once` flag when the worker gets one.
-          command: backendBootstrap ? null : ['python', '-c', 'from shilpa.workers.cad import run_once; run_once()']
+          // A job execution processes at most one message and exits 0 (also when the queue is empty).
+          command: backendBootstrap ? null : ['python', '-m', 'shilpa.workers.cad', '--once']
           resources: workerSize
           // No model credentials: the kill switch is forced off and no OpenAI endpoint is passed. No Key Vault access either.
           env: concat(dbEnv, blobEnv, queueEnv, [

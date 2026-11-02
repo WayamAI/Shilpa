@@ -1,9 +1,9 @@
 # Local parity stack.   docker compose up --build
 #   studio  http://localhost:13000 (sign in as dev@wayam.local)      api  http://localhost:18000/v1/health
 # Today's code runs on SQLite in the `shilpa-data` volume shared by api, coordinator and worker.
-# The Postgres, Azurite (Blob) and Service Bus services are for the cloud adapters being added in build step 2:
+# The Postgres and Azurite (Blob) services are in the `cloud` profile:
 #   docker compose --profile cloud up        starts postgres + azurite
-# To point the backend at Postgres once the driver ships (psycopg in uv.lock), set before `up`:
+# To run the backend on Postgres (psycopg is in uv.lock), set before `up`:
 #   SHILPA_DATABASE_URL=postgresql+psycopg://shilpa:shilpa@postgres:5432/shilpa
 # Secrets: put them in an untracked .env next to this file (AZURE_OPENAI_*, OLLAMA_API_KEY); never in images.
 
@@ -39,6 +39,10 @@ services:
     <<: *backend
     ports:
       - "18000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false   # only present under --profile cloud; then the API waits for Postgres
 
   coordinator:
     <<: *backend

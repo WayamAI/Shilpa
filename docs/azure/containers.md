@@ -21,14 +21,22 @@ Image sizes (measured, Docker Desktop, amd64): backend 2.1 GB on disk (487 MB co
 
 ```
 docker compose up --build        # studio http://localhost:13000, API http://localhost:18000/v1/health
-docker compose --profile cloud up postgres azurite   # cloud-parity services (not used by today's code)
+docker compose --profile cloud up postgres azurite   # cloud-parity services (Postgres and Azurite)
 ```
 
 Ports are 13000 (web), 18000 (API), 15432 (Postgres), 11000-11002 (Azurite blob, queue, table; 10000 was taken on the dev machine). Sign in with `dev@wayam.local`.
 Today's code runs on SQLite in the `shilpa-data` volume, shared by api, coordinator and worker (the queue is DB-backed).
 Compose substitutes variables from a `.env` in the repo root, and the developer `.env` there is the same file the app reads. If it sets `SHILPA_LLM_PROVIDER=ollama` and `OLLAMA_API_KEY`, the containers will use them; use a separate `--env-file` for a clean run. The model kill switch defaults to `SHILPA_LLM=off`; to plan with a model put `SHILPA_LLM=on` plus `AZURE_OPENAI_*` (or `SHILPA_LLM_PROVIDER=ollama` and `OLLAMA_API_KEY`, laptops only) in an untracked `.env` next to the compose file.
 
-When the Postgres driver lands (step 2): `SHILPA_DATABASE_URL=postgresql+psycopg://shilpa:shilpa@postgres:5432/shilpa docker compose --profile cloud up`. Compose does not default to Postgres yet because `psycopg` is not in `uv.lock`.
+**Postgres in compose.** `psycopg` is in `uv.lock` and the backend image, so the `cloud` profile works end to end. Compose still defaults to SQLite; to run api, coordinator and worker on Postgres set the URL before `up`:
+
+```
+SHILPA_DATABASE_URL=postgresql+psycopg://shilpa:shilpa@postgres:5432/shilpa docker compose --profile cloud up --build
+```
+
+The API creates the schema on first start; check `http://localhost:18000/v1/health/ready` (database, blob store and queue). Add `-v` to `docker compose down` to drop the Postgres and Azurite volumes.
+
+**CAD worker modes.** `python -m shilpa.workers.cad` loops forever (compose). `python -m shilpa.workers.cad --once` processes at most one message and exits 0, also when the queue is empty; it is what the Container Apps Job runs. Both call `enforce_startup()` and `configure_logging()` like the API.
 
 The **Service Bus emulator is not enabled**: it requires accepting Microsoft's emulator EULA (`ACCEPT_EULA=Y`), a SQL Server container with its own EULA, and a queue `Config.json`. A commented block in `docker-compose.yml` shows the wiring; enable it deliberately.
 

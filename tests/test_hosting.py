@@ -355,3 +355,84 @@ def test_telemetry_configures_exporter_when_available(monkeypatch):
     monkeypatch.setitem(sys.modules, "azure.monitor.opentelemetry", mod)
     assert telemetry.setup_telemetry(None, connection_string="InstrumentationKey=x") is True
     assert got == {"connection_string": "InstrumentationKey=x"}
+
+
+# ------------------------------------------------------------------ cloud backend settings and worker --once
+
+
+def cloudc(**kw):
+    return dataclasses.replace(cfg.CloudSettings(), **kw)
+
+
+def test_azure_blob_backend_needs_account_url_and_container():
+    c = cloudc(blob_backend="azure", blob_account_url="", blob_container="")
+    text = "\n".join(cfg.startup_problems(hosted(), good_settings(), c))
+    assert "SHILPA_BLOB_ACCOUNT_URL" in text and "SHILPA_BLOB_CONTAINER" in text
+    ok = cloudc(blob_backend="azure", blob_account_url="https://a.blob.core.windows.net", blob_container="artifacts")
+    assert cfg.startup_problems(hosted(), good_settings(), ok) == []
+    # the emulator connection string stands in for the account URL
+    assert cfg.startup_problems(hosted(), good_settings(), cloudc(blob_backend="azure", blob_connection_string="UseDevelopmentStorage=true")) == []
+    assert cfg.startup_problems(hosted(), good_settings(), cloudc(blob_backend="local")) == []
+
+
+def test_servicebus_queue_needs_namespace():
+    assert any("SHILPA_SERVICEBUS_NAMESPACE" in m
+               for m in cfg.startup_problems(hosted(), good_settings(), cloudc(queue_backend="servicebus")))
+    assert cfg.startup_problems(hosted(), good_settings(), cloudc(queue_backend="servicebus", servicebus_namespace="n.servicebus.windows.net")) == []
+    assert cfg.startup_problems(hosted(), good_settings(), cloudc(queue_backend="db")) == []
+
+
+def test_backend_checks_apply_locally_too():
+    h = dataclasses.replace(cfg.HostingSettings(), env="local")
+    assert any("SHILPA_BLOB_ACCOUNT_URL" in m for m in cfg.startup_problems(h, cfg.Settings(), cloudc(blob_backend="azure")))
+
+
+@pytest.mark.parametrize("url,bad", [
+    ("postgresql+psycopg://u@x.postgres.database.azure.com/db", True),
+    ("postgresql+psycopg://u@x.postgres.database.azure.com/db?sslmode=prefer", True),
+    ("postgresql+psycopg://u@x.postgres.database.azure.com/db?sslmode=require", False),
+    ("postgresql+psycopg://u@x.postgres.database.azure.com/db?sslmode=verify-full", False),
+    ("postgresql+psycopg://u:p@postgres:5432/db", False),  # not an Azure host: left alone
+])
+def test_azure_postgres_requires_sslmode_when_hosted(url, bad):
+    msgs = cfg.startup_problems(hosted(), good_settings(database_url=url), cloudc())
+    assert any("sslmode" in m for m in msgs) is bad
+    # local development is never blocked on it
+    h = dataclasses.replace(cfg.HostingSettings(), env="local")
+    assert cfg.startup_problems(h, dataclasses.replace(cfg.Settings(), database_url=url), cloudc()) == []
+
+
+def test_cad_worker_once_exits_zero_on_empty_queue(monkeypatch):
+    from shilpa.workers import cad
+
+    calls = []
+    monkeypatch.setattr(cad, "run_once", lambda: calls.append(1) or False)
+    monkeypatch.setattr(cad, "init_db", lambda: None)
+    assert cad.main(["--once"]) == 0
+    assert calls == [1]  # exactly one attempt, no loop
+
+
+def test_cad_worker_once_processes_one_message_only(monkeypatch):
+    from shilpa import queue
+    from shilpa.workers import cad
+
+    handled = []
+    msgs = [types.SimpleNamespace(body={"n": i}) for i in range(3)]
+    monkeypatch.setattr(queue, "receive", lambda name: msgs.pop(0) if msgs else None)
+    monkeypatch.setattr(queue, "complete", lambda r: None)
+    monkeypatch.setattr(cad, "handle_cad", lambda r: handled.append(r.body["n"]))
+    monkeypatch.setattr(cad, "init_db", lambda: None)
+    assert cad.main(["--once"]) == 0
+    assert handled == [0] and len(msgs) == 2
+
+
+def test_cad_worker_once_exits_zero_even_if_handler_crashes(monkeypatch):
+    from shilpa import queue
+    from shilpa.workers import cad
+
+    abandoned = []
+    monkeypatch.setattr(queue, "receive", lambda name: types.SimpleNamespace(body={}))
+    monkeypatch.setattr(queue, "abandon", lambda r: abandoned.append(1))
+    monkeypatch.setattr(cad, "handle_cad", lambda r: 1 / 0)
+    monkeypatch.setattr(cad, "init_db", lambda: None)
+    assert cad.main(["--once"]) == 0 and abandoned == [1]  # the message is redelivered; the job execution itself succeeded

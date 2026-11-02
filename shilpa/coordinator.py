@@ -277,7 +277,12 @@ def run_once() -> bool:
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    from . import settings as cfg
+    from .logging_setup import configure_logging
+
+    cfg.enforce_startup()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")  # local: as before
+    configure_logging(cfg.hosting.env, cfg.hosting.log_level)  # hosted: JSON + redaction replace it
     init_db()
     log.info("coordinator started (llm configured: %s)", settings.llm_configured)
     last_watch = 0.0

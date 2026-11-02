@@ -188,9 +188,18 @@ class HostingSettings:
         return (f"{self.entra_authority}/{t}/v2.0", f"https://sts.windows.net/{t}/")
 
 
-def startup_problems(h: HostingSettings | None = None, s: Settings | None = None) -> list[str]:
+def _azure_postgres_without_tls(url: str) -> bool:
+    from urllib.parse import parse_qs, urlsplit
+
+    u = urlsplit(url)
+    if not u.scheme.startswith("postgres") or not (u.hostname or "").endswith(".postgres.database.azure.com"):
+        return False
+    return parse_qs(u.query).get("sslmode", [""])[0] not in ("require", "verify-ca", "verify-full")
+
+
+def startup_problems(h: HostingSettings | None = None, s: Settings | None = None, c: "CloudSettings | None" = None) -> list[str]:
     """Every reason this configuration must not start, each naming the variable. Empty means fine."""
-    h, s = h or hosting, s or settings
+    h, s, c = h or hosting, s or settings, c or cloud
     if h.env not in ENVIRONMENTS:
         return [f"SHILPA_ENV={h.env!r} is not one of {', '.join(ENVIRONMENTS)}"]
     problems: list[str] = []
@@ -204,6 +213,11 @@ def startup_problems(h: HostingSettings | None = None, s: Settings | None = None
             problems.append(f"SHILPA_AUTH_MODE={s.auth_mode!r} is not valid (entra)")
         if s.database_url.startswith("sqlite"):
             problems.append(f"DATABASE_URL must point at PostgreSQL when SHILPA_ENV={h.env} (it is unset or SQLite)")
+        elif _azure_postgres_without_tls(s.database_url):
+            # Azure Database for PostgreSQL only listens on TLS, but libpq's default (prefer) would silently
+            # downgrade if a proxy or misrouted host answered in clear. Hosted envs must say so explicitly.
+            problems.append("DATABASE_URL must include sslmode=require (or verify-full) for an Azure PostgreSQL host "
+                            f"when SHILPA_ENV={h.env}")
         if s.llm_provider not in ("azure", "ollama"):
             problems.append(f"SHILPA_LLM_PROVIDER={s.llm_provider!r} is not valid (azure)")
         if s.llm_enabled and s.llm_provider == "azure":
@@ -211,6 +225,14 @@ def startup_problems(h: HostingSettings | None = None, s: Settings | None = None
                 problems.append("AZURE_OPENAI_ENDPOINT is required (or set SHILPA_LLM=off)")
             if not s.aoai_deployment:
                 problems.append("AZURE_OPENAI_DEPLOYMENT is required (or set SHILPA_LLM=off)")
+    if c.blob_backend == "azure" and not c.blob_connection_string:
+        if not c.blob_account_url:
+            problems.append("SHILPA_BLOB_ACCOUNT_URL is required when SHILPA_BLOB_BACKEND=azure (or SHILPA_BLOB_CONNECTION_STRING for Azurite)")
+        if not c.blob_container:
+            problems.append("SHILPA_BLOB_CONTAINER is required when SHILPA_BLOB_BACKEND=azure")
+    if c.queue_backend == "servicebus" and not c.servicebus_connection_string and not c.servicebus_namespace:
+        problems.append("SHILPA_SERVICEBUS_NAMESPACE is required when SHILPA_QUEUE_BACKEND=servicebus "
+                        "(or SHILPA_SERVICEBUS_CONNECTION_STRING for the emulator)")
     if s.auth_mode == "entra":
         if not h.entra_tenant_id:
             problems.append("SHILPA_ENTRA_TENANT_ID is required when SHILPA_AUTH_MODE=entra")
@@ -223,8 +245,8 @@ def startup_problems(h: HostingSettings | None = None, s: Settings | None = None
     return problems
 
 
-def enforce_startup(h: HostingSettings | None = None, s: Settings | None = None) -> None:
-    problems = startup_problems(h, s)
+def enforce_startup(h: HostingSettings | None = None, s: Settings | None = None, c: "CloudSettings | None" = None) -> None:
+    problems = startup_problems(h, s, c)
     if problems:
         raise ConfigError("Refusing to start:\n  - " + "\n  - ".join(problems))
 

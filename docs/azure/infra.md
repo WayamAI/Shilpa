@@ -150,7 +150,7 @@ for p in infra/params/*.bicepparam; do az bicep build-params --file "$p" --stdou
 | web | Container App | external | image default (`node server.js`) | `SHILPA_API_ORIGIN=https://<api-internal-fqdn>`; probes on `/login` |
 | api | Container App | internal | image default (uvicorn :8000) | probes on `/v1/health` (change to live/ready when they exist) |
 | coordinator | Container App | none | `python -m shilpa.coordinator` | fixed at 1 replica |
-| CAD worker | Container Apps **Job**, event trigger | none | `python -c "from shilpa.workers.cad import run_once; run_once()"` | KEDA `azure-servicebus` rule on queue `cad`, `messageCount=1`, authenticated with the worker identity, 0 to `workerMaxExecutions` executions, `replicaRetryLimit` 0 (redelivery belongs to Service Bus) |
+| CAD worker | Container Apps **Job**, event trigger | none | `python -m shilpa.workers.cad --once` | KEDA `azure-servicebus` rule on queue `cad`, `messageCount=1`, authenticated with the worker identity, 0 to `workerMaxExecutions` executions, `replicaRetryLimit` 0 (redelivery belongs to Service Bus) |
 
 Environment variables set by Bicep use the names in `shilpa/settings.py` (`DATABASE_AUTH=entra`, `SHILPA_BLOB_BACKEND=azure`, `SHILPA_BLOB_ACCOUNT_URL`, `SHILPA_BLOB_CONTAINER`, `SHILPA_QUEUE_BACKEND=servicebus`, `SHILPA_SERVICEBUS_NAMESPACE`, `SHILPA_ENTRA_*`, `AZURE_OPENAI_*`, `SHILPA_MODEL_*`). `DATABASE_URL` is `postgresql+psycopg://<identity-name>@<host>:5432/shilpa?sslmode=require` with no password. `AZURE_CLIENT_ID` selects the user-assigned identity for `DefaultAzureCredential`. No secrets are passed anywhere; there are no Container Apps secrets.
 
@@ -216,5 +216,5 @@ This is my arithmetic over the blueprint's inputs, for the CPU and planner part 
 4. Database: who runs migrations, per-table grants for the worker, HA mode and geo-redundant backup for prod.
 5. Private networking: whether the pilot is external (VNet, private endpoints, Premium Service Bus/ACR, Front Door Premium) and how operators reach private data services.
 6. Front Door: the origin is the public web FQDN, and nothing yet stops callers from bypassing Front Door. Options: private-link origin with an internal-only Container Apps environment, or validate the `X-Azure-FDID` header in the app (output `frontDoorId` is available).
-7. Worker as a Job: `main()` in `cad.py` loops forever, so the Job runs `run_once()` through `python -c`. A `--once` flag (and an `init_db`-free path) would be cleaner.
+7. Worker as a Job: the Job runs `python -m shilpa.workers.cad --once` (one message, exit 0). It still calls `init_db()` on start, which is idempotent; an `init_db`-free path would be marginally faster.
 8. KEDA permission check above, and the API readiness-to-queue question.
