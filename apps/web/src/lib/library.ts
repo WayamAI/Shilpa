@@ -1,4 +1,4 @@
-import { api, catalogApi, type CatalogGenerator, type ModelSummary, type Project } from "@/lib/api";
+import { api, catalogApi, fetchBlob, type CatalogGenerator, type ModelSummary, type Project } from "@/lib/api";
 
 /**
  * One list of everything a user can @-mention, assembled from what exists
@@ -36,9 +36,12 @@ const COMPLEX_THUMB = "/imagery/sh-card-02-complex-part-128.webp";
 
 /** Catalog thumbnails are real renders of each generator at default parameters
     (scripts/render_catalog_thumbs.py); index.json lists which ones exist.
-    Model thumbnails are renders of a model's head version, named
-    <model_id>-v<n>, so a newer version without one falls back to the icon
-    (scripts/render_model_thumbs.py). */
+    Model thumbnails come from the API first: the THUMB artifact the CAD worker
+    renders for every version (thumb_artifact_id on the model). Models without
+    one (versions older than the worker change and not yet backfilled with
+    `python -m shilpa.thumbs backfill`) fall back to the static renders of the
+    head version, named <model_id>-v<n> (scripts/render_model_thumbs.py), then
+    to the icon. */
 const THUMB_DIR = "/thumbs/catalog";
 const MODEL_THUMB_DIR = "/thumbs/models";
 
@@ -49,6 +52,22 @@ async function loadRendered(dir: string): Promise<Set<string>> {
   } catch {
     return new Set();
   }
+}
+
+/* The download route needs the bearer header, which an <img src> cannot send,
+   so the bytes are fetched once per artifact and shown through an object URL. */
+const apiThumbs = new Map<string, Promise<string | null>>();
+
+function apiThumb(artifactId: string): Promise<string | null> {
+  let hit = apiThumbs.get(artifactId);
+  if (!hit) {
+    hit = fetchBlob(`/v1/artifacts/${artifactId}/download`).then(
+      (b) => URL.createObjectURL(b),
+      () => null,
+    );
+    apiThumbs.set(artifactId, hit);
+  }
+  return hit;
 }
 
 function fromGenerator(g: CatalogGenerator, rendered: Set<string>): LibraryItem {
@@ -72,11 +91,11 @@ function fromGenerator(g: CatalogGenerator, rendered: Set<string>): LibraryItem 
 
 const KIND_LABEL: Record<string, string> = { part: "Part", sheet_metal: "Sheet metal", assembly: "Assembly", product: "Product" };
 
-function fromModel(m: ModelSummary, project: Project, rendered: Set<string>): LibraryItem {
+function fromModel(m: ModelSummary, project: Project, rendered: Set<string>, fromApi: string | null): LibraryItem {
   const complex = m.kind === "assembly" || m.kind === "product";
   const what = KIND_LABEL[m.kind ?? "part"] ?? "Part";
   const file = `${m.id}-v${m.head_number}`;
-  const own = m.head_number != null && rendered.has(file);
+  const own = fromApi != null || (m.head_number != null && rendered.has(file));
   return {
     id: `model:${m.id}`,
     name: m.name,
@@ -87,7 +106,7 @@ function fromModel(m: ModelSummary, project: Project, rendered: Set<string>): Li
     family: what,
     version: m.head_number,
     href: `/projects/${project.id}`,
-    thumb: own ? `${MODEL_THUMB_DIR}/${file}.webp` : complex ? COMPLEX_THUMB : NATIVE_THUMB,
+    thumb: fromApi ?? (own ? `${MODEL_THUMB_DIR}/${file}.webp` : complex ? COMPLEX_THUMB : NATIVE_THUMB),
     thumbKind: own ? "render" : "icon",
     haystack: [m.name, what, project.name].join(" ").toLowerCase(),
   };
@@ -101,7 +120,13 @@ export async function loadLibrary(): Promise<LibraryItem[]> {
     loadRendered(MODEL_THUMB_DIR),
   ]);
   const details = await Promise.all(projects.filter((p) => p.model_count > 0).map((p) => api.project(p.id)));
-  const models = details.flatMap((d) => d.models.map((m) => fromModel(m, d, modelRendered)));
+  const models = await Promise.all(
+    details.flatMap((d) =>
+      d.models.map(async (m) =>
+        fromModel(m, d, modelRendered, m.thumb_artifact_id ? await apiThumb(m.thumb_artifact_id) : null),
+      ),
+    ),
+  );
   const parts = catalog.generators.filter((g) => g.listed !== false).map((g) => fromGenerator(g, rendered));
   /* Your own models first, then the catalog. */
   return [...models, ...parts];

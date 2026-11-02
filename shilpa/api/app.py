@@ -642,7 +642,8 @@ async def job_events(job_id: str, request: Request, p: Principal = Depends(princ
 
 def _model_out(s, m: Model) -> dict:
     head = s.get(ModelVersion, m.head_version_id) if m.head_version_id else None
-    return {"id": m.id, "project_id": m.project_id, "name": m.name, "kind": m.kind or "part", "head_version_id": m.head_version_id,
+    thumb = s.scalar(select(Artifact.id).where(Artifact.version_id == m.head_version_id, Artifact.format == "THUMB")) if head else None
+    return {"thumb_artifact_id": thumb, "id": m.id, "project_id": m.project_id, "name": m.name, "kind": m.kind or "part", "head_version_id": m.head_version_id,
             "head_number": head.number if head else None, "created_at": m.created_at.isoformat()}
 
 
@@ -806,7 +807,8 @@ MEDIA = {"FCSTD": ("application/octet-stream", "FCStd"), "STEP": ("model/step", 
          "PLACEMENTS": ("application/json", "json"), "MESHES": ("application/json", "json"),
          "VIEWER": ("application/json", "json"), "PRODUCT": ("application/json", "json"),
          "PRODUCT_BOM_CSV": ("text/csv", "csv"), "PRODUCT_BOM_JSON": ("application/json", "json"),
-         "ASSEMBLY_SPEC": ("application/json", "json"), "RENDER_SIDE": ("image/png", "png"), "RENDER_ISO": ("image/png", "png")}
+         "ASSEMBLY_SPEC": ("application/json", "json"), "RENDER_SIDE": ("image/png", "png"), "RENDER_ISO": ("image/png", "png"),
+         "THUMB": ("image/webp", "webp")}
 NAMED_FORMATS = ("STEP", "STL", "GLB", "FCSTD")
 
 
@@ -820,7 +822,7 @@ def download(artifact_id: str, p: Principal = Depends(principal)):
         media, ext = MEDIA.get(a.format, ("application/octet-stream", "bin"))
         safe_name = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in (m.name or "model"))[:60]
         suffix = {"BOM_CSV": "bom", "BOM_JSON": "bom", "DXF": "flat", "PRODUCT_BOM_CSV": "product_bom", "PRODUCT_BOM_JSON": "product_bom",
-                  "RENDER_SIDE": "side", "RENDER_ISO": "iso"}.get(a.format, a.format.lower())
+                  "RENDER_SIDE": "side", "RENDER_ISO": "iso", "THUMB": "thumb"}.get(a.format, a.format.lower())
         fname = f"{safe_name}_v{v.number}.{ext}" if a.format in NAMED_FORMATS else f"{safe_name}_v{v.number}_{suffix}.{ext}"
     if not path.exists():
         raise _err(404, "not_found", "artifact bytes missing")

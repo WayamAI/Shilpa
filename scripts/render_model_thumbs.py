@@ -12,18 +12,16 @@ so a newer version without a render falls back to the icon instead of a stale im
 
 from __future__ import annotations
 
-import io
 import json
 import os
 import sys
 import urllib.request
 from pathlib import Path
 
-import numpy as np
-import trimesh
-
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from render_catalog_thumbs import ROOT, decode, render  # noqa: E402
+from render_catalog_thumbs import ROOT  # noqa: E402
+
+from shilpa import thumbs  # noqa: E402
 
 OUT = ROOT / "apps" / "web" / "public" / "thumbs" / "models"
 API = os.environ.get("API", "http://127.0.0.1:8010").rstrip("/")
@@ -42,35 +40,19 @@ def artifact(version: dict, fmt: str) -> bytes | None:
     return get(f"/v1/artifacts/{a['id']}/download", raw=True) if a else None
 
 
-def part_mesh(version: dict) -> tuple[np.ndarray, np.ndarray]:
+def part_mesh(version: dict):
     stl = artifact(version, "STL")
     if stl is None:
         raise ValueError("no STL artifact")
-    m = trimesh.load(io.BytesIO(stl), file_type="stl")
-    return np.asarray(m.vertices, dtype=float), np.asarray(m.faces, dtype=np.int64)
+    return thumbs.part_mesh(stl)
 
 
-def assembly_mesh(version: dict) -> tuple[np.ndarray, np.ndarray]:
+def assembly_mesh(version: dict):
     raw = artifact(version, "MESHES")
     viewer = version.get("viewer")
     if raw is None or not viewer:
         raise ValueError("no MESHES artifact or viewer instances")
-    parts = json.loads(raw)["parts"]
-    vs, fs, base = [], [], 0
-    for inst in viewer["instances"]:
-        key = inst.get("mesh")
-        if not key or key not in parts or inst.get("error") or inst.get("placed") is False:
-            continue
-        v, f = decode(parts[key])
-        if inst.get("matrix"):
-            m = np.array(inst["matrix"], dtype=float)  # row-major part-to-world
-            v = v @ m[:3, :3].T + m[:3, 3]
-        vs.append(v)
-        fs.append(f + base)
-        base += len(v)
-    if not vs:
-        raise ValueError("no placed instances with geometry")
-    return np.vstack(vs), np.vstack(fs)
+    return thumbs.assembly_mesh(raw, viewer)
 
 
 def main() -> int:
@@ -88,7 +70,7 @@ def main() -> int:
                 verts, faces = (part_mesh if m["kind"] == "part" else assembly_mesh)(version)
                 if len(faces) == 0:
                     raise ValueError("empty mesh")
-                render(verts, faces).save(OUT / f"{name}.webp", "WEBP", quality=88, method=6)
+                (OUT / f"{name}.webp").write_bytes(thumbs.to_webp(thumbs.render(verts, faces)))
                 done += 1
                 print(f"ok   {name}  {m['kind']}  {len(faces)} tris")
             except Exception as e:  # keep going; the library falls back to the icon

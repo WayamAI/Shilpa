@@ -25,7 +25,7 @@ from pathlib import Path
 
 from sqlalchemy import select, update
 
-from .. import queue
+from .. import queue, thumbs
 from ..contracts.errors import ErrorCode, ShilpaError
 from ..contracts.hashing import recipe_hash
 from ..db import (
@@ -51,9 +51,9 @@ SAFE_ENV_KEYS = ("SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "PATH", "TEMP", "TMP", "
                  "SHILPA_FREECAD_CMD")  # a path to the FreeCAD binary, not a credential
 
 PUBLISHED_FILES = {"FCSTD": "model.FCStd", "STEP": "model.step", "STL": "model.stl", "STL_UNITS": "model.stl.units.json", "GLB": "preview.glb",
-                   "RECIPE": "recipe.json", "VALIDATION": "validation.json", "FEATURES": "features.json"}
+                   "RECIPE": "recipe.json", "VALIDATION": "validation.json", "FEATURES": "features.json", "THUMB": thumbs.THUMB_FILE}
 # Assembly, sheet-metal and product jobs publish their own file sets.
-KIND_FILES = kinds.FILES
+KIND_FILES = {k: {**v, "THUMB": thumbs.THUMB_FILE} for k, v in kinds.FILES.items()}
 
 
 def _scrubbed_env() -> dict:
@@ -139,6 +139,7 @@ def handle_cad(r: queue.Received) -> None:
         recipe, tenant, project = dict(job.recipe), job.tenant_id, job.project_id
         kind = (job.input or {}).get("exec") if (job.input or {}).get("exec") in KIND_FILES else None
         options = {"freecad": bool((job.input or {}).get("freecad"))}
+        is_export = job.kind == "export"
     if not _claim_lease(job_id):
         raise RuntimeError("job lease held by another worker")
     with tx() as s:
@@ -160,7 +161,17 @@ def handle_cad(r: queue.Received) -> None:
         stop.set()
         renewer.join(timeout=5)
         reporter.join(timeout=5)
+    if result.get("ok") and not is_export:
+        _stage_thumb(out_dir)
     finish(job_id, attempt_no, recipe, result, cpu_s, staging_key)
+
+
+def _stage_thumb(out_dir: Path) -> None:
+    """Render thumb.webp next to the staged geometry files. Best effort: a failure never fails the job."""
+    try:
+        thumbs.write_thumb(out_dir)
+    except Exception:
+        log.exception("thumbnail render failed; publishing without one")
 
 
 def transition_event(s, job_id, type_, data):

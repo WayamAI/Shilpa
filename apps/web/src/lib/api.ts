@@ -24,6 +24,8 @@ export type Usage = {
 export type ModelKind = "part" | "assembly" | "sheet_metal" | "product";
 export type ModelSummary = {
   id: string; project_id: string; name: string; kind?: ModelKind; head_version_id: string | null; head_number: number | null; created_at: string;
+  /** THUMB artifact of the head version (rendered by the API when the version is published); null until one exists. */
+  thumb_artifact_id?: string | null;
 };
 export type Project = { id: string; name: string; created_at: string; model_count: number };
 export type Attempt = { number: number; status: string; error: ErrorInfo | null; worker: string | null };
