@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from . import queue
 from .agent import planner
-from .agent.llm import Budget
+from .agent.llm import Budget, usage_totals
 from .contracts.errors import ErrorCode, ShilpaError
 from .db import Job, JobAttempt, ModelVersion, QueueMessage, Specification, UsageEvent, init_db, now, tx
 from .jobs import TERMINAL, StaleRevision, emit, load, transition
@@ -45,6 +45,7 @@ def _record_usage(s, job: Job, budget: Budget, used: dict) -> None:
         s.add(UsageEvent(tenant_id=job.tenant_id, job_id=job.id, kind="llm", input_tokens=c["input_tokens"],
                          output_tokens=c["output_tokens"], detail=c))
     used["input_tokens"], used["output_tokens"] = budget.used_input, budget.used_output
+    used.update(usage_totals(budget.calls, used))
     budget.calls.clear()
 
 

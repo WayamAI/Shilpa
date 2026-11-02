@@ -23,6 +23,7 @@ from sse_starlette.sse import EventSourceResponse
 from ..adapters import CAPABILITY_MATRIX
 from ..agent import planner, router
 from ..agent.llm import Budget, PlannerDisabled, ensure_enabled
+from ..agent.llm import usage_totals as llm_usage_totals
 from ..contracts.errors import ErrorCode, ShilpaError
 from ..db import (
     Artifact,
@@ -372,7 +373,8 @@ def create_specification(project_id: str, body: SpecIn, p: Principal = Depends(p
         req = to_requirements(extract(ingested, page_dir, budget, body.prompt))
     else:
         req = planner.extract_requirements(body.prompt, budget)
-    req["_usage"] = {"input_tokens": budget.used_input, "output_tokens": budget.used_output, "ms": round((time.time() - t0) * 1000)}
+    req["_usage"] = {"input_tokens": budget.used_input, "output_tokens": budget.used_output, "ms": round((time.time() - t0) * 1000),
+                     **llm_usage_totals(budget.calls)}
     with tx() as s:
         for c in budget.calls:
             s.add(UsageEvent(tenant_id=p.tenant_id, job_id=None, kind="llm", input_tokens=c["input_tokens"],

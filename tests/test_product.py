@@ -122,8 +122,9 @@ def test_llm_planner_with_fake_client(fake_llm, text):
     assert res.ok and res.supported and res.choices is not None
     req = fake_llm.requests[-1]
     assert req["response_format"]["json_schema"]["name"] == "product_plan" and req["response_format"]["json_schema"]["strict"]
-    assert res.usage == [{"purpose": "product_plan", "input_tokens": 1200, "output_tokens": 150, "ms": res.usage[0]["ms"],
-                          "model": "fake-model"}]
+    assert len(res.usage) == 1  # plus provenance keys (prompt_version, cached, cost_usd, ...) added by the gateway
+    assert {k: res.usage[0][k] for k in ("purpose", "input_tokens", "output_tokens", "model", "cached")} == {
+        "purpose": "product_plan", "input_tokens": 1200, "output_tokens": 150, "model": "fake-model", "cached": False}
     spec = bicycle_spec(res.choices)
     if text.startswith("bike for a 2 m"):
         # The model's assumptions are tagged "llm", the stated height "user", the size comes from the table.

@@ -16,6 +16,23 @@ def _int(name: str, default: int) -> int:
     return int(os.getenv(name, default))
 
 
+# Price table: model name -> (input USD per 1M tokens, output USD per 1M tokens[, cached-input USD per 1M tokens]).
+# TODO(user): fill in the real prices for your Ollama Cloud models and Azure deployments. They are deliberately
+# empty: unknown models get ``cost_usd: None`` rather than an invented number. The same table can be supplied
+# without editing code as JSON in SHILPA_MODEL_PRICES, e.g. '{"beam": [0.5, 1.5], "gpt-4o": [2.5, 10, 1.25]}'.
+MODEL_PRICES_USD_PER_MTOK: dict[str, tuple[float, ...]] = {}
+
+
+def _prices() -> dict[str, tuple[float, ...]]:
+    import json
+
+    table = dict(MODEL_PRICES_USD_PER_MTOK)
+    raw = os.getenv("SHILPA_MODEL_PRICES", "").strip()
+    if raw:
+        table.update({k: tuple(float(x) for x in v) for k, v in json.loads(raw).items()})
+    return table
+
+
 @dataclass(frozen=True)
 class Budgets:
     """Per-job budgets shared by every call and retry (blueprint section 9)."""
@@ -53,6 +70,19 @@ class Settings:
     llm_mode: str = os.getenv("SHILPA_LLM", "on" if (os.getenv("AZURE_OPENAI_ENDPOINT") or (
         os.getenv("SHILPA_LLM_PROVIDER", "").lower() == "ollama" and os.getenv("OLLAMA_API_KEY"))) else "off"
     ).strip().lower()
+    # Per-stage model overrides (blank = the provider's single default model above). For Azure these are
+    # deployment names, for Ollama model names. Stages: intake, plan, repair, edit.
+    model_intake: str = os.getenv("SHILPA_MODEL_INTAKE", "").strip()
+    model_plan: str = os.getenv("SHILPA_MODEL_PLAN", "").strip()
+    model_repair: str = os.getenv("SHILPA_MODEL_REPAIR", "").strip()
+    model_edit: str = os.getenv("SHILPA_MODEL_EDIT", "").strip()
+    # Number of golden examples embedded in each plan prompt, chosen per request by keyword similarity.
+    plan_examples_k: int = _int("SHILPA_PLAN_EXAMPLES_K", 3)
+    # Content-addressed result cache for intake and plan calls (never repair/edit). 0/off disables it.
+    llm_cache: bool = os.getenv("SHILPA_LLM_CACHE", "on").strip().lower() not in ("off", "0", "false", "no")
+    llm_cache_ttl_s: int = _int("SHILPA_LLM_CACHE_TTL_S", 7 * 24 * 3600)
+    llm_cache_max_entries: int = _int("SHILPA_LLM_CACHE_MAX_ENTRIES", 2000)
+    model_prices: dict = field(default_factory=_prices)
     # Worker
     worker_timeout_s: int = _int("SHILPA_WORKER_TIMEOUT_S", 300)
     lock_duration_s: int = _int("SHILPA_LOCK_DURATION_S", 60)
@@ -78,6 +108,21 @@ class Settings:
     def llm_model(self) -> str:
         """The model or deployment name calls go to (for logs and the health endpoint)."""
         return self.ollama_model if self.llm_provider == "ollama" else self.aoai_deployment
+
+    def stage_model(self, stage: str | None) -> str | None:
+        """The model override for a stage (intake | plan | repair | edit), or None for the provider default."""
+        return {"intake": self.model_intake, "plan": self.model_plan, "repair": self.model_repair,
+                "edit": self.model_edit}.get(stage or "") or None
+
+    def estimate_cost_usd(self, model: str | None, input_tokens: int, output_tokens: int,
+                          cached_input_tokens: int | None = None) -> float | None:
+        """Estimated USD for one call from the price table; None when the model has no listed price."""
+        price = self.model_prices.get(model or "")
+        if not price or len(price) < 2:
+            return None
+        cached = min(cached_input_tokens or 0, input_tokens)
+        cached_rate = price[2] if len(price) > 2 else price[0]
+        return round(((input_tokens - cached) * price[0] + cached * cached_rate + output_tokens * price[1]) / 1e6, 6)
 
     @property
     def planner_status(self) -> str:

@@ -18,12 +18,16 @@ from pydantic import ValidationError
 from ..adapters import CAPABILITIES
 from ..contracts.compile import ANGLE_TO_DEG, FEATURE_REF_FIELDS, LENGTH_TO_MM, compile_recipe
 from ..contracts.errors import ErrorCode, ShilpaError
+from ..settings import settings
+from .examples import examples_text
 from .llm import Budget, call_structured, strict_schema
 from .router import classify as classify_request  # noqa: F401  (routing: part | sheet_metal | assembly | product)
 from .schemas import PlanOutput, Requirements, from_recipe, to_recipe
 
 log = logging.getLogger("shilpa.planner")
 CORPUS = Path(__file__).resolve().parents[2] / "evals" / "corpus"
+# The fixed example set the planner used before per-request selection (kept for the before/after measurement
+# in evals/prompt_size.py; the live prompt now uses ``examples.select_example_ids``).
 EXAMPLE_IDS = ("P01", "F03", "B03", "E02", "H03", "N02", "N07", "N08")
 
 IR_GUIDE = """
@@ -171,7 +175,8 @@ def extract_requirements(prompt: str, budget: Budget) -> dict:
     for attempt in (1, 2):
         try:
             data = call_structured(system=INTAKE_SYSTEM, user=prompt, schema_name="requirements", schema=_schema("requirements"),
-                                   budget=budget, max_output_tokens=2500, purpose="intake")
+                                   budget=budget, max_output_tokens=2500, purpose="intake", cache=True,
+                                   validate=Requirements.model_validate)
             break
         except ShilpaError as exc:
             # One retry for a slow model call, inside the same budget; other errors are final.
@@ -273,12 +278,27 @@ Use the stated units. Prefer the simplest feature sequence that matches the requ
 """
 
 
-def _plan_call(user: str, budget: Budget, purpose: str, feedback: str | None = None) -> dict:
-    system = PLAN_SYSTEM.replace("{examples}", _examples())
+def plan_system(query: str, family: str | None = None, k: int | None = None) -> str:
+    """The plan system prompt: fixed instructions first (a stable, cacheable prefix), then the k golden examples
+    most relevant to ``query``."""
+    k = settings.plan_examples_k if k is None else k
+    # k < 0 restores the legacy fixed set of eight examples, for before/after comparisons.
+    return PLAN_SYSTEM.replace("{examples}", _examples() if k < 0 else examples_text(query, k, family))
+
+
+def _plan_call(user: str, budget: Budget, purpose: str, feedback: str | None = None, query: str | None = None,
+               family: str | None = None) -> dict:
+    system = plan_system(query if query is not None else user, family)
     if feedback:
         user += f"\n\nYour previous answer was rejected: {feedback}\nReturn a corrected answer."
+
+    def check(raw: dict) -> None:
+        PlanOutput.model_validate(_normalize_plan(raw))
+
+    # Only the first-pass plan is cached; repair and edit calls (and their retries) always go to the model.
     data = call_structured(system=system, user=user, schema_name="recipe_plan", schema=_schema("plan"),
-                           budget=budget, max_output_tokens=8000, purpose=purpose)
+                           budget=budget, max_output_tokens=8000, purpose=purpose, cache=(purpose == "plan"),
+                           validate=check, prompt_template=PLAN_SYSTEM)
     data = _normalize_plan(data)
     try:
         plan = PlanOutput.model_validate(data).model_dump()
@@ -338,7 +358,18 @@ def check_recipe(recipe: dict) -> dict:
 
 def plan_recipe(requirements: dict, budget: Budget, feedback: str | None = None) -> dict:
     req = {k: requirements[k] for k in ("family", "summary", "units", "dimensions", "features", "assumptions") if k in requirements}
-    return _plan_call("Confirmed requirements:\n" + json.dumps(req, indent=1), budget, "plan", feedback)
+    query = " ".join([str(req.get("summary") or ""), str(req.get("family") or ""),
+                      " ".join(str(f) for f in req.get("features") or []),
+                      " ".join(str(d.get("name", "")) for d in req.get("dimensions") or [] if isinstance(d, dict))])
+    return _plan_call("Confirmed requirements:\n" + json.dumps(req, indent=1), budget, "plan", feedback, query,
+                      req.get("family"))
+
+
+def _recipe_query(recipe: dict) -> str:
+    """Example-selection text for a recipe: its name, operations and parameter names."""
+    feats = recipe.get("features") or []
+    return " ".join([str(recipe.get("name") or ""), " ".join(str(f.get("op", "")).replace("_", " ") for f in feats),
+                     " ".join(str(k).replace("_", " ") for k in (recipe.get("parameters") or {}))])
 
 
 def repair_recipe(recipe: dict, error: dict, feature_results: list | None, budget: Budget) -> dict:
@@ -350,7 +381,7 @@ def repair_recipe(recipe: dict, error: dict, feature_results: list | None, budge
         f"Failure:\n{json.dumps(error, separators=(',', ':'))}\n\n"
         f"Feature results:\n{json.dumps(feature_results or [], separators=(',', ':'), default=str)[:3000]}"
     )
-    return _plan_call(user, budget, "repair")
+    return _plan_call(user, budget, "repair", query=_recipe_query(recipe))
 
 
 # Fields whose change alters which way stated dimensions are measured (a shell grown outward makes a
@@ -406,7 +437,7 @@ def edit_recipe(recipe: dict, instruction: str, budget: Budget, feedback: str | 
         f"Current recipe:\n{json.dumps(from_recipe(recipe), separators=(',', ':'))}\n\n"
         f"Edit request: {instruction}"
     )
-    return _plan_call(user, budget, "edit", feedback)
+    return _plan_call(user, budget, "edit", feedback, query=_recipe_query(recipe) + " " + instruction)
 
 
 def apply_parameter_edit(recipe: dict, changes: dict[str, float]) -> dict:
