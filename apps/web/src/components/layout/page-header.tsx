@@ -24,16 +24,16 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <div className="shrink-0 border-b border-muted px-4 py-4 sm:px-5">
+    <div className="shrink-0 border-b border-line px-4 py-4 sm:px-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2.5">
             {mark}
-            <h2 className="min-w-0 font-display text-display-lg text-primary sm:text-display-xl">{title}</h2>
+            <h2 className="min-w-0 text-lg font-semibold text-ink sm:text-xl">{title}</h2>
             {info}
           </div>
           {description ? (
-            <p className="mt-1 max-w-[70ch] text-body-md text-tertiary">{description}</p>
+            <p className="mt-1 max-w-[70ch] text-sm text-muted-text">{description}</p>
           ) : null}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}

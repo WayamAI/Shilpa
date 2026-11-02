@@ -28,9 +28,9 @@ function puckClass(active: boolean, disabled: boolean) {
     "flex size-9 shrink-0 items-center justify-center rounded-full",
     "transition-[background-color,color] duration-[180ms] ease-out",
     active
-      ? "bg-action-primary icon-on-color"
-      : "bg-action icon-tertiary group-hover:bg-raised-2 group-hover:icon-secondary",
-    disabled ? "bg-action-secondary-disabled icon-quaternary" : "",
+      ? "bg-action text-on-action"
+      : "bg-surface-2 text-muted group-hover:bg-surface-2 group-hover:text-body",
+    disabled ? "bg-surface text-muted" : "",
   ].join(" ");
 }
 
@@ -51,7 +51,7 @@ export function SidebarItem({
   const wrapper = [
     "group relative flex items-center rounded-full outline-none",
     "transition-colors duration-[180ms] ease-out",
-    "focus-visible:ring-2 focus-visible:ring-active",
+    "focus-visible:ring-2 focus-visible:ring-line-strong",
     expanded ? "w-full gap-3 pr-3" : "justify-center",
     disabled ? "pointer-events-none" : "",
   ].join(" ");
@@ -64,8 +64,8 @@ export function SidebarItem({
       {expanded ? (
         <span
           className={[
-            "truncate text-label-sm transition-colors duration-[180ms]",
-            active ? "text-primary" : "text-tertiary group-hover:text-secondary",
+            "truncate text-xs font-semibold transition-colors duration-[180ms]",
+            active ? "text-ink" : "text-muted-text group-hover:text-body",
           ].join(" ")}
         >
           {label}
@@ -130,7 +130,7 @@ export function SidebarGroupTrigger({
       className={[
         "group relative flex items-center rounded-full outline-none",
         "transition-colors duration-[180ms] ease-out",
-        "focus-visible:ring-2 focus-visible:ring-active",
+        "focus-visible:ring-2 focus-visible:ring-line-strong",
         expanded ? "w-full gap-3 pr-2" : "justify-center",
       ].join(" ")}
     >
@@ -141,8 +141,8 @@ export function SidebarGroupTrigger({
         <>
           <span
             className={[
-              "min-w-0 flex-1 truncate text-left text-label-sm transition-colors duration-[180ms]",
-              active ? "text-primary" : "text-tertiary group-hover:text-secondary",
+              "min-w-0 flex-1 truncate text-left text-xs font-semibold transition-colors duration-[180ms]",
+              active ? "text-ink" : "text-muted-text group-hover:text-body",
             ].join(" ")}
           >
             {label}
@@ -152,7 +152,7 @@ export function SidebarGroupTrigger({
             strokeWidth={1.75}
             aria-hidden
             className={[
-              "shrink-0 icon-quaternary transition-transform duration-[180ms]",
+              "shrink-0 text-muted transition-transform duration-[180ms]",
               open ? "rotate-90" : "",
             ].join(" ")}
           />
@@ -186,30 +186,30 @@ export function SidebarTreeItem({
       className={[
         "group relative flex items-center gap-2 rounded-lg py-1.5 pr-2 pl-3",
         "outline-none transition-colors duration-[180ms] ease-out",
-        "focus-visible:ring-2 focus-visible:ring-active",
+        "focus-visible:ring-2 focus-visible:ring-line-strong",
         active
-          ? "bg-action text-primary"
-          : "text-tertiary hover:bg-action hover:text-secondary",
+          ? "bg-surface-2 text-ink"
+          : "text-muted-text hover:bg-surface-2 hover:text-body",
       ].join(" ")}
     >
       {last ? (
         <span
           aria-hidden
-          className="pointer-events-none absolute top-0 -left-px h-1/2 w-2.5 rounded-bl-[3px] border-b border-l border-muted"
+          className="pointer-events-none absolute top-0 -left-px h-1/2 w-2.5 rounded-bl-[3px] border-b border-l border-line"
         />
       ) : (
         <span
           aria-hidden
-          className="pointer-events-none absolute top-1/2 -left-px h-px w-2.5 bg-muted"
+          className="pointer-events-none absolute top-1/2 -left-px h-px w-2.5 bg-line"
         />
       )}
       <Icon
         size={14}
         strokeWidth={1.75}
         aria-hidden
-        className={active ? "icon-secondary" : "icon-quaternary group-hover:icon-tertiary"}
+        className={active ? "text-body" : "text-muted group-hover:text-muted"}
       />
-      <span className="truncate text-label-sm">{label}</span>
+      <span className="truncate text-xs font-semibold">{label}</span>
     </Link>
   );
 }
@@ -224,7 +224,7 @@ export function SidebarTreeLabel({
   return (
     <p
       className={[
-        "px-3 py-1 text-caption tracking-[0.08em] text-quaternary uppercase",
+        "px-3 py-1 text-xs tracking-[0.08em] text-muted-text uppercase",
         className ?? "",
       ].join(" ")}
     >
@@ -239,7 +239,7 @@ export function SidebarTreeBranch({ children }: { children: ReactNode }) {
     <div className="relative mt-0.5 ml-[18px] overflow-hidden">
       <span
         aria-hidden
-        className="pointer-events-none absolute top-0 bottom-4 left-0 w-px bg-muted"
+        className="pointer-events-none absolute top-0 bottom-4 left-0 w-px bg-line"
       />
       {children}
     </div>

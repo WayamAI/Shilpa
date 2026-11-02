@@ -9,21 +9,18 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { EmptyState } from "@/components/ui/primitives";
 import { IconButton } from "@/components/ui/controls";
-import { useTheme } from "@/context/theme-context";
 import { fetchBlob } from "@/lib/api";
 
 // glTF from the CAD worker is in metres with Y up. The scene works in millimetres
 // (scale 1000). CAD axes map to scene axes as X->X, Y->-Z, Z->Y.
 
-export type Palette = { background: string; material: string; edge: string; cell: string; section: string; x: string; y: string; z: string; theme: string };
+export type Palette = { background: string; material: string; edge: string; cell: string; section: string; x: string; y: string; z: string };
 
 /**
- * Resolve the --viewer-* semantic tokens for the active theme. This component is
- * client-only (dynamic import, ssr: false) and the theme attribute is set before
- * the theme state changes, so reading computed styles during render is safe.
+ * Resolve the --viewer-* tokens once. This component is client-only (dynamic
+ * import, ssr: false), so reading computed styles during render is safe.
  */
 export function usePalette(): Palette {
-  const { theme } = useTheme();
   return useMemo(() => {
     const css = getComputedStyle(document.documentElement);
     const v = (name: string) => css.getPropertyValue(name).trim();
@@ -36,9 +33,8 @@ export function usePalette(): Palette {
       x: v("--viewer-axis-x"),
       y: v("--viewer-axis-y"),
       z: v("--viewer-axis-z"),
-      theme,
     };
-  }, [theme]);
+  }, []);
 }
 
 export function webglAvailable(): boolean {
@@ -101,7 +97,7 @@ export default function ModelViewer({ glbId, size }: { glbId: string | null; siz
     };
   }, [glbId]);
 
-  // Re-skin on theme change without reloading the model.
+  // Apply the viewer material and edges once the model loads.
   useEffect(() => {
     if (!scene || !palette) return;
     scene.traverse((o) => {
@@ -149,16 +145,16 @@ export default function ModelViewer({ glbId, size }: { glbId: string | null; siz
       )}
 
       <div className="pointer-events-none absolute top-3 left-3 flex flex-wrap gap-2">
-        <span className="rounded-full border border-muted bg-container px-2.5 py-1 text-caption text-tertiary">Units mm</span>
+        <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-muted-text">Units mm</span>
         {label ? (
-          <span className="rounded-full border border-muted bg-container px-2.5 py-1 text-caption tabular text-secondary" title="Exact size from the validated STEP">
+          <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs tabular text-body" title="Exact size from the validated STEP">
             {label} mm
           </span>
         ) : null}
       </div>
       {scene ? (
         <div className="absolute top-3 right-3">
-          <IconButton label="Reset view" onClick={() => setNonce((n) => n + 1)} className="bg-container">
+          <IconButton label="Reset view" onClick={() => setNonce((n) => n + 1)} className="bg-bg">
             <RotateCcw size={14} strokeWidth={1.75} aria-hidden />
           </IconButton>
         </div>
@@ -166,13 +162,13 @@ export default function ModelViewer({ glbId, size }: { glbId: string | null; siz
       {!glbId ? (
         <div className="absolute inset-0 flex items-center justify-center">
           <EmptyState
-            mark={<Box size={24} strokeWidth={1.5} className="icon-quaternary" aria-hidden />}
+            mark={<Box size={24} strokeWidth={1.5} className="text-muted" aria-hidden />}
             title="No part yet"
             detail="Describe a part, upload a drawing, or start from a reference part."
           />
         </div>
       ) : null}
-      {error ? <p className="absolute inset-x-0 bottom-3 text-center text-body-sm text-error">Preview failed: {error}</p> : null}
+      {error ? <p className="absolute inset-x-0 bottom-3 text-center text-xs text-fail-text">Preview failed: {error}</p> : null}
     </div>
   );
 }

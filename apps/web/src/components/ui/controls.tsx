@@ -22,15 +22,15 @@ type ButtonSize = "md" | "sm";
 
 const BUTTON_VARIANT: Record<ButtonVariant, string> = {
   primary:
-    "bg-action-primary text-action-primary-content hover:bg-action-primary-hover disabled:bg-action-primary-disabled",
+    "bg-action text-on-action hover:bg-action-hover disabled:bg-action/45",
   secondary:
-    "border border-muted bg-action text-secondary hover:border-default hover:bg-raised-2 hover:text-primary disabled:text-quaternary disabled:hover:bg-action",
-  tertiary: "text-tertiary hover:bg-action-tertiary-hover hover:text-secondary disabled:text-quaternary",
+    "border border-line bg-surface-2 text-body hover:border-line-strong hover:bg-surface-2 hover:text-ink disabled:text-muted-text disabled:hover:bg-surface-2",
+  tertiary: "text-muted-text hover:bg-surface-2 hover:text-body disabled:text-muted-text",
 };
 
 const BUTTON_SIZE: Record<ButtonSize, string> = {
-  md: "h-9 px-4 text-label-md gap-2",
-  sm: "h-8 px-3 text-label-sm gap-1.5",
+  md: "h-9 px-4 text-sm font-semibold gap-2",
+  sm: "h-8 px-3 text-xs font-semibold gap-1.5",
 };
 
 export function Button({
@@ -46,7 +46,7 @@ export function Button({
       {...props}
       className={[
         "inline-flex shrink-0 items-center justify-center rounded-full outline-none",
-        "transition-colors duration-[180ms] focus-visible:ring-2 focus-visible:ring-active",
+        "transition-colors duration-[180ms] focus-visible:ring-2 focus-visible:ring-line-strong",
         "disabled:cursor-not-allowed",
         BUTTON_VARIANT[variant],
         BUTTON_SIZE[size],
@@ -71,7 +71,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       {...props}
-      className={`flex size-8 shrink-0 items-center justify-center rounded-full bg-action icon-tertiary outline-none transition-colors duration-[180ms] hover:bg-raised-2 hover:icon-secondary focus-visible:ring-2 focus-visible:ring-active disabled:opacity-50 ${className}`}
+      className={`flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted outline-none transition-colors duration-[180ms] hover:bg-surface-2 hover:text-body focus-visible:ring-2 focus-visible:ring-line-strong disabled:opacity-50 ${className}`}
     >
       {children}
     </button>
@@ -81,15 +81,15 @@ export function IconButton({
 // --- fields -----------------------------------------------------------------
 
 const FIELD =
-  "w-full rounded-full border border-muted bg-action px-4 text-body-md text-primary outline-none placeholder:text-quaternary transition-colors duration-[180ms] focus-visible:border-default focus-visible:ring-2 focus-visible:ring-active disabled:text-tertiary";
+  "w-full rounded-full border border-line bg-surface-2 px-4 text-sm text-ink outline-none placeholder:text-muted-text transition-colors duration-[180ms] focus-visible:border-line-strong focus-visible:ring-2 focus-visible:ring-line-strong disabled:text-muted-text";
 
 /** Caption label above a control (Chronos sign-in pattern). */
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <label className="flex min-w-0 flex-col gap-1.5">
-      <span className="text-caption tracking-[0.08em] text-quaternary uppercase">{label}</span>
+      <span className="text-xs tracking-[0.08em] text-muted-text uppercase">{label}</span>
       {children}
-      {hint ? <span className="text-body-sm text-quaternary">{hint}</span> : null}
+      {hint ? <span className="text-xs text-muted-text">{hint}</span> : null}
     </label>
   );
 }
@@ -106,7 +106,7 @@ export function NumberInput({ className = "", ...props }: ComponentPropsWithoutR
       step="any"
       inputMode="decimal"
       {...props}
-      className={`h-8 w-24 rounded-full border border-muted bg-action px-3 text-right text-body-sm tabular text-primary outline-none transition-colors duration-[180ms] focus-visible:border-default focus-visible:ring-2 focus-visible:ring-active disabled:bg-transparent disabled:text-secondary ${className}`}
+      className={`h-8 w-24 rounded-full border border-line bg-surface-2 px-3 text-right text-xs tabular text-ink outline-none transition-colors duration-[180ms] focus-visible:border-line-strong focus-visible:ring-2 focus-visible:ring-line-strong disabled:bg-transparent disabled:text-body ${className}`}
     />
   );
 }
@@ -115,7 +115,7 @@ export function Textarea({ className = "", ...props }: ComponentPropsWithoutRef<
   return (
     <textarea
       {...props}
-      className={`min-h-[84px] w-full resize-none rounded-2xl border border-muted bg-action px-4 py-3 text-body-md text-primary outline-none placeholder:text-quaternary transition-colors duration-[180ms] focus-visible:border-default focus-visible:ring-2 focus-visible:ring-active disabled:text-tertiary ${className}`}
+      className={`min-h-[84px] w-full resize-none rounded-2xl border border-line bg-surface-2 px-4 py-3 text-sm text-ink outline-none placeholder:text-muted-text transition-colors duration-[180ms] focus-visible:border-line-strong focus-visible:ring-2 focus-visible:ring-line-strong disabled:text-muted-text ${className}`}
     />
   );
 }
@@ -139,7 +139,7 @@ export function Tabs<T extends string>({
   label: string;
 }) {
   return (
-    <div role="tablist" aria-label={label} className="flex min-w-0 gap-0.5 rounded-full border border-muted bg-action p-0.5">
+    <div role="tablist" aria-label={label} className="flex min-w-0 gap-0.5 rounded-full border border-line bg-surface-2 p-0.5">
       {tabs.map((tab) => {
         const selected = tab.id === value;
         return (
@@ -150,9 +150,9 @@ export function Tabs<T extends string>({
             aria-selected={selected}
             onClick={() => onChange(tab.id)}
             className={[
-              "h-7 min-w-0 flex-auto truncate rounded-full px-2 text-label-sm outline-none",
-              "transition-colors duration-[180ms] focus-visible:ring-2 focus-visible:ring-active",
-              selected ? "bg-action-primary text-action-primary-content" : "text-tertiary hover:bg-raised-2 hover:text-secondary",
+              "h-7 min-w-0 flex-auto truncate rounded-full px-2 text-xs font-semibold outline-none",
+              "transition-colors duration-[180ms] focus-visible:ring-2 focus-visible:ring-line-strong",
+              selected ? "bg-action text-on-action" : "text-muted-text hover:bg-surface-2 hover:text-body",
             ].join(" ")}
           >
             {tab.label}
@@ -198,28 +198,28 @@ export function Dialog({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stage/50 p-3 sm:p-6">
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={id}
         tabIndex={-1}
-        className={`flex max-h-full w-full flex-col overflow-hidden rounded-xl border border-muted bg-container shadow-lg outline-none ${size === "xl" ? "max-w-[1480px]" : "max-w-xl"}`}
+        className={`flex max-h-full w-full flex-col overflow-hidden rounded-xl border border-line bg-bg shadow-popover outline-none ${size === "xl" ? "max-w-[1480px]" : "max-w-xl"}`}
       >
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-muted px-5 py-4">
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-4">
           <div className="min-w-0">
-            <h2 id={id} className="font-display text-display-lg text-primary">
+            <h2 id={id} className="text-lg font-semibold text-ink">
               {title}
             </h2>
-            {subtitle ? <div className="mt-1 text-body-sm text-tertiary">{subtitle}</div> : null}
+            {subtitle ? <div className="mt-1 text-xs text-muted-text">{subtitle}</div> : null}
           </div>
           <IconButton label="Close" onClick={onClose}>
             <X size={16} strokeWidth={1.75} aria-hidden />
           </IconButton>
         </header>
         <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
-        {footer ? <footer className="shrink-0 border-t border-muted px-5 py-3">{footer}</footer> : null}
+        {footer ? <footer className="shrink-0 border-t border-line px-5 py-3">{footer}</footer> : null}
       </div>
     </div>
   );
@@ -232,9 +232,9 @@ export function KeyValue({ rows }: { rows: { label: string; value: ReactNode; ti
   return (
     <dl className="flex flex-col">
       {rows.map((row) => (
-        <div key={row.label} className="flex items-baseline justify-between gap-4 border-b border-muted py-2 last:border-b-0" title={row.title}>
-          <dt className="text-body-sm text-tertiary">{row.label}</dt>
-          <dd className="min-w-0 truncate text-right text-body-md tabular text-primary">{row.value}</dd>
+        <div key={row.label} className="flex items-baseline justify-between gap-4 border-b border-line py-2 last:border-b-0" title={row.title}>
+          <dt className="text-xs text-muted-text">{row.label}</dt>
+          <dd className="min-w-0 truncate text-right text-sm tabular text-ink">{row.value}</dd>
         </div>
       ))}
     </dl>

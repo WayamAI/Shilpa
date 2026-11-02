@@ -8,7 +8,6 @@ import * as THREE from "three";
 
 import { IconButton } from "@/components/ui/controls";
 import { EmptyState } from "@/components/ui/primitives";
-import { useTheme } from "@/context/theme-context";
 import type { CatalogPort, PartMesh } from "@/lib/api";
 
 import { usePalette, webglAvailable } from "./model-viewer";
@@ -59,12 +58,11 @@ function FitPart({ geometry, sizeKey, nonce }: { geometry: THREE.BufferGeometry 
 }
 
 function useKindColors() {
-  const { theme } = useTheme();
   return useMemo(() => {
     const css = getComputedStyle(document.documentElement);
     const v = (name: string) => css.getPropertyValue(name).trim();
-    return { face: v("--viewer-axis-x"), axis: v("--viewer-axis-z"), point: v("--viewer-axis-y"), select: v("--viewer-select"), theme };
-  }, [theme]);
+    return { face: v("--viewer-axis-x"), axis: v("--viewer-axis-z"), point: v("--viewer-axis-y"), select: v("--viewer-select") };
+  }, []);
 }
 
 function PortMarker({ port, length, color, selected }: { port: CatalogPort; length: number; color: string; selected: boolean }) {
@@ -168,9 +166,9 @@ export default function PartViewer({
       </Canvas>
 
       <div className="pointer-events-none absolute top-3 left-3 flex flex-wrap gap-2">
-        <span className="rounded-full border border-muted bg-container px-2.5 py-1 text-caption text-tertiary">Units mm</span>
+        <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-muted-text">Units mm</span>
         {showPorts ? (
-          <span className="flex items-center gap-2 rounded-full border border-muted bg-container px-2.5 py-1 text-caption text-secondary">
+          <span className="flex items-center gap-2 rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-body">
             {(["face", "axis", "point"] as const).map((k) => (
               <span key={k} className="flex items-center gap-1">
                 <span className="inline-block size-2 rounded-full" style={{ background: kinds[k] }} aria-hidden />
@@ -179,11 +177,11 @@ export default function PartViewer({
             ))}
           </span>
         ) : null}
-        {busy ? <span className="rounded-full border border-muted bg-container px-2.5 py-1 text-caption text-secondary">Building…</span> : null}
+        {busy ? <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-body">Building…</span> : null}
       </div>
       {geometry ? (
         <div className="absolute top-3 right-3">
-          <IconButton label="Reset view" onClick={() => setNonce((n) => n + 1)} className="bg-container">
+          <IconButton label="Reset view" onClick={() => setNonce((n) => n + 1)} className="bg-bg">
             <RotateCcw size={14} strokeWidth={1.75} aria-hidden />
           </IconButton>
         </div>

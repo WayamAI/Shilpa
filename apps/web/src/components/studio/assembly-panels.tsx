@@ -11,14 +11,14 @@ import { checkDetail, checkTitle, groupLabel, isWarning, partsTree } from "@/lib
 import type { Highlight } from "./assembly-viewer";
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-5 mb-2 text-caption tracking-[0.08em] text-quaternary uppercase first:mt-0">{children}</h3>;
+  return <h3 className="mt-5 mb-2 text-xs tracking-[0.08em] text-muted-text uppercase first:mt-0">{children}</h3>;
 }
 
 function Swatch({ color }: { color: string | null }) {
   return (
     <span
       aria-hidden
-      className="inline-block size-3 shrink-0 rounded-full border border-default"
+      className="inline-block size-3 shrink-0 rounded-full border border-line-strong"
       style={color ? { background: color } : undefined}
     />
   );
@@ -48,7 +48,7 @@ export function PartsTree({
   const failing = useMemo(() => failingInstances(viewer), [viewer]);
   return (
     <div>
-      <p className="mb-2 text-caption tracking-[0.08em] text-quaternary uppercase">
+      <p className="mb-2 text-xs tracking-[0.08em] text-muted-text uppercase">
         {viewer.instances.length} part{viewer.instances.length === 1 ? "" : "s"} · {viewer.mates.length} mate{viewer.mates.length === 1 ? "" : "s"} ·
         DOF {viewer.dof.computed ?? "—"}
       </p>
@@ -65,15 +65,15 @@ export function PartsTree({
                 onBlur={() => onHover(null)}
                 onClick={() => onSelect(active ? null : inst.id)}
                 className={[
-                  "flex w-full min-w-0 items-center gap-2 rounded-lg border py-1.5 pr-2 text-left outline-none transition-colors duration-[150ms] focus-visible:ring-2 focus-visible:ring-active",
-                  active ? "border-active bg-raised" : hovered === inst.id ? "border-muted bg-raised" : "border-transparent hover:bg-raised",
+                  "flex w-full min-w-0 items-center gap-2 rounded-lg border py-1.5 pr-2 text-left outline-none transition-colors duration-[150ms] focus-visible:ring-2 focus-visible:ring-line-strong",
+                  active ? "border-line-strong bg-surface" : hovered === inst.id ? "border-line bg-surface" : "border-transparent hover:bg-surface",
                 ].join(" ")}
                 style={{ paddingLeft: `${8 + Math.min(depth, 6) * 14}px` }}
               >
                 <Swatch color={inst.color} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-body-sm text-primary">{inst.id}</span>
-                  <span className="block truncate text-caption text-quaternary">
+                  <span className="block truncate text-xs text-ink">{inst.id}</span>
+                  <span className="block truncate text-xs text-muted-text">
                     {inst.part_number}
                     {inst.copy_of ? ` · copy of ${inst.copy_of}` : ""}
                     {inst.grounded ? " · ground" : via ? ` · ${via}` : !inst.placed ? " · not placed" : ""}
@@ -94,7 +94,7 @@ export function PartsTree({
           <Caption>Spec issues</Caption>
           <ul className="flex flex-col gap-1.5">
             {viewer.issues.map((i, k) => (
-              <li key={k} className="rounded-lg border border-warning-stroke bg-warning-surface px-3 py-2 text-body-sm text-warning">
+              <li key={k} className="rounded-lg border border-consent/40 bg-consent-soft px-3 py-2 text-xs text-consent-text">
                 {i.message}
               </li>
             ))}
@@ -114,37 +114,37 @@ export function BomTable({ viewer, onSelect }: { viewer: Viewer; onSelect: (id: 
   const mass = viewer.bom.reduce((n, l) => n + (l.mass_g ?? 0) * l.quantity, 0);
   return (
     <div>
-      <p className="mb-2 text-caption tracking-[0.08em] text-quaternary uppercase">
+      <p className="mb-2 text-xs tracking-[0.08em] text-muted-text uppercase">
         {viewer.bom.length} line{viewer.bom.length === 1 ? "" : "s"} · {total} item{total === 1 ? "" : "s"}
         {withMass ? ` · ${(mass / 1000).toFixed(2)} kg` : ""}
       </p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[300px]" data-testid="bom-table">
           <thead>
-            <tr className="border-b border-muted text-left">
-              <th scope="col" className="py-1.5 pr-2 text-caption font-normal text-quaternary">Part number</th>
-              <th scope="col" className="py-1.5 pr-2 text-right text-caption font-normal text-quaternary">Qty</th>
-              <th scope="col" className="py-1.5 pr-2 text-caption font-normal text-quaternary">Source</th>
-              <th scope="col" className="py-1.5 text-right text-caption font-normal text-quaternary">{withMass ? "Mass g" : "Volume mm³"}</th>
+            <tr className="border-b border-line text-left">
+              <th scope="col" className="py-1.5 pr-2 text-xs font-normal text-muted-text">Part number</th>
+              <th scope="col" className="py-1.5 pr-2 text-right text-xs font-normal text-muted-text">Qty</th>
+              <th scope="col" className="py-1.5 pr-2 text-xs font-normal text-muted-text">Source</th>
+              <th scope="col" className="py-1.5 text-right text-xs font-normal text-muted-text">{withMass ? "Mass g" : "Volume mm³"}</th>
             </tr>
           </thead>
           <tbody>
             {viewer.bom.map((line) => (
               <tr
                 key={line.part_number}
-                className="cursor-pointer border-b border-muted last:border-b-0 hover:bg-raised"
+                className="cursor-pointer border-b border-line last:border-b-0 hover:bg-surface"
                 onClick={() => onSelect(line.instances[0] ?? null)}
                 title={`Instances: ${line.instances.join(", ")}`}
               >
-                <td className="py-1.5 pr-2 text-body-sm text-primary">
+                <td className="py-1.5 pr-2 text-xs text-ink">
                   <span className="block truncate">{line.part_number}</span>
                   {(line.description ?? line.name) && (line.description ?? line.name) !== line.part_number ? (
-                    <span className="block truncate text-caption text-quaternary">{line.description ?? line.name}</span>
+                    <span className="block truncate text-xs text-muted-text">{line.description ?? line.name}</span>
                   ) : null}
                 </td>
-                <td className="py-1.5 pr-2 text-right text-body-sm tabular text-primary">{line.quantity}</td>
-                <td className="py-1.5 pr-2 text-body-sm text-tertiary">{line.procurement ?? line.generator ?? line.source}</td>
-                <td className="py-1.5 text-right text-body-sm tabular text-secondary">
+                <td className="py-1.5 pr-2 text-right text-xs tabular text-ink">{line.quantity}</td>
+                <td className="py-1.5 pr-2 text-xs text-muted-text">{line.procurement ?? line.generator ?? line.source}</td>
+                <td className="py-1.5 text-right text-xs tabular text-body">
                   {withMass
                     ? line.mass_g !== null && line.mass_g !== undefined
                       ? line.mass_g.toLocaleString(undefined, { maximumFractionDigits: 0 })
@@ -204,7 +204,7 @@ export function ChecksPanel({
             </StatusBadge>
           </span>
         ) : null}
-        <span className="text-body-sm text-tertiary">measured on the placed solids</span>
+        <span className="text-xs text-muted-text">measured on the placed solids</span>
         {highlight ? (
           <Button size="sm" variant="tertiary" className="ml-auto" onClick={() => onHighlight(null)}>
             <X size={13} strokeWidth={1.75} aria-hidden />
@@ -231,20 +231,20 @@ export function ChecksPanel({
                     onClick={() => onHighlight(active ? null : { ids: c.instances, tone: c.passed ? "pass" : "clash", label: c.name })}
                     title={clickable ? `Highlight ${c.instances.join(", ")}` : (c.note ?? "")}
                     className={[
-                      "flex w-full items-start justify-between gap-3 rounded-lg border px-2.5 py-2 text-left outline-none transition-colors duration-[150ms] focus-visible:ring-2 focus-visible:ring-active",
+                      "flex w-full items-start justify-between gap-3 rounded-lg border px-2.5 py-2 text-left outline-none transition-colors duration-[150ms] focus-visible:ring-2 focus-visible:ring-line-strong",
                       active
-                        ? "border-active bg-raised"
+                        ? "border-line-strong bg-surface"
                         : c.passed
                           ? "border-transparent"
                           : warn
-                            ? "border-warning-stroke bg-warning-surface"
-                            : "border-error-stroke bg-error-surface",
-                      clickable ? "hover:bg-raised" : "cursor-default",
+                            ? "border-consent/40 bg-consent-soft"
+                            : "border-fail/40 bg-fail-soft",
+                      clickable ? "hover:bg-surface" : "cursor-default",
                     ].join(" ")}
                   >
                     <span className="min-w-0">
-                      <span className="block text-body-sm text-primary [overflow-wrap:anywhere]">{checkTitle(c)}</span>
-                      <span className="block text-caption text-quaternary tabular [overflow-wrap:anywhere]">{checkDetail(c)}</span>
+                      <span className="block text-xs text-ink [overflow-wrap:anywhere]">{checkTitle(c)}</span>
+                      <span className="block text-xs text-muted-text tabular [overflow-wrap:anywhere]">{checkDetail(c)}</span>
                     </span>
                     <span className="shrink-0">
                       <StatusBadge tone={c.passed ? "success" : warn ? "warning" : "error"}>{c.passed ? "pass" : warn ? "warn" : "fail"}</StatusBadge>
@@ -256,7 +256,7 @@ export function ChecksPanel({
           </ul>
         </section>
       ))}
-      <p className="mt-4 text-body-sm text-quaternary">
+      <p className="mt-4 text-xs text-muted-text">
         Interference and clearance are measured with exact boolean and distance passes on the B-reps. A clean check is not an engineering
         review: fits, loads and tolerances still need an engineer.
       </p>
@@ -301,19 +301,19 @@ function JointRow({ joint, value, onChange }: { joint: ViewerJoint; value: numbe
 
   const id = `joint-${joint.name}`;
   return (
-    <li className="rounded-lg border border-muted px-3 py-2.5" data-joint={joint.name}>
+    <li className="rounded-lg border border-line px-3 py-2.5" data-joint={joint.name}>
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0">
-          <label htmlFor={id} className="block truncate text-body-sm text-primary">
+          <label htmlFor={id} className="block truncate text-xs text-ink">
             {joint.name}
           </label>
-          <span className="block truncate text-caption text-quaternary">
+          <span className="block truncate text-xs text-muted-text">
             {joint.type} · {joint.moving.join(", ")} on {joint.a === joint.moving[0] ? joint.b : joint.a}
             {joint.has_limits ? "" : " · no limits set"}
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-1">
-          <span className="w-20 text-right text-body-md tabular text-primary" data-testid={`joint-value-${joint.name}`}>
+          <span className="w-20 text-right text-sm tabular text-ink" data-testid={`joint-value-${joint.name}`}>
             {+value.toFixed(2)} {joint.unit}
           </span>
           <IconButton label={`Sweep ${joint.name}`} onClick={sweep}>
@@ -335,7 +335,7 @@ function JointRow({ joint, value, onChange }: { joint: ViewerJoint; value: numbe
         onChange={(e) => onChange(Number(e.target.value))}
         className="mt-2 w-full accent-[var(--viewer-select)]"
       />
-      <div className="flex justify-between text-caption tabular text-quaternary">
+      <div className="flex justify-between text-xs tabular text-muted-text">
         <span>
           {lo} {joint.unit}
         </span>
@@ -362,7 +362,7 @@ export function JointsPanel({
   }
   return (
     <div>
-      <p className="mb-2 text-body-sm text-tertiary">
+      <p className="mb-2 text-xs text-muted-text">
         Drag a joint across its limits to see the motion the sweep check samples. Poses are previews; the published version keeps the
         assembled values.
       </p>
@@ -412,15 +412,15 @@ export function KindExportPanel({
   const assembly = version.kind === "assembly" || version.kind === "product";
   return (
     <div>
-      <p className="mb-3 text-body-sm text-tertiary">
+      <p className="mb-3 text-xs text-muted-text">
         Source v{version.number} · build123d {version.engine.build123d} · OCP {version.engine.ocp}
       </p>
       <ul className="flex flex-col">
         {files.map((a) => (
-          <li key={a.id} className="flex items-center justify-between gap-3 border-b border-muted py-2 last:border-b-0">
+          <li key={a.id} className="flex items-center justify-between gap-3 border-b border-line py-2 last:border-b-0">
             <span className="min-w-0">
-              <span className="block text-body-md text-primary">{KIND_LABELS[a.format][0]}</span>
-              <span className="block truncate text-caption text-quaternary">
+              <span className="block text-sm text-ink">{KIND_LABELS[a.format][0]}</span>
+              <span className="block truncate text-xs text-muted-text">
                 {KIND_LABELS[a.format][1]} · {(a.bytes / 1024).toFixed(1)} KB
               </span>
             </span>
@@ -432,18 +432,18 @@ export function KindExportPanel({
         ))}
       </ul>
       {assembly && !hasFcstd ? (
-        <div className="mt-4 rounded-lg border border-muted bg-raised p-3">
+        <div className="mt-4 rounded-lg border border-line bg-surface p-3">
           <div className="flex items-center gap-2">
-            <FileBox size={15} strokeWidth={1.75} className="icon-tertiary" aria-hidden />
-            <span className="text-body-md text-primary">Native FreeCAD assembly</span>
+            <FileBox size={15} strokeWidth={1.75} className="text-muted" aria-hidden />
+            <span className="text-sm text-ink">Native FreeCAD assembly</span>
           </div>
-          <p className="mt-1 text-body-sm text-tertiary">
+          <p className="mt-1 text-xs text-muted-text">
             One App::Link per instance and a native joint per mate; FreeCAD&apos;s solver re-places the parts and Shilpa checks the joints hold.
           </p>
           <Button size="sm" variant="primary" className="mt-3" disabled={!canExport || !freecadAvailable} onClick={onExportFcstd}>
             Create FreeCAD file
           </Button>
-          {!freecadAvailable ? <p className="mt-2 text-body-sm text-quaternary">FreeCAD is not installed on this server.</p> : null}
+          {!freecadAvailable ? <p className="mt-2 text-xs text-muted-text">FreeCAD is not installed on this server.</p> : null}
         </div>
       ) : null}
     </div>

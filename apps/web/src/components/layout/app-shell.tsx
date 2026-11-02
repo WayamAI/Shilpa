@@ -24,19 +24,19 @@ function AppShell({ children }: { children: ReactNode }) {
   const { error } = useSession();
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-page">
+    <div className="flex h-screen w-full overflow-hidden bg-surface">
       {navOpen ? (
-        <button type="button" aria-label="Close navigation" onClick={() => setNavOpen(false)} className="fixed inset-0 z-40 bg-black/50 lg:hidden" />
+        <button type="button" aria-label="Close navigation" onClick={() => setNavOpen(false)} className="fixed inset-0 z-40 bg-stage/50 lg:hidden" />
       ) : null}
       <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar onMenu={() => setNavOpen(true)} />
         {error ? (
-          <div role="alert" className="shrink-0 border-b border-error-stroke bg-error-surface px-5 py-2 text-body-sm text-error">
+          <div role="alert" className="shrink-0 border-b border-fail/40 bg-fail-soft px-5 py-2 text-xs text-fail-text">
             The Shilpa API is not reachable ({error}). Start it with <code className="font-medium">uv run python -m shilpa.dev</code>.
           </div>
         ) : null}
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-page">{children}</main>
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface">{children}</main>
       </div>
     </div>
   );

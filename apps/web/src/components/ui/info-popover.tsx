@@ -42,7 +42,7 @@ export function InfoPopover({
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex size-7 items-center justify-center rounded-full text-quaternary outline-none transition-colors duration-[150ms] hover:bg-raised hover:text-secondary focus-visible:ring-2 focus-visible:ring-active"
+        className="inline-flex size-7 items-center justify-center rounded-full text-muted-text outline-none transition-colors duration-[150ms] hover:bg-surface hover:text-body focus-visible:ring-2 focus-visible:ring-line-strong"
       >
         <Info size={15} strokeWidth={1.75} aria-hidden />
       </button>
@@ -51,7 +51,7 @@ export function InfoPopover({
           id={id}
           role="dialog"
           aria-label={label}
-          className="absolute top-[calc(100%+8px)] left-0 z-50 w-[min(calc(100vw-2.5rem),22rem)] rounded-lg border border-muted bg-container p-3 shadow-lg sm:w-[28rem]"
+          className="absolute top-[calc(100%+8px)] left-0 z-50 w-[min(calc(100vw-2.5rem),22rem)] rounded-lg border border-line bg-bg p-3 shadow-popover sm:w-[28rem]"
         >
           {children}
         </div>

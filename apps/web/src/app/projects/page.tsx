@@ -56,7 +56,7 @@ export default function ProjectsPage() {
         description="Each project holds parts, their immutable versions and the requests and drawings they came from."
         info={
           <InfoPopover label="About projects">
-            <p className="text-body-sm text-secondary">
+            <p className="text-xs text-body">
               Open a project to describe a part, upload a drawing or start from a reference part. Every change creates a new version; older
               versions stay available and can be restored.
             </p>
@@ -102,49 +102,49 @@ export default function ProjectsPage() {
             title={projects ? `All projects · ${projects.length}` : "All projects"}
             padded={false}
             action={
-              <label className="flex h-8 items-center gap-2 rounded-full border border-muted bg-action px-3 text-label-sm text-tertiary focus-within:ring-2 focus-within:ring-active">
+              <label className="flex h-8 items-center gap-2 rounded-full border border-line bg-surface-2 px-3 text-xs font-semibold text-muted-text focus-within:ring-2 focus-within:ring-line-strong">
                 <Search size={13} strokeWidth={1.75} aria-hidden />
                 <input
                   aria-label="Search projects"
                   placeholder="Search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="w-28 bg-transparent text-label-sm text-primary outline-none placeholder:text-quaternary sm:w-44"
+                  className="w-28 bg-transparent text-xs font-semibold text-ink outline-none placeholder:text-muted-text sm:w-44"
                 />
               </label>
             }
           >
-            {error ? <p className="p-4 text-body-sm text-error">{error}</p> : null}
+            {error ? <p className="p-4 text-xs text-fail-text">{error}</p> : null}
             {projects && shown.length === 0 ? (
               <EmptyState
-                mark={<Box size={22} strokeWidth={1.5} className="icon-quaternary" aria-hidden />}
+                mark={<Box size={22} strokeWidth={1.5} className="text-muted" aria-hidden />}
                 title={projects.length === 0 ? "No projects yet" : "No projects match"}
                 detail={projects.length === 0 ? "Create a project to start your first part." : undefined}
               />
             ) : null}
             <ul className="min-h-0 overflow-y-auto">
               {shown.map((p) => (
-                <li key={p.id} className="border-b border-muted last:border-b-0">
+                <li key={p.id} className="border-b border-line last:border-b-0">
                   <Link
                     href={`/projects/${p.id}`}
-                    className="group flex items-center justify-between gap-4 px-4 py-3 outline-none transition-colors duration-[150ms] hover:bg-raised focus-visible:bg-raised"
+                    className="group flex items-center justify-between gap-4 px-4 py-3 outline-none transition-colors duration-[150ms] hover:bg-surface focus-visible:bg-surface"
                   >
                     <span className="flex min-w-0 items-center gap-3">
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-action icon-tertiary">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted">
                         <Box size={16} strokeWidth={1.75} aria-hidden />
                       </span>
                       <span className="min-w-0">
-                        <span className="block truncate text-body-md text-primary">{p.name}</span>
-                        <span className="block text-body-sm text-quaternary">
+                        <span className="block truncate text-sm text-ink">{p.name}</span>
+                        <span className="block text-xs text-muted-text">
                           Created {new Date(p.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
                         </span>
                       </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-4">
-                      <span className="text-body-sm tabular text-tertiary">
+                      <span className="text-xs tabular text-muted-text">
                         {p.model_count} part{p.model_count === 1 ? "" : "s"}
                       </span>
-                      <ArrowRight size={14} strokeWidth={1.75} aria-hidden className="icon-quaternary transition-transform group-hover:translate-x-0.5" />
+                      <ArrowRight size={14} strokeWidth={1.75} aria-hidden className="text-muted transition-transform group-hover:translate-x-0.5" />
                     </span>
                   </Link>
                 </li>

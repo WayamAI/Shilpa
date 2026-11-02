@@ -39,7 +39,7 @@ export function Select({
         size={12}
         strokeWidth={1.75}
         aria-hidden
-        className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-quaternary"
+        className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-text"
       />
     </span>
   );
@@ -129,12 +129,12 @@ export function Panel({
 }) {
   return (
     <section
-      className={`isolate flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-muted bg-container ${className}`}
+      className={`isolate flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-line bg-bg ${className}`}
     >
       {title || action ? (
-        <header className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-muted px-4">
+        <header className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-line px-4">
           {title ? (
-            <h2 className="min-w-0 truncate text-caption tracking-[0.08em] text-quaternary uppercase">
+            <h2 className="min-w-0 truncate text-xs tracking-[0.08em] text-muted-text uppercase">
               {title}
             </h2>
           ) : (
@@ -170,29 +170,29 @@ export function KpiTile({
 }) {
   const deltaTone =
     tone === "success"
-      ? "text-success"
+      ? "text-pass-text"
       : tone === "info"
-        ? "text-info"
+        ? "text-complex-text"
         : tone === "warning"
-          ? "text-warning"
+          ? "text-consent-text"
           : tone === "error"
-            ? "text-error"
-            : "text-tertiary";
+            ? "text-fail-text"
+            : "text-muted-text";
 
   return (
-    <div className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-muted bg-container px-4 py-3.5">
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-line bg-bg px-4 py-3.5">
       <div className="flex items-start justify-between gap-2">
-        <span className="truncate text-caption tracking-[0.08em] text-quaternary uppercase">
+        <span className="truncate text-xs tracking-[0.08em] text-muted-text uppercase">
           {label}
         </span>
         {mark}
       </div>
-      <span className="font-display text-display-xl tabular text-primary sm:text-display-2xl">
+      <span className="text-xl font-semibold tabular text-ink sm:text-2xl">
         {value}
       </span>
       <div className="flex items-baseline gap-2">
-        {delta ? <span className={`text-body-sm tabular ${deltaTone}`}>{delta}</span> : null}
-        {hint ? <span className="truncate text-caption text-quaternary">{hint}</span> : null}
+        {delta ? <span className={`text-xs tabular ${deltaTone}`}>{delta}</span> : null}
+        {hint ? <span className="truncate text-xs text-muted-text">{hint}</span> : null}
       </div>
     </div>
   );
@@ -203,11 +203,11 @@ export function KpiTile({
 export type StatusTone = "success" | "info" | "neutral" | "warning" | "error";
 
 const TONE_CLASS: Record<StatusTone, string> = {
-  success: "bg-success-badge",
-  info: "bg-info-badge",
-  neutral: "bg-neutral-badge",
-  warning: "bg-warning-badge",
-  error: "bg-error-badge",
+  success: "bg-pass-text",
+  info: "bg-complex",
+  neutral: "bg-body",
+  warning: "bg-consent-text",
+  error: "bg-fail-text",
 };
 
 export function StatusBadge({
@@ -219,7 +219,7 @@ export function StatusBadge({
 }) {
   return (
     <span
-      className={`inline-flex max-w-full items-center truncate rounded-full px-2.5 py-0.5 text-caption font-medium text-badge ${TONE_CLASS[tone]}`}
+      className={`inline-flex max-w-full items-center truncate rounded-full px-2.5 py-0.5 text-xs font-medium text-on-action ${TONE_CLASS[tone]}`}
     >
       {children}
     </span>
@@ -229,11 +229,11 @@ export function StatusBadge({
 /** Small dot for dense rows where a full badge is too heavy. */
 export function StatusDot({ tone = "neutral" }: { tone?: StatusTone }) {
   const bg: Record<StatusTone, string> = {
-    success: "bg-success",
-    info: "bg-info",
-    neutral: "bg-neutral",
-    warning: "bg-warning",
-    error: "bg-error",
+    success: "bg-pass",
+    info: "bg-complex",
+    neutral: "bg-muted",
+    warning: "bg-consent",
+    error: "bg-fail",
   };
   return <span className={`inline-block size-1.5 rounded-full ${bg[tone]}`} aria-hidden />;
 }
@@ -252,8 +252,8 @@ export function EmptyState({
   return (
     <div className="flex h-full min-h-[160px] flex-col items-center justify-center gap-1.5 px-6 text-center">
       {mark}
-      <p className="text-body-md text-tertiary">{title}</p>
-      {detail ? <p className="text-body-sm text-quaternary">{detail}</p> : null}
+      <p className="text-sm text-muted-text">{title}</p>
+      {detail ? <p className="text-xs text-muted-text">{detail}</p> : null}
     </div>
   );
 }
@@ -284,14 +284,14 @@ export function BarList({
         const content = (
           <>
             <span className="flex items-baseline justify-between gap-3">
-              <span className="truncate text-body-sm text-secondary">{row.label}</span>
-              <span className="shrink-0 text-body-sm tabular text-primary">
+              <span className="truncate text-xs text-body">{row.label}</span>
+              <span className="shrink-0 text-xs tabular text-ink">
                 {formatValue(row.value)}
               </span>
             </span>
-            <span className="mt-1 block h-1.5 w-full overflow-hidden rounded-full bg-raised-2">
+            <span className="mt-1 block h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
               <span
-                className={`block h-full rounded-full ${selected ? "bg-action-primary" : "bg-quaternary"}`}
+                className={`block h-full rounded-full ${selected ? "bg-action" : "bg-muted"}`}
                 style={{ width: `${(row.value / max) * 100}%` }}
               />
             </span>
@@ -305,7 +305,7 @@ export function BarList({
                 type="button"
                 onClick={() => onSelect(row.id)}
                 aria-pressed={selected}
-                className="block w-full rounded-md px-1.5 py-1 text-left transition-colors duration-[150ms] hover:bg-raised"
+                className="block w-full rounded-md px-1.5 py-1 text-left transition-colors duration-[150ms] hover:bg-surface"
               >
                 {content}
               </button>

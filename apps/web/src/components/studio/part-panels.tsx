@@ -8,7 +8,7 @@ import { EmptyState, StatusBadge } from "@/components/ui/primitives";
 import { downloadArtifact, paramValue, type Check, type Version } from "@/lib/api";
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-5 mb-2 text-caption tracking-[0.08em] text-quaternary uppercase first:mt-0">{children}</h3>;
+  return <h3 className="mt-5 mb-2 text-xs tracking-[0.08em] text-muted-text uppercase first:mt-0">{children}</h3>;
 }
 
 function humanize(name: string) {
@@ -45,7 +45,7 @@ export function ParamsPanel({
   return (
     <div>
       {!isHead ? (
-        <p className="mb-3 rounded-lg border border-warning-stroke bg-warning-surface px-3 py-2 text-body-sm text-warning">
+        <p className="mb-3 rounded-lg border border-consent/40 bg-consent-soft px-3 py-2 text-xs text-consent-text">
           Viewing an older version. Edits apply to the latest version.
         </p>
       ) : null}
@@ -56,9 +56,9 @@ export function ParamsPanel({
             const unit = meta.kind === "count" ? "" : meta.kind === "angle" ? (meta.unit ?? "deg") : (meta.unit ?? units);
             const derived = !!meta.expr;
             return (
-              <tr key={name} className="border-b border-muted last:border-b-0">
+              <tr key={name} className="border-b border-line last:border-b-0">
                 <th scope="row" className="py-1.5 pr-2 text-left font-normal">
-                  <label htmlFor={`p-${name}`} className="text-body-sm text-secondary capitalize">
+                  <label htmlFor={`p-${name}`} className="text-xs text-body capitalize">
                     {humanize(name)}
                   </label>
                   {meta.source && meta.source !== "user" ? (
@@ -75,7 +75,7 @@ export function ParamsPanel({
                     onChange={(e) => setDraft((d) => ({ ...d, [name]: e.target.value }))}
                   />
                 </td>
-                <td className="w-9 py-1.5 pl-2 text-body-sm text-quaternary">{unit}</td>
+                <td className="w-9 py-1.5 pl-2 text-xs text-muted-text">{unit}</td>
               </tr>
             );
           })}
@@ -99,8 +99,8 @@ export function ParamsPanel({
           <Caption>Assumptions</Caption>
           <ul className="flex flex-col gap-1.5">
             {version.recipe.assumptions.map((a) => (
-              <li key={a.parameter} className="text-body-sm text-tertiary">
-                <span className="text-secondary">{humanize(a.parameter)}</span> — {a.reason}
+              <li key={a.parameter} className="text-xs text-muted-text">
+                <span className="text-body">{humanize(a.parameter)}</span> — {a.reason}
               </li>
             ))}
           </ul>
@@ -111,9 +111,9 @@ export function ParamsPanel({
       <ol className="flex flex-col">
         {(version.features ?? []).map((f, i) => (
           <li key={f.id} className="flex items-baseline gap-2 py-1">
-            <span className="w-5 shrink-0 text-right text-caption tabular text-quaternary">{i + 1}</span>
-            <code className="truncate text-body-sm text-primary">{f.id}</code>
-            <span className="truncate text-body-sm text-quaternary">{humanize(f.op)}</span>
+            <span className="w-5 shrink-0 text-right text-xs tabular text-muted-text">{i + 1}</span>
+            <code className="truncate text-xs text-ink">{f.id}</code>
+            <span className="truncate text-xs text-muted-text">{humanize(f.op)}</span>
           </li>
         ))}
       </ol>
@@ -172,7 +172,7 @@ export function ValidationPanel({ version }: { version: Version }) {
         <span className="shrink-0">
           <StatusBadge tone={v.passed ? "success" : "error"}>{v.passed ? "all checks passed" : `${failed.length} failed`}</StatusBadge>
         </span>
-        <span className="text-body-sm text-tertiary">measured on the re-imported STEP</span>
+        <span className="text-xs text-muted-text">measured on the re-imported STEP</span>
       </div>
       {m ? (
         <KeyValue
@@ -188,22 +188,22 @@ export function ValidationPanel({ version }: { version: Version }) {
       <Caption>Checks · {v.checks.length}</Caption>
       <ul className="flex flex-col">
         {v.checks.map((c: Check, i) => (
-          <li key={i} className="flex items-start justify-between gap-3 border-b border-muted py-2 last:border-b-0" title={c.note ?? ""}>
+          <li key={i} className="flex items-start justify-between gap-3 border-b border-line py-2 last:border-b-0" title={c.note ?? ""}>
             <span className="min-w-0">
-              <span className="block text-body-sm text-primary">{checkLabel(c.name)}</span>
+              <span className="block text-xs text-ink">{checkLabel(c.name)}</span>
               {c.requested !== null && c.requested !== undefined ? (
-                <span className="block truncate text-caption text-quaternary tabular">
+                <span className="block truncate text-xs text-muted-text tabular">
                   {fmt(c.requested)} → {fmt(c.actual)}
                 </span>
               ) : c.note ? (
-                <span className="block truncate text-caption text-quaternary">{c.note}</span>
+                <span className="block truncate text-xs text-muted-text">{c.note}</span>
               ) : null}
             </span>
             <StatusBadge tone={c.passed ? "success" : "error"}>{c.passed ? "pass" : "fail"}</StatusBadge>
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-body-sm text-quaternary">
+      <p className="mt-3 text-xs text-muted-text">
         A valid solid does not establish strength, fit or manufacturability. Tolerances are software comparison tolerances.
       </p>
     </div>
@@ -227,7 +227,7 @@ export function VersionsPanel({
 }) {
   return (
     <div>
-    <p className="mb-2 text-caption tracking-[0.08em] text-quaternary uppercase">
+    <p className="mb-2 text-xs tracking-[0.08em] text-muted-text uppercase">
       {versions.length} version{versions.length === 1 ? "" : "s"} · each change is a new immutable version
     </p>
     <ol className="flex flex-col gap-2">
@@ -238,14 +238,14 @@ export function VersionsPanel({
             <div
               className={[
                 "rounded-lg border px-3 py-2.5 transition-colors duration-[150ms]",
-                active ? "border-active bg-raised" : "border-muted hover:bg-raised",
+                active ? "border-line-strong bg-surface" : "border-line hover:bg-surface",
               ].join(" ")}
             >
               <div className="flex items-center justify-between gap-2">
-                <button type="button" onClick={() => onOpen(v.id)} className="flex min-w-0 items-baseline gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-active">
-                  <span className="font-display text-display-base text-primary">v{v.number}</span>
+                <button type="button" onClick={() => onOpen(v.id)} className="flex min-w-0 items-baseline gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-line-strong">
+                  <span className="text-md font-semibold text-ink">v{v.number}</span>
                   {i === 0 ? <StatusBadge tone="info">latest</StatusBadge> : null}
-                  <span className="truncate text-caption text-quaternary">{new Date(v.created_at).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}</span>
+                  <span className="truncate text-xs text-muted-text">{new Date(v.created_at).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}</span>
                 </button>
                 {i > 0 && canRestore ? (
                   <Button size="sm" variant="tertiary" onClick={() => onRestore(v.id)} title="Restore as a new version">
@@ -254,7 +254,7 @@ export function VersionsPanel({
                   </Button>
                 ) : null}
               </div>
-              <p className="mt-1 text-body-sm text-tertiary">{v.change_summary || (v.parent_version_id ? "Edited" : "Initial generation")}</p>
+              <p className="mt-1 text-xs text-muted-text">{v.change_summary || (v.parent_version_id ? "Edited" : "Initial generation")}</p>
             </div>
           </li>
         );
@@ -281,15 +281,15 @@ export function ExportPanel({ version, canExport, onExportFcstd }: { version: Ve
   const hasFcstd = version.artifacts.some((a) => a.format === "FCSTD");
   return (
     <div>
-      <p className="mb-3 text-body-sm text-tertiary">
+      <p className="mb-3 text-xs text-muted-text">
         Source v{version.number} · build123d {version.engine.build123d} · OCP {version.engine.ocp}
       </p>
       <ul className="flex flex-col">
         {files.map((a) => (
-          <li key={a.id} className="flex items-center justify-between gap-3 border-b border-muted py-2 last:border-b-0">
+          <li key={a.id} className="flex items-center justify-between gap-3 border-b border-line py-2 last:border-b-0">
             <span className="min-w-0">
-              <span className="block text-body-md text-primary">{LABELS[a.format][0]}</span>
-              <span className="block truncate text-caption text-quaternary">
+              <span className="block text-sm text-ink">{LABELS[a.format][0]}</span>
+              <span className="block truncate text-xs text-muted-text">
                 {LABELS[a.format][1]} · {(a.bytes / 1024).toFixed(1)} KB
               </span>
             </span>
@@ -301,12 +301,12 @@ export function ExportPanel({ version, canExport, onExportFcstd }: { version: Ve
         ))}
       </ul>
       {!hasFcstd ? (
-        <div className="mt-4 rounded-lg border border-muted bg-raised p-3">
+        <div className="mt-4 rounded-lg border border-line bg-surface p-3">
           <div className="flex items-center gap-2">
-            <FileBox size={15} strokeWidth={1.75} className="icon-tertiary" aria-hidden />
-            <span className="text-body-md text-primary">Native FreeCAD file</span>
+            <FileBox size={15} strokeWidth={1.75} className="text-muted" aria-hidden />
+            <span className="text-sm text-ink">Native FreeCAD file</span>
           </div>
-          <p className="mt-1 text-body-sm text-tertiary">
+          <p className="mt-1 text-xs text-muted-text">
             Builds Sketcher and PartDesign features driven by a Params sheet, then checks they match this version.
           </p>
           <Button size="sm" variant="primary" className="mt-3" disabled={!canExport} onClick={onExportFcstd}>

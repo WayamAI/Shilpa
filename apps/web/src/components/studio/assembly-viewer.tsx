@@ -8,7 +8,6 @@ import * as THREE from "three";
 
 import { IconButton } from "@/components/ui/controls";
 import { EmptyState } from "@/components/ui/primitives";
-import { useTheme } from "@/context/theme-context";
 import { fetchBlob, type MeshSet, type Viewer } from "@/lib/api";
 import { posedMatrices } from "@/lib/assembly";
 
@@ -21,12 +20,11 @@ import { usePalette, webglAvailable } from "./model-viewer";
 export type Highlight = { ids: string[]; tone: "clash" | "pass"; label: string } | null;
 
 function useAccent() {
-  const { theme } = useTheme();
   return useMemo(() => {
     const css = getComputedStyle(document.documentElement);
     const v = (name: string) => css.getPropertyValue(name).trim();
-    return { select: v("--viewer-select"), hover: v("--viewer-hover"), clash: v("--viewer-clash"), pass: v("--viewer-pass"), theme };
-  }, [theme]);
+    return { select: v("--viewer-select"), hover: v("--viewer-hover"), clash: v("--viewer-clash"), pass: v("--viewer-pass") };
+  }, []);
 }
 
 function decode(meshes: MeshSet): Record<string, THREE.BufferGeometry> {
@@ -251,29 +249,29 @@ export default function AssemblyViewer({
       </Canvas>
 
       <div className="pointer-events-none absolute top-3 left-3 flex flex-wrap gap-2">
-        <span className="rounded-full border border-muted bg-container px-2.5 py-1 text-caption text-tertiary">Units mm</span>
+        <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-muted-text">Units mm</span>
         {viewer.size ? (
-          <span className="rounded-full border border-muted bg-container px-2.5 py-1 text-caption tabular text-secondary" title="Assembled envelope">
+          <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs tabular text-body" title="Assembled envelope">
             {viewer.size.map((v) => +v.toFixed(2)).join(" × ")} mm
           </span>
         ) : null}
         {hovered || selected ? (
-          <span className="rounded-full border border-muted bg-container px-2.5 py-1 text-caption text-primary">{hovered ?? selected}</span>
+          <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-ink">{hovered ?? selected}</span>
         ) : null}
       </div>
       {geoms ? (
         <div className="absolute top-3 right-3">
-          <IconButton label="Reset view" onClick={() => setNonce((n) => n + 1)} className="bg-container">
+          <IconButton label="Reset view" onClick={() => setNonce((n) => n + 1)} className="bg-bg">
             <RotateCcw size={14} strokeWidth={1.75} aria-hidden />
           </IconButton>
         </div>
       ) : null}
       {!meshesId ? (
         <div className="absolute inset-0 flex items-center justify-center">
-          <EmptyState mark={<Boxes size={24} strokeWidth={1.5} className="icon-quaternary" aria-hidden />} title="No preview meshes" />
+          <EmptyState mark={<Boxes size={24} strokeWidth={1.5} className="text-muted" aria-hidden />} title="No preview meshes" />
         </div>
       ) : null}
-      {current?.error ? <p className="absolute inset-x-0 bottom-3 text-center text-body-sm text-error">Preview failed: {current.error}</p> : null}
+      {current?.error ? <p className="absolute inset-x-0 bottom-3 text-center text-xs text-fail-text">Preview failed: {current.error}</p> : null}
     </div>
   );
 }

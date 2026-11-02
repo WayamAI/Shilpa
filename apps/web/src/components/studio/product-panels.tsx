@@ -8,7 +8,7 @@ import { fetchBlob, type ProductInfo, type Version } from "@/lib/api";
 import { fmtValue } from "@/lib/assembly";
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-5 mb-2 text-caption tracking-[0.08em] text-quaternary uppercase first:mt-0">{children}</h3>;
+  return <h3 className="mt-5 mb-2 text-xs tracking-[0.08em] text-muted-text uppercase first:mt-0">{children}</h3>;
 }
 
 const STATUS_TONE: Record<string, StatusTone> = { passed: "success", repaired: "info", unresolved: "error" };
@@ -27,13 +27,13 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
     <div data-testid="router-panel">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <StatusBadge tone={STATUS_TONE[product.status] ?? "neutral"}>{product.status}</StatusBadge>
-        <span className="text-body-sm text-tertiary">
+        <span className="text-xs text-muted-text">
           {router ? `${router.iterations.length} round${router.iterations.length === 1 ? "" : "s"} · ${router.seconds} s` : ""}
         </span>
       </div>
       {product.request ? (
-        <p className="mb-3 rounded-lg border border-muted bg-raised px-3 py-2 text-body-sm text-secondary">
-          <span className="text-quaternary">Request · </span>
+        <p className="mb-3 rounded-lg border border-line bg-surface px-3 py-2 text-xs text-body">
+          <span className="text-muted-text">Request · </span>
           {product.request}
         </p>
       ) : null}
@@ -41,22 +41,22 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
       <Caption>Build, check, repair</Caption>
       <ol className="flex flex-col gap-2">
         {(router?.iterations ?? []).map((it) => (
-          <li key={it.iteration} className="rounded-lg border border-muted px-3 py-2.5" data-iteration={it.iteration}>
+          <li key={it.iteration} className="rounded-lg border border-line px-3 py-2.5" data-iteration={it.iteration}>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-body-sm text-primary">Round {it.iteration + 1}</span>
+              <span className="text-xs text-ink">Round {it.iteration + 1}</span>
               <span className="flex items-center gap-2">
-                <span className="text-caption tabular text-quaternary">{it.seconds} s</span>
+                <span className="text-xs tabular text-muted-text">{it.seconds} s</span>
                 <StatusBadge tone={it.passed ? "success" : "error"}>{it.passed ? "pass" : `${it.failed.length} failed`}</StatusBadge>
               </span>
             </div>
-            {it.failed.length ? <p className="mt-1 text-caption text-error [overflow-wrap:anywhere]">Failed: {it.failed.map(humanize).join(", ")}</p> : null}
-            {it.warnings.length ? <p className="mt-1 text-caption text-warning [overflow-wrap:anywhere]">Warnings: {it.warnings.map(humanize).join(", ")}</p> : null}
+            {it.failed.length ? <p className="mt-1 text-xs text-fail-text [overflow-wrap:anywhere]">Failed: {it.failed.map(humanize).join(", ")}</p> : null}
+            {it.warnings.length ? <p className="mt-1 text-xs text-consent-text [overflow-wrap:anywhere]">Warnings: {it.warnings.map(humanize).join(", ")}</p> : null}
             {it.actions.length ? (
               <ul className="mt-1.5 flex flex-col gap-1">
                 {it.actions.map((a, k) => (
-                  <li key={k} className="text-body-sm text-secondary">
-                    <StatusBadge tone="info">{a.level}</StatusBadge> <span className="text-primary">{humanize(a.param)}</span> → {fmtValue(a.new)}
-                    <span className="block text-caption text-quaternary">{a.reason}</span>
+                  <li key={k} className="text-xs text-body">
+                    <StatusBadge tone="info">{a.level}</StatusBadge> <span className="text-ink">{humanize(a.param)}</span> → {fmtValue(a.new)}
+                    <span className="block text-xs text-muted-text">{a.reason}</span>
                   </li>
                 ))}
               </ul>
@@ -70,14 +70,14 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
           <Caption>Changes · {router.history.length}</Caption>
           <ul className="flex flex-col">
             {router.history.map((h, k) => (
-              <li key={k} className="border-b border-muted py-2 last:border-b-0">
+              <li key={k} className="border-b border-line py-2 last:border-b-0">
                 <span className="flex items-baseline justify-between gap-2">
-                  <span className="text-body-sm text-primary">{humanize(h.param)}</span>
-                  <span className="text-body-sm tabular text-secondary">
+                  <span className="text-xs text-ink">{humanize(h.param)}</span>
+                  <span className="text-xs tabular text-body">
                     {fmtValue(h.old)} → {fmtValue(h.new)}
                   </span>
                 </span>
-                <span className="block text-caption text-quaternary">
+                <span className="block text-xs text-muted-text">
                   round {h.iteration} · {h.level}-level · {humanize(h.check)} · {h.reason}
                 </span>
               </li>
@@ -91,7 +91,7 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
           <Caption>Unresolved</Caption>
           <ul className="flex flex-col gap-1.5">
             {router.unresolved.map((u, k) => (
-              <li key={k} className="rounded-lg border border-error-stroke bg-error-surface px-3 py-2 text-body-sm text-error">
+              <li key={k} className="rounded-lg border border-fail/40 bg-fail-soft px-3 py-2 text-xs text-fail-text">
                 {humanize(u.check)}
                 {u.level ? ` (${u.level})` : ""}: {u.reason}
               </li>
@@ -104,7 +104,7 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
           <Caption>Suggestions</Caption>
           <ul className="flex flex-col gap-1.5">
             {router.suggestions.map((sg, k) => (
-              <li key={k} className="rounded-lg border border-warning-stroke bg-warning-surface px-3 py-2 text-body-sm text-warning">
+              <li key={k} className="rounded-lg border border-consent/40 bg-consent-soft px-3 py-2 text-xs text-consent-text">
                 {humanize(sg.check)}: {sg.suggestion}
               </li>
             ))}
@@ -118,11 +118,11 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
           <table className="w-full" data-testid="skeleton-table">
             <tbody>
               {skeleton.map(([name, p]) => (
-                <tr key={name} className="border-b border-muted last:border-b-0" title={p.note ?? ""}>
-                  <th scope="row" className="py-1.5 pr-2 text-left text-body-sm font-normal text-secondary">
+                <tr key={name} className="border-b border-line last:border-b-0" title={p.note ?? ""}>
+                  <th scope="row" className="py-1.5 pr-2 text-left text-xs font-normal text-body">
                     {humanize(name)}
                   </th>
-                  <td className="py-1.5 pr-2 text-right text-body-sm tabular text-primary">
+                  <td className="py-1.5 pr-2 text-right text-xs tabular text-ink">
                     {fmtValue(p.value)}
                     {p.unit ? ` ${p.unit}` : ""}
                   </td>
@@ -157,14 +157,14 @@ function Render({ id, label }: { id: string; label: string }) {
   }, [id]);
   const src = loaded && loaded.id === id ? loaded.url : null;
   return (
-    <figure className="overflow-hidden rounded-lg border border-muted bg-raised">
+    <figure className="overflow-hidden rounded-lg border border-line bg-surface">
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element -- an authenticated blob URL, not a static asset
         <img src={src} alt={label} className="block h-auto w-full" />
       ) : (
         <div className="aspect-[16/10] w-full" />
       )}
-      <figcaption className="border-t border-muted px-3 py-1.5 text-caption text-quaternary">{label}</figcaption>
+      <figcaption className="border-t border-line px-3 py-1.5 text-xs text-muted-text">{label}</figcaption>
     </figure>
   );
 }

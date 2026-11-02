@@ -76,11 +76,11 @@ function AssemblyWorkspace({ version, versions, canWrite, busy, freecadAvailable
         padded={false}
         className="min-h-[420px] lg:min-h-0"
         title={version.kind === "product" ? "Product" : "Assembly"}
-        action={<span className="text-caption tabular text-quaternary">{version.recipe_hash.slice(0, 8)}</span>}
+        action={<span className="text-xs tabular text-muted-text">{version.recipe_hash.slice(0, 8)}</span>}
       >
         {viewer ? (
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="shrink-0 border-b border-muted px-4 py-2.5">
+            <div className="shrink-0 border-b border-line px-4 py-2.5">
               <Tabs<AsmTab>
                 label="Assembly details"
                 value={tab}
@@ -94,7 +94,7 @@ function AssemblyWorkspace({ version, versions, canWrite, busy, freecadAvailable
                   <PartsTree viewer={viewer} selected={selected} hovered={hovered} onHover={setHovered} onSelect={select} />
                   {product && viewer.joints.length ? (
                     <>
-                      <h3 className="mt-5 mb-2 text-caption tracking-[0.08em] text-quaternary uppercase">Joints</h3>
+                      <h3 className="mt-5 mb-2 text-xs tracking-[0.08em] text-muted-text uppercase">Joints</h3>
                       {jointsPanel}
                     </>
                   ) : null}
@@ -131,7 +131,7 @@ function AssemblyWorkspace({ version, versions, canWrite, busy, freecadAvailable
         padded={false}
         className="min-h-[420px] lg:min-h-0"
         title={isHead ? "Model" : `Model · v${version.number}`}
-        action={<span className="text-caption text-quaternary">click a part to select · drag to orbit</span>}
+        action={<span className="text-xs text-muted-text">click a part to select · drag to orbit</span>}
       >
         {viewer ? (
           <AssemblyViewer
@@ -165,11 +165,11 @@ function SheetMetalWorkspace({ version, versions, canWrite, busy, freecadAvailab
         padded={false}
         className="min-h-[420px] lg:min-h-0"
         title="Sheet metal"
-        action={<span className="text-caption tabular text-quaternary">{version.recipe_hash.slice(0, 8)}</span>}
+        action={<span className="text-xs tabular text-muted-text">{version.recipe_hash.slice(0, 8)}</span>}
       >
         {viewer ? (
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="shrink-0 border-b border-muted px-4 py-2.5">
+            <div className="shrink-0 border-b border-line px-4 py-2.5">
               <Tabs<SheetTab>
                 label="Sheet-metal details"
                 value={tab}
@@ -200,7 +200,7 @@ function SheetMetalWorkspace({ version, versions, canWrite, busy, freecadAvailab
       </Panel>
 
       <div className="grid min-h-[640px] grid-rows-[minmax(0,1.15fr)_minmax(0,1fr)] gap-3 lg:min-h-0">
-        <Panel padded={false} className="min-h-0" title="Folded" action={<span className="text-caption text-quaternary">drag to orbit · scroll to zoom</span>}>
+        <Panel padded={false} className="min-h-0" title="Folded" action={<span className="text-xs text-muted-text">drag to orbit · scroll to zoom</span>}>
           {viewer ? (
             <AssemblyViewer
               meshesId={meshes}
@@ -214,7 +214,7 @@ function SheetMetalWorkspace({ version, versions, canWrite, busy, freecadAvailab
             />
           ) : null}
         </Panel>
-        <Panel padded={false} className="min-h-0" title="Flat pattern" action={<span className="text-caption text-quaternary">as cut · DXF in Export</span>}>
+        <Panel padded={false} className="min-h-0" title="Flat pattern" action={<span className="text-xs text-muted-text">as cut · DXF in Export</span>}>
           {viewer?.flat ? <FlatPatternView flat={viewer.flat} selectedBend={bend} onSelectBend={setBend} /> : <EmptyState title="No flat pattern" />}
         </Panel>
       </div>

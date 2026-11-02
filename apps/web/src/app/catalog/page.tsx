@@ -24,7 +24,7 @@ const PartViewer = dynamic(() => import("@/components/studio/part-viewer"), {
 });
 
 const SELECT =
-  "h-8 w-full min-w-0 rounded-full border border-muted bg-action text-body-sm text-primary outline-none focus-visible:ring-2 focus-visible:ring-active";
+  "h-8 w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs text-ink outline-none focus-visible:ring-2 focus-visible:ring-line-strong";
 
 // ---------------------------------------------------------------- schema helpers
 
@@ -146,16 +146,16 @@ function ParamField({
         value={String(value ?? "")}
         placeholder={placeholder || (p.type === "array" ? "comma separated" : "")}
         onChange={(e) => onChange(e.target.value)}
-        className="!h-8 text-body-sm"
+        className="!h-8 text-xs"
       />
     );
   }
   const hint = [limits(p), p.description].filter(Boolean).join(" · ");
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-muted py-2 last:border-b-0">
+    <div className="flex items-center justify-between gap-3 border-b border-line py-2 last:border-b-0">
       <div className="min-w-0">
-        <p className="truncate text-body-sm text-primary">{label(name, prop)}</p>
-        {hint ? <p className="truncate text-caption text-quaternary" title={hint}>{hint}</p> : null}
+        <p className="truncate text-xs text-ink">{label(name, prop)}</p>
+        {hint ? <p className="truncate text-xs text-muted-text" title={hint}>{hint}</p> : null}
       </div>
       <div className="flex max-w-[55%] shrink-0 justify-end">{control}</div>
     </div>
@@ -169,17 +169,17 @@ function Suggestions({ matches, onPick }: { matches: CatalogMatch[]; onPick: (m:
   if (!matches.length) return null;
   return (
     <div className="mb-3" data-testid="catalog-matches">
-      <p className="mb-1 text-caption tracking-[0.08em] text-quaternary uppercase">Exact part</p>
+      <p className="mb-1 text-xs tracking-[0.08em] text-muted-text uppercase">Exact part</p>
       <ul className="flex flex-col gap-1">
         {matches.map((m) => (
           <li key={`${m.generator}|${JSON.stringify(m.params)}`}>
             <button
               type="button"
               onClick={() => onPick(m)}
-              className="w-full rounded-md border border-muted bg-raised px-2 py-1.5 text-left outline-none transition-colors duration-[180ms] hover:bg-raised-2 focus-visible:ring-2 focus-visible:ring-active"
+              className="w-full rounded-md border border-line bg-surface px-2 py-1.5 text-left outline-none transition-colors duration-[180ms] hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-line-strong"
             >
-              <span className="block truncate text-body-sm text-primary">{m.label}</span>
-              <span className="block truncate text-caption text-quaternary">{m.summary}</span>
+              <span className="block truncate text-xs text-ink">{m.label}</span>
+              <span className="block truncate text-xs text-muted-text">{m.summary}</span>
             </button>
           </li>
         ))}
@@ -308,17 +308,17 @@ export default function CatalogPage() {
         description="Standard and stock parts Shilpa builds without the AI planner: set the sizes, inspect the ports that mates connect to, download STEP."
       />
       <PageBody>
-        {error ? <p className="mb-3 text-body-sm text-error">{error}</p> : null}
+        {error ? <p className="mb-3 text-xs text-fail-text">{error}</p> : null}
         <div className="flex min-h-0 flex-col gap-4 xl:h-[calc(100vh-190px)] xl:flex-row">
           {/* Narrow screens pick from a grouped list so the 3D view stays near the top. */}
           <div className="flex flex-col gap-2 xl:hidden">
-            <TextInput aria-label="Type a part" placeholder="Type a part: M6x20 socket head, 6204-2RS…" value={query} onChange={(e) => setQuery(e.target.value)} className="!h-10 text-body-sm" />
+            <TextInput aria-label="Type a part" placeholder="Type a part: M6x20 socket head, 6204-2RS…" value={query} onChange={(e) => setQuery(e.target.value)} className="!h-10 text-xs" />
             <Suggestions matches={suggestions} onPick={applyMatch} />
             <Select
               aria-label="Part"
               value={selected ?? ""}
               onChange={(e) => pick(e.target.value)}
-              className="h-10 w-full min-w-0 rounded-full border border-muted bg-action text-body-sm text-primary outline-none focus-visible:ring-2 focus-visible:ring-active"
+              className="h-10 w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs text-ink outline-none focus-visible:ring-2 focus-visible:ring-line-strong"
             >
               {(catalog?.families ?? []).map((f) => (
                 <optgroup key={f} label={f}>
@@ -337,13 +337,13 @@ export default function CatalogPage() {
           <div className="hidden xl:block xl:w-72 xl:shrink-0">
             <Panel title="Parts">
               <div className="relative mb-3">
-                <Search size={14} strokeWidth={1.75} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 icon-quaternary" aria-hidden />
+                <Search size={14} strokeWidth={1.75} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted" aria-hidden />
                 <TextInput
                   aria-label="Search parts"
                   placeholder="Search, or type M6x20 socket head"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="!h-9 pl-8 text-body-sm"
+                  className="!h-9 pl-8 text-xs"
                 />
               </div>
               <Suggestions matches={suggestions} onPick={applyMatch} />
@@ -351,7 +351,7 @@ export default function CatalogPage() {
               <nav aria-label="Catalogue parts" className="flex flex-col gap-4" data-testid="catalog-list">
                 {groups.map(({ family, items }) => (
                   <div key={family}>
-                    <p className="mb-1 text-caption tracking-[0.08em] text-quaternary uppercase">
+                    <p className="mb-1 text-xs tracking-[0.08em] text-muted-text uppercase">
                       {family} <span className="tabular">· {items.length}</span>
                     </p>
                     <ul className="flex flex-col">
@@ -361,12 +361,12 @@ export default function CatalogPage() {
                             type="button"
                             onClick={() => pick(g.name)}
                             aria-current={g.name === selected ? "true" : undefined}
-                            className={`w-full rounded-md px-2 py-1.5 text-left outline-none transition-colors duration-[180ms] focus-visible:ring-2 focus-visible:ring-active ${
-                              g.name === selected ? "bg-raised-2 text-primary" : "text-secondary hover:bg-raised"
+                            className={`w-full rounded-md px-2 py-1.5 text-left outline-none transition-colors duration-[180ms] focus-visible:ring-2 focus-visible:ring-line-strong ${
+                              g.name === selected ? "bg-surface-2 text-ink" : "text-body hover:bg-surface"
                             }`}
                           >
-                            <span className="block truncate text-body-sm">{g.summary}</span>
-                            <span className="block truncate text-caption text-quaternary">
+                            <span className="block truncate text-xs">{g.summary}</span>
+                            <span className="block truncate text-xs text-muted-text">
                               {g.name} · {g.standard}
                             </span>
                           </button>
@@ -386,7 +386,7 @@ export default function CatalogPage() {
             className="min-h-[420px] flex-1"
             action={
               <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1.5 text-label-sm text-tertiary">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-text">
                   <input type="checkbox" checked={showPorts} onChange={(e) => setShowPorts(e.target.checked)} className="size-3.5" />
                   Ports
                 </label>
@@ -401,18 +401,18 @@ export default function CatalogPage() {
               <div className="relative h-full min-h-[420px]">
                 <PartViewer mesh={current?.mesh ?? null} ports={current?.ports ?? []} showPorts={showPorts} selectedPort={port} busy={busy} />
                 {buildError ? (
-                  <p className="absolute inset-x-3 bottom-3 rounded-md border border-muted bg-container px-3 py-2 text-body-sm text-error" data-testid="build-error">
+                  <p className="absolute inset-x-3 bottom-3 rounded-md border border-line bg-bg px-3 py-2 text-xs text-fail-text" data-testid="build-error">
                     {buildError}
                   </p>
                 ) : current ? (
-                  <p className="pointer-events-none absolute bottom-3 left-3 rounded-full border border-muted bg-container px-2.5 py-1 text-caption tabular text-secondary">
+                  <p className="pointer-events-none absolute bottom-3 left-3 rounded-full border border-line bg-bg px-2.5 py-1 text-xs tabular text-body">
                     {current.size.map((v) => +v.toFixed(2)).join(" × ")} mm · {(current.volume_mm3 / 1000).toFixed(1)} cm³ ·{" "}
                     {current.timings_ms.build < 1 ? "cached" : `built in ${Math.round(current.timings_ms.build)} ms`}
                   </p>
                 ) : null}
               </div>
             ) : (
-              <EmptyState mark={<Library size={24} strokeWidth={1.5} className="icon-quaternary" aria-hidden />} title="Pick a part" />
+              <EmptyState mark={<Library size={24} strokeWidth={1.5} className="text-muted" aria-hidden />} title="Pick a part" />
             )}
           </Panel>
 
@@ -465,25 +465,25 @@ export default function CatalogPage() {
                         type="button"
                         onClick={() => setPort(port === p.name ? null : p.name)}
                         aria-pressed={port === p.name}
-                        className={`w-full border-b border-muted px-1 py-2 text-left outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-active ${
-                          port === p.name ? "bg-raised-2" : "hover:bg-raised"
+                        className={`w-full border-b border-line px-1 py-2 text-left outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-line-strong ${
+                          port === p.name ? "bg-surface-2" : "hover:bg-surface"
                         }`}
                       >
                         <span className="flex items-center gap-2">
                           <StatusDot tone={p.on_geometry ? "success" : "error"} />
-                          <span className="truncate text-body-sm text-primary">{p.name}</span>
+                          <span className="truncate text-xs text-ink">{p.name}</span>
                           <StatusBadge tone="neutral">{p.kind}</StatusBadge>
                         </span>
-                        {p.label ? <span className="mt-0.5 block truncate text-caption text-tertiary">{p.label}</span> : null}
+                        {p.label ? <span className="mt-0.5 block truncate text-xs text-muted-text">{p.label}</span> : null}
                         {Object.keys(p.contract).length ? (
-                          <span className="mt-0.5 block truncate text-caption tabular text-quaternary">
+                          <span className="mt-0.5 block truncate text-xs tabular text-muted-text">
                             {Object.entries(p.contract)
                               .filter(([k]) => k !== "kind" && k !== "straddle")
                               .map(([k, v]) => `${k} ${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
                               .join(" · ")}
                           </span>
                         ) : null}
-                        {!p.on_geometry && p.note ? <span className="mt-0.5 block text-caption text-error">{p.note}</span> : null}
+                        {!p.on_geometry && p.note ? <span className="mt-0.5 block text-xs text-fail-text">{p.note}</span> : null}
                       </button>
                     </li>
                   ))}

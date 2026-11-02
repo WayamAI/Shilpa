@@ -64,7 +64,7 @@ export function HeroDrawing({ className = "" }: { className?: string }) {
       </g>
 
       {/* dimension callouts */}
-      <g fontFamily="var(--font-geist), system-ui, sans-serif" fontSize="13" fill="#ffffff" fillOpacity="0.72">
+      <g fontFamily="var(--font-ui)" fontSize="13" fill="#ffffff" fillOpacity="0.72">
         <line x1={bottom.cx - bottom.rx} y1={bottom.cy + 46} x2={bottom.cx + bottom.rx} y2={bottom.cy + 46} stroke="#ffffff" strokeOpacity="0.45" />
         <line x1={bottom.cx - bottom.rx} y1={bottom.cy + 6} x2={bottom.cx - bottom.rx} y2={bottom.cy + 52} stroke="#ffffff" strokeOpacity="0.25" />
         <line x1={bottom.cx + bottom.rx} y1={bottom.cy + 6} x2={bottom.cx + bottom.rx} y2={bottom.cy + 52} stroke="#ffffff" strokeOpacity="0.25" />

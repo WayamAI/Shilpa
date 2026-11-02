@@ -62,12 +62,12 @@ export default function SystemPage() {
                   { name: "FreeCAD engine", detail: "Native FCStd export", ok: !!health?.freecad_available },
                   { name: "Identity", detail: health?.auth_mode === "dev" ? "Local dev identities (Entra ID in Azure)" : "Entra ID", ok: !!me },
                 ].map((s) => (
-                  <li key={s.name} className="flex items-center justify-between gap-3 border-b border-muted py-2.5 last:border-b-0">
+                  <li key={s.name} className="flex items-center justify-between gap-3 border-b border-line py-2.5 last:border-b-0">
                     <span className="flex min-w-0 items-center gap-2.5">
                       <StatusDot tone={s.ok ? "success" : "warning"} />
                       <span className="min-w-0">
-                        <span className="block text-body-md text-primary">{s.name}</span>
-                        <span className="block truncate text-body-sm text-quaternary">{s.detail}</span>
+                        <span className="block text-sm text-ink">{s.name}</span>
+                        <span className="block truncate text-xs text-muted-text">{s.detail}</span>
                       </span>
                     </span>
                     <StatusBadge tone={s.ok ? "success" : "warning"}>{s.ok ? "available" : "unavailable"}</StatusBadge>
@@ -79,12 +79,12 @@ export default function SystemPage() {
               {total ? (
                 <KeyValue rows={Object.entries(jobs).sort((a, b) => b[1] - a[1]).map(([state, n]) => ({ label: state, value: n }))} />
               ) : (
-                <p className="text-body-sm text-quaternary">No jobs yet.</p>
+                <p className="text-xs text-muted-text">No jobs yet.</p>
               )}
-              <h3 className="mt-5 mb-2 text-caption tracking-[0.08em] text-quaternary uppercase">Supported operations · build123d</h3>
+              <h3 className="mt-5 mb-2 text-xs tracking-[0.08em] text-muted-text uppercase">Supported operations · build123d</h3>
               <div className="flex flex-wrap gap-1.5">
                 {ops.map((op) => (
-                  <span key={op} className="rounded-full border border-muted bg-action px-2.5 py-0.5 text-caption text-tertiary">
+                  <span key={op} className="rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-xs text-muted-text">
                     {op.replace(/_/g, " ")}
                   </span>
                 ))}

@@ -8,7 +8,7 @@ import type { FlatPattern, Viewer, ViewerCheck } from "@/lib/api";
 import { fmtValue } from "@/lib/assembly";
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-5 mb-2 text-caption tracking-[0.08em] text-quaternary uppercase first:mt-0">{children}</h3>;
+  return <h3 className="mt-5 mb-2 text-xs tracking-[0.08em] text-muted-text uppercase first:mt-0">{children}</h3>;
 }
 
 const n = (v: number, d = 2) => +v.toFixed(d);
@@ -79,7 +79,7 @@ export function FlatPatternView({ flat, selectedBend, onSelectBend }: { flat: Fl
             </g>
           );
         })}
-        <text x={x0 + w / 2} y={-y0 + pad * 0.95} fontSize={font} textAnchor="middle" style={{ fill: "var(--text-tertiary)" }}>
+        <text x={x0 + w / 2} y={-y0 + pad * 0.95} fontSize={font} textAnchor="middle" style={{ fill: "var(--color-muted-text)" }}>
           {n(w)} mm
         </text>
         <text
@@ -88,17 +88,17 @@ export function FlatPatternView({ flat, selectedBend, onSelectBend }: { flat: Fl
           fontSize={font}
           textAnchor="middle"
           transform={`rotate(-90 ${x1 + pad * 0.55} ${-(y0 + h / 2)})`}
-          style={{ fill: "var(--text-tertiary)" }}
+          style={{ fill: "var(--color-muted-text)" }}
         >
           {n(h)} mm
         </text>
       </svg>
       <div className="pointer-events-none absolute top-3 left-3 flex flex-wrap gap-2">
-        <span className="rounded-full border border-muted bg-container px-2.5 py-1 text-caption text-tertiary">Flat · mm</span>
-        <span className="rounded-full border border-muted bg-container px-2.5 py-1 text-caption tabular text-secondary" data-testid="flat-size">
+        <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-muted-text">Flat · mm</span>
+        <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs tabular text-body" data-testid="flat-size">
           {n(flat.size[0], 3)} × {n(flat.size[1], 3)} mm
         </span>
-        <span className="rounded-full border border-muted bg-container px-2.5 py-1 text-caption text-tertiary">
+        <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-muted-text">
           {flat.bends.length} bend line{flat.bends.length === 1 ? "" : "s"}
         </span>
       </div>
@@ -128,9 +128,9 @@ export function BendTable({ viewer, selectedBend, onSelectBend }: { viewer: View
         <div className="overflow-x-auto">
           <table className="w-full" data-testid="bend-table">
             <thead>
-              <tr className="border-b border-muted text-left">
+              <tr className="border-b border-line text-left">
                 {["Bend", "From", "Angle", "R", "K", "BA"].map((hd) => (
-                  <th key={hd} scope="col" className={`py-1.5 pr-2 text-caption font-normal text-quaternary ${hd === "Bend" || hd === "From" ? "" : "text-right"}`}>
+                  <th key={hd} scope="col" className={`py-1.5 pr-2 text-xs font-normal text-muted-text ${hd === "Bend" || hd === "From" ? "" : "text-right"}`}>
                     {hd}
                   </th>
                 ))}
@@ -141,25 +141,25 @@ export function BendTable({ viewer, selectedBend, onSelectBend }: { viewer: View
                 <tr
                   key={b.id}
                   onClick={() => onSelectBend(selectedBend === b.id ? null : b.id)}
-                  className={`cursor-pointer border-b border-muted last:border-b-0 ${selectedBend === b.id ? "bg-raised" : "hover:bg-raised"}`}
+                  className={`cursor-pointer border-b border-line last:border-b-0 ${selectedBend === b.id ? "bg-surface" : "hover:bg-surface"}`}
                 >
-                  <td className="py-1.5 pr-2 text-body-sm text-primary">{b.id}</td>
-                  <td className="py-1.5 pr-2 text-body-sm text-tertiary">{b.parent}</td>
-                  <td className="py-1.5 pr-2 text-right text-body-sm tabular text-primary">
+                  <td className="py-1.5 pr-2 text-xs text-ink">{b.id}</td>
+                  <td className="py-1.5 pr-2 text-xs text-muted-text">{b.parent}</td>
+                  <td className="py-1.5 pr-2 text-right text-xs tabular text-ink">
                     {n(b.angle, 1)}° {b.direction}
                   </td>
-                  <td className="py-1.5 pr-2 text-right text-body-sm tabular text-secondary">{n(b.radius, 2)}</td>
-                  <td className="py-1.5 pr-2 text-right text-body-sm tabular text-secondary">{n(b.k, 3)}</td>
-                  <td className="py-1.5 text-right text-body-sm tabular text-secondary">{n(b.allowance, 3)}</td>
+                  <td className="py-1.5 pr-2 text-right text-xs tabular text-body">{n(b.radius, 2)}</td>
+                  <td className="py-1.5 pr-2 text-right text-xs tabular text-body">{n(b.k, 3)}</td>
+                  <td className="py-1.5 text-right text-xs tabular text-body">{n(b.allowance, 3)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : (
-        <p className="text-body-sm text-quaternary">A flat blank: no bends.</p>
+        <p className="text-xs text-muted-text">A flat blank: no bends.</p>
       )}
-      <p className="mt-3 text-body-sm text-quaternary">Bend allowance BA = angle × (R + K·T); K from DIN 6935 unless the spec fixes it. Lengths in mm.</p>
+      <p className="mt-3 text-xs text-muted-text">Bend allowance BA = angle × (R + K·T); K from DIN 6935 unless the spec fixes it. Lengths in mm.</p>
     </div>
   );
 }
@@ -195,13 +195,13 @@ export function SheetChecks({ viewer }: { viewer: Viewer }) {
       {items.map((c) => {
         const t = ruleTitle(c);
         return (
-          <li key={c.name} data-check={c.name} data-passed={c.passed} className="flex items-start justify-between gap-3 border-b border-muted py-2 last:border-b-0" title={c.note ?? ""}>
+          <li key={c.name} data-check={c.name} data-passed={c.passed} className="flex items-start justify-between gap-3 border-b border-line py-2 last:border-b-0" title={c.note ?? ""}>
             <span className="min-w-0">
-              <span className="block text-body-sm text-primary">
+              <span className="block text-xs text-ink">
                 {t.rule}
-                {t.where ? <span className="text-tertiary"> · {t.where}</span> : null}
+                {t.where ? <span className="text-muted-text"> · {t.where}</span> : null}
               </span>
-              <span className="block text-caption text-quaternary tabular [overflow-wrap:anywhere]">
+              <span className="block text-xs text-muted-text tabular [overflow-wrap:anywhere]">
                 {c.requested !== null && c.requested !== undefined && (typeof c.actual !== "object" || Array.isArray(c.actual))
                   ? `${fmtValue(c.requested)} → ${fmtValue(c.actual)}`
                   : (c.note ?? fmtValue(c.actual))}
@@ -221,13 +221,13 @@ export function SheetChecks({ viewer }: { viewer: Viewer }) {
         <StatusBadge tone={viewer.passed ? "success" : "error"}>
           {viewer.passed ? `all ${viewer.checks.length} checks passed` : `${failed.length} of ${viewer.checks.length} failed`}
         </StatusBadge>
-        <span className="text-body-sm text-tertiary">folded solid and flat pattern</span>
+        <span className="text-xs text-muted-text">folded solid and flat pattern</span>
       </div>
       <Caption>Shop rules · {rules.filter((c) => c.passed).length}/{rules.length}</Caption>
-      {rules.length ? list(rules) : <p className="text-body-sm text-quaternary">No flanges or cutouts to check.</p>}
+      {rules.length ? list(rules) : <p className="text-xs text-muted-text">No flanges or cutouts to check.</p>}
       <Caption>Geometry and unfold · {geometry.filter((c) => c.passed).length}/{geometry.length}</Caption>
       {list(geometry)}
-      <p className="mt-3 text-body-sm text-quaternary">
+      <p className="mt-3 text-xs text-muted-text">
         Rules are conservative shop defaults (flange ≥ 2.5T + R, holes ≥ 2T + R from a bend), not a specific press brake.
       </p>
     </div>

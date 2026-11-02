@@ -1,10 +1,9 @@
 "use client";
 
-import { LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, SunMedium } from "lucide-react";
+import { LogOut, Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { useTheme } from "@/context/theme-context";
 import { NAV_ITEMS, navItemForPath } from "@/lib/navigation";
 import { clearSession } from "@/lib/session";
 
@@ -19,7 +18,6 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
   const pathname = usePathname();
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
-  const { isDark, toggleTheme } = useTheme();
   const active = navItemForPath(pathname);
   const showExpanded = expanded || open;
 
@@ -33,14 +31,14 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
       aria-label="Primary"
       data-expanded={showExpanded}
       className={[
-        "flex h-full shrink-0 flex-col border-r border-muted bg-container",
+        "flex h-full shrink-0 flex-col border-r border-line bg-bg",
         "transition-[width,transform] duration-200 ease-out",
         "fixed inset-y-0 left-0 z-50 lg:relative lg:z-30 lg:translate-x-0",
         showExpanded ? "w-[252px]" : "w-[68px]",
         open ? "translate-x-0" : "-translate-x-full pointer-events-none lg:pointer-events-auto lg:translate-x-0",
       ].join(" ")}
     >
-      <div className={["flex h-14 shrink-0 items-center border-b border-muted", showExpanded ? "gap-2.5 px-4" : "justify-center"].join(" ")}>
+      <div className={["flex h-14 shrink-0 items-center border-b border-line", showExpanded ? "gap-2.5 px-4" : "justify-center"].join(" ")}>
         <Logo wordmark={showExpanded} />
       </div>
 
@@ -61,7 +59,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
         </ul>
       </nav>
 
-      <div className={["flex shrink-0 flex-col gap-1.5 border-t border-muted py-3", showExpanded ? "px-3" : "px-[14px]"].join(" ")}>
+      <div className={["flex shrink-0 flex-col gap-1.5 border-t border-line py-3", showExpanded ? "px-3" : "px-[14px]"].join(" ")}>
         <div className="hidden lg:contents">
           <SidebarItem
             icon={showExpanded ? PanelLeftClose : PanelLeftOpen}
@@ -70,7 +68,6 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
             expanded={showExpanded}
           />
         </div>
-        <SidebarItem icon={isDark ? SunMedium : Moon} label={isDark ? "Switch to light" : "Switch to dark"} onClick={toggleTheme} expanded={showExpanded} />
         <SidebarItem icon={LogOut} label="Sign out" onClick={signOut} expanded={showExpanded} />
       </div>
     </aside>
@@ -84,7 +81,7 @@ export function SidebarMenuButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label="Open navigation"
-      className="flex size-8 items-center justify-center rounded-full bg-action icon-tertiary outline-none transition-colors duration-[180ms] hover:bg-raised-2 hover:icon-secondary focus-visible:ring-2 focus-visible:ring-active lg:hidden"
+      className="flex size-8 items-center justify-center rounded-full bg-surface-2 text-muted outline-none transition-colors duration-[180ms] hover:bg-surface-2 hover:text-body focus-visible:ring-2 focus-visible:ring-line-strong lg:hidden"
     >
       <Menu size={16} strokeWidth={1.75} aria-hidden />
     </button>

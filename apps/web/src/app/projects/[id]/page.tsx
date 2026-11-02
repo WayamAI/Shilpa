@@ -145,18 +145,18 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Workspace header: compact, so the viewer keeps the height. */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-muted px-4 py-3 sm:px-5">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/projects"
             aria-label="All projects"
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-action icon-tertiary outline-none transition-colors duration-[180ms] hover:bg-raised-2 hover:icon-secondary focus-visible:ring-2 focus-visible:ring-active"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted outline-none transition-colors duration-[180ms] hover:bg-surface-2 hover:text-body focus-visible:ring-2 focus-visible:ring-line-strong"
           >
             <ArrowLeft size={15} strokeWidth={1.75} aria-hidden />
           </Link>
           <div className="min-w-0">
-            <h2 className="truncate font-display text-display-lg text-primary">{project?.name ?? "…"}</h2>
-            <p className="truncate text-body-sm text-tertiary">
+            <h2 className="truncate text-lg font-semibold text-ink">{project?.name ?? "…"}</h2>
+            <p className="truncate text-xs text-muted-text">
               {model ? (
                 <>
                   {model.name}
@@ -193,7 +193,7 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
                 setModelId(e.target.value);
                 loadModel(e.target.value).catch((err) => setError(errText(err)));
               }}
-              className="h-8 max-w-[260px] rounded-full border border-muted bg-action text-label-sm text-secondary outline-none focus-visible:ring-2 focus-visible:ring-active"
+              className="h-8 max-w-[260px] rounded-full border border-line bg-surface-2 text-xs font-semibold text-body outline-none focus-visible:ring-2 focus-visible:ring-line-strong"
             >
               {!modelId ? <option value="">New part</option> : null}
               {project.models.map((m) => (
@@ -237,11 +237,11 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
             padded={false}
             className="min-h-[420px] lg:min-h-0"
             title="Part"
-            action={version ? <span className="text-caption tabular text-quaternary">{version.recipe_hash.slice(0, 8)}</span> : undefined}
+            action={version ? <span className="text-xs tabular text-muted-text">{version.recipe_hash.slice(0, 8)}</span> : undefined}
           >
             {version ? (
               <div className="flex min-h-0 flex-1 flex-col">
-                <div className="shrink-0 border-b border-muted px-4 py-2.5">
+                <div className="shrink-0 border-b border-line px-4 py-2.5">
                   <Tabs<Tab>
                     label="Part details"
                     value={tab}
@@ -277,7 +277,7 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
             )}
           </Panel>
 
-          <Panel padded={false} className="min-h-[420px] lg:min-h-0" title="Model" action={version ? <span className="text-caption text-quaternary">drag to orbit · scroll to zoom</span> : undefined}>
+          <Panel padded={false} className="min-h-[420px] lg:min-h-0" title="Model" action={version ? <span className="text-xs text-muted-text">drag to orbit · scroll to zoom</span> : undefined}>
             <ModelViewer glbId={glb} size={version?.validation?.measurement?.bbox_size ?? null} />
           </Panel>
           </>
