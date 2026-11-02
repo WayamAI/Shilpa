@@ -1,0 +1,360 @@
+# Shilpa CI/CD (Azure DevOps). Docs: docs/azure/infra.md
+#
+# validate -> build (scan, SBOM, push by digest) -> deploy dev (what-if, deploy, smoke) -> staging -> prod
+#
+# No secrets live in this file. Azure access uses service connections backed by workload identity federation
+# (no client secrets); approvals and checks are configured on the Azure DevOps *Environments* below, not in YAML.
+#
+# One-time setup (placeholders to replace, see docs/azure/infra.md "Pipeline setup"):
+#   Service connections (type: Azure Resource Manager, workload identity federation):
+#     sc-shilpa-dev, sc-shilpa-stg, sc-shilpa-prod
+#   Environments with approvals/checks: shilpa-dev (none), shilpa-staging, shilpa-prod (manual approval)
+#   Variable group `shilpa-dev` (non-secret): AZURE_RG, ACR_NAME (the dev registry that builds push to)
+#   Variable groups `shilpa-staging`, `shilpa-prod`: AZURE_RG, ACR_NAME
+#   Resource groups and the first (bootstrap) infra deployment are created by an operator; see docs.
+
+parameters:
+- name: targets
+  type: object
+  default:
+  - key: staging
+    dependsOn: deploy_dev
+    environment: shilpa-staging
+    serviceConnection: sc-shilpa-stg          # [placeholder]
+    variableGroup: shilpa-staging              # defines TARGET_ACR_NAME, TARGET_AZURE_RG, SOURCE_ACR_NAME (the dev/build registry)
+    paramsFile: staging.bicepparam
+  - key: prod
+    dependsOn: deploy_staging
+    environment: shilpa-prod                   # configure a manual approval check on this environment
+    serviceConnection: sc-shilpa-prod         # [placeholder]
+    variableGroup: shilpa-prod
+    paramsFile: prod.bicepparam
+
+trigger:
+  branches:
+    include: [main]
+  paths:
+    exclude: ['docs/**', '*.md']
+
+pr:
+  branches:
+    include: [main]
+
+pool:
+  vmImage: ubuntu-24.04
+
+variables:
+  # [Verify] Pin to the versions you have reviewed. Binaries are checked against the release's published checksums.
+  SYFT_VERSION: '1.34.0'
+  TRIVY_VERSION: '0.65.0'
+  GITLEAKS_VERSION: '8.28.0'
+  PYTHON_VERSION: '3.12'
+  NODE_VERSION: '24.x'
+  BICEP_MAIN: infra/main.bicep
+  IMAGE_TAG: $(Build.BuildNumber)
+
+stages:
+# ============================================================================================ validate
+- stage: validate
+  displayName: Validate
+  jobs:
+  - job: python
+    displayName: Python tests
+    steps:
+    - task: UsePythonVersion@0
+      inputs: { versionSpec: $(PYTHON_VERSION) }
+    - script: pip install uv
+      displayName: Install uv
+    - script: uv sync --frozen
+      displayName: Install dependencies
+    # ruff is not configured in pyproject.toml yet; enable these two lines when [tool.ruff] is added.
+    # - script: uv run ruff check .
+    #   displayName: ruff
+    - script: uv run pytest -q --junitxml=$(Build.ArtifactStagingDirectory)/pytest.xml
+      displayName: pytest (no model calls)
+      env:
+        SHILPA_LLM: 'off'
+    - task: PublishTestResults@2
+      condition: succeededOrFailed()
+      inputs: { testResultsFormat: JUnit, testResultsFiles: '$(Build.ArtifactStagingDirectory)/pytest.xml', testRunTitle: pytest }
+
+  - job: web
+    displayName: Web typecheck and lint
+    steps:
+    - task: NodeTool@0
+      inputs: { versionSpec: $(NODE_VERSION) }
+    - script: npm ci
+      workingDirectory: apps/web
+      displayName: npm ci
+    - script: npm run typecheck
+      workingDirectory: apps/web
+      displayName: tsc --noEmit
+    - script: npm run lint
+      workingDirectory: apps/web
+      displayName: eslint
+
+  - job: bicep
+    displayName: Bicep build and lint
+    steps:
+    - script: |
+        set -euo pipefail
+        az bicep install
+        az bicep build --file $(BICEP_MAIN) --stdout > /dev/null
+        for p in infra/params/*.bicepparam; do az bicep build-params --file "$p" --stdout > /dev/null; done
+        # Lint warnings (including use-recent-api-versions) are printed; errors fail the build via bicepconfig.json.
+        az bicep lint --file $(BICEP_MAIN)
+      displayName: az bicep build / build-params / lint
+
+  - job: secrets
+    displayName: Secret scan
+    steps:
+    - script: |
+        set -euo pipefail
+        base="https://github.com/gitleaks/gitleaks/releases/download/v$(GITLEAKS_VERSION)"
+        curl -fsSLO "$base/gitleaks_$(GITLEAKS_VERSION)_linux_x64.tar.gz"
+        curl -fsSLO "$base/gitleaks_$(GITLEAKS_VERSION)_checksums.txt"
+        sha256sum --check --ignore-missing "gitleaks_$(GITLEAKS_VERSION)_checksums.txt"
+        tar -xzf "gitleaks_$(GITLEAKS_VERSION)_linux_x64.tar.gz" gitleaks
+        ./gitleaks dir . --redact --no-banner
+      displayName: gitleaks (pinned, checksum verified)
+
+# ============================================================================================ build
+- stage: build
+  displayName: Build, scan, push
+  dependsOn: validate
+  variables:
+  - group: shilpa-dev
+  jobs:
+  - job: images
+    displayName: Images
+    steps:
+    - script: |
+        set -euo pipefail
+        install_dir="$HOME/.local/bin"; mkdir -p "$install_dir"
+        # syft
+        sb="https://github.com/anchore/syft/releases/download/v$(SYFT_VERSION)"
+        curl -fsSLO "$sb/syft_$(SYFT_VERSION)_linux_amd64.tar.gz"
+        curl -fsSLO "$sb/syft_$(SYFT_VERSION)_checksums.txt"
+        sha256sum --check --ignore-missing "syft_$(SYFT_VERSION)_checksums.txt"
+        tar -xzf "syft_$(SYFT_VERSION)_linux_amd64.tar.gz" -C "$install_dir" syft
+        # trivy
+        tb="https://github.com/aquasecurity/trivy/releases/download/v$(TRIVY_VERSION)"
+        curl -fsSLO "$tb/trivy_$(TRIVY_VERSION)_Linux-64bit.tar.gz"
+        curl -fsSLO "$tb/trivy_$(TRIVY_VERSION)_checksums.txt"
+        sha256sum --check --ignore-missing "trivy_$(TRIVY_VERSION)_checksums.txt"
+        tar -xzf "trivy_$(TRIVY_VERSION)_Linux-64bit.tar.gz" -C "$install_dir" trivy
+        echo "##vso[task.prependpath]$install_dir"
+      displayName: Install syft and trivy (pinned, checksum verified)
+
+    - script: |
+        set -euo pipefail
+        docker build -f apps/web/Dockerfile -t shilpa-web:ci apps/web
+        docker build -f Dockerfile.backend -t shilpa-backend:ci .
+      displayName: docker build (web, backend)
+
+    - script: |
+        set -euo pipefail
+        mkdir -p "$(Build.ArtifactStagingDirectory)/evidence"
+        for img in shilpa-web shilpa-backend; do
+          syft "$img:ci" -o spdx-json="$(Build.ArtifactStagingDirectory)/evidence/$img.sbom.spdx.json"
+          # Report everything, fail the build on fixable HIGH/CRITICAL findings.
+          trivy image --format json --output "$(Build.ArtifactStagingDirectory)/evidence/$img.trivy.json" "$img:ci"
+          trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed "$img:ci"
+        done
+      displayName: SBOM (syft) and vulnerability scan (trivy)
+
+    - task: PublishBuildArtifacts@1
+      condition: succeededOrFailed()
+      displayName: Publish SBOMs and scan reports
+      inputs: { PathtoPublish: '$(Build.ArtifactStagingDirectory)/evidence', ArtifactName: evidence }
+
+    # Only main pushes. Pull requests stop after the scan.
+    - task: AzureCLI@2
+      condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+      displayName: Push to ACR and record digests
+      inputs:
+        azureSubscription: sc-shilpa-dev            # [placeholder] workload identity federation service connection
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          set -euo pipefail
+          az acr login --name "$(ACR_NAME)"
+          server="$(az acr show --name "$(ACR_NAME)" --query loginServer -o tsv)"
+          mkdir -p "$(Build.ArtifactStagingDirectory)/digests"
+          out="$(Build.ArtifactStagingDirectory)/digests/images.json"
+          echo '{}' > "$out"
+          for pair in "shilpa-web:shilpa-web" "shilpa-backend:shilpa-backend"; do
+            local_name="${pair%%:*}"; repo="${pair##*:}"
+            docker tag "$local_name:ci" "$server/$repo:$(IMAGE_TAG)"
+            docker push "$server/$repo:$(IMAGE_TAG)"
+            digest="$(az acr repository show --name "$(ACR_NAME)" --image "$repo:$(IMAGE_TAG)" --query digest -o tsv)"
+            python3 - "$out" "$repo" "$digest" <<'PY'
+          import json, sys
+          path, repo, digest = sys.argv[1:4]
+          data = json.load(open(path)); data[repo] = digest; json.dump(data, open(path, "w"))
+          PY
+          done
+          cat "$out"
+
+    - task: PublishBuildArtifacts@1
+      condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+      displayName: Publish image digests
+      inputs: { PathtoPublish: '$(Build.ArtifactStagingDirectory)/digests', ArtifactName: digests }
+
+# ============================================================================================ deploy dev
+- stage: deploy_dev
+  displayName: Deploy dev
+  dependsOn: build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  variables:
+  - group: shilpa-dev
+  jobs:
+  - deployment: dev
+    displayName: Dev
+    environment: shilpa-dev
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          - download: current
+            artifact: digests
+          - task: AzureCLI@2
+            displayName: what-if
+            inputs:
+              azureSubscription: sc-shilpa-dev
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                server="$(az acr show --name "$(ACR_NAME)" --query loginServer -o tsv)"
+                web="$server/shilpa-web@$(python3 -c "import json;print(json.load(open('$(Pipeline.Workspace)/digests/images.json'))['shilpa-web'])")"
+                backend="$server/shilpa-backend@$(python3 -c "import json;print(json.load(open('$(Pipeline.Workspace)/digests/images.json'))['shilpa-backend'])")"
+                # Read by readEnvironmentVariable() in the .bicepparam files (a .bicepparam cannot be mixed with inline overrides).
+                export SHILPA_WEB_IMAGE="$web" SHILPA_BACKEND_IMAGE="$backend"
+                az deployment group what-if --resource-group "$(AZURE_RG)" \
+                  --template-file infra/main.bicep --parameters infra/params/dev.bicepparam \
+                  --no-pretty-print --result-format ResourceIdOnly
+          - task: AzureCLI@2
+            name: deploy
+            displayName: Deploy infrastructure and apps
+            inputs:
+              azureSubscription: sc-shilpa-dev
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                server="$(az acr show --name "$(ACR_NAME)" --query loginServer -o tsv)"
+                web="$server/shilpa-web@$(python3 -c "import json;print(json.load(open('$(Pipeline.Workspace)/digests/images.json'))['shilpa-web'])")"
+                backend="$server/shilpa-backend@$(python3 -c "import json;print(json.load(open('$(Pipeline.Workspace)/digests/images.json'))['shilpa-backend'])")"
+                # Read by readEnvironmentVariable() in the .bicepparam files (a .bicepparam cannot be mixed with inline overrides).
+                export SHILPA_WEB_IMAGE="$web" SHILPA_BACKEND_IMAGE="$backend"
+                url="$(az deployment group create --resource-group "$(AZURE_RG)" --name "shilpa-$(Build.BuildId)" \
+                  --template-file infra/main.bicep --parameters infra/params/dev.bicepparam \
+                  --query properties.outputs.webUrl.value -o tsv)"
+                echo "##vso[task.setvariable variable=webUrl;isOutput=true]$url"
+          - task: AzureCLI@2
+            displayName: Smoke test (/v1/health through the web proxy)
+            inputs:
+              azureSubscription: sc-shilpa-dev
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                url="$(deploy.webUrl)"
+                for i in $(seq 1 30); do
+                  if curl -fsS --max-time 10 "$url/v1/health" | tee /dev/stderr | python3 -c "import json,sys;sys.exit(0 if json.load(sys.stdin).get('ok') else 1)"; then
+                    echo; echo "healthy after $i attempt(s)"; exit 0
+                  fi
+                  sleep 10
+                done
+                echo "smoke test failed: $url/v1/health"; exit 1
+
+# ============================================================================================ staging and prod
+# The same digests move forward: `az acr import` copies each image by tag from the build registry into the target
+# registry; the pipeline then asserts the digest is unchanged before deploying it by digest.
+- ${{ each target in parameters.targets }}:
+  - stage: deploy_${{ target.key }}
+    displayName: Deploy ${{ target.key }}
+    dependsOn: ${{ target.dependsOn }}
+    condition: succeeded()
+    variables:
+    - group: ${{ target.variableGroup }}
+    jobs:
+    - deployment: ${{ target.key }}
+      displayName: ${{ target.key }}
+      environment: ${{ target.environment }}   # approvals and checks are configured on this environment
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - checkout: self
+            - download: current
+              artifact: digests
+            - task: AzureCLI@2
+              displayName: Promote images (same digests)
+              inputs:
+                azureSubscription: ${{ target.serviceConnection }}
+                scriptType: bash
+                scriptLocation: inlineScript
+                inlineScript: |
+                  set -euo pipefail
+                  # The target registry is the one in this environment's variable group; the build registry is dev.
+                  src_id="$(az acr show --name "$(SOURCE_ACR_NAME)" --query id -o tsv)"
+                  for repo in shilpa-web shilpa-backend; do
+                    digest="$(python3 -c "import json;print(json.load(open('$(Pipeline.Workspace)/digests/images.json'))['$repo'])")"
+                    az acr import --name "$(TARGET_ACR_NAME)" --registry "$src_id" \
+                      --source "$repo@$digest" --image "$repo:$(IMAGE_TAG)" --force
+                    got="$(az acr repository show --name "$(TARGET_ACR_NAME)" --image "$repo:$(IMAGE_TAG)" --query digest -o tsv)"
+                    [ "$got" = "$digest" ] || { echo "digest changed for $repo: $digest -> $got"; exit 1; }
+                  done
+            - task: AzureCLI@2
+              displayName: what-if
+              inputs:
+                azureSubscription: ${{ target.serviceConnection }}
+                scriptType: bash
+                scriptLocation: inlineScript
+                inlineScript: |
+                  set -euo pipefail
+                  server="$(az acr show --name "$(TARGET_ACR_NAME)" --query loginServer -o tsv)"
+                  web="$server/shilpa-web@$(python3 -c "import json;print(json.load(open('$(Pipeline.Workspace)/digests/images.json'))['shilpa-web'])")"
+                  backend="$server/shilpa-backend@$(python3 -c "import json;print(json.load(open('$(Pipeline.Workspace)/digests/images.json'))['shilpa-backend'])")"
+                  # Read by readEnvironmentVariable() in the .bicepparam files (a .bicepparam cannot be mixed with inline overrides).
+                  export SHILPA_WEB_IMAGE="$web" SHILPA_BACKEND_IMAGE="$backend"
+                  az deployment group what-if --resource-group "$(TARGET_AZURE_RG)" \
+                    --template-file infra/main.bicep --parameters infra/params/${{ target.paramsFile }} \
+                    --no-pretty-print --result-format ResourceIdOnly
+            - task: AzureCLI@2
+              name: deploy
+              displayName: Deploy infrastructure and apps
+              inputs:
+                azureSubscription: ${{ target.serviceConnection }}
+                scriptType: bash
+                scriptLocation: inlineScript
+                inlineScript: |
+                  set -euo pipefail
+                  server="$(az acr show --name "$(TARGET_ACR_NAME)" --query loginServer -o tsv)"
+                  web="$server/shilpa-web@$(python3 -c "import json;print(json.load(open('$(Pipeline.Workspace)/digests/images.json'))['shilpa-web'])")"
+                  backend="$server/shilpa-backend@$(python3 -c "import json;print(json.load(open('$(Pipeline.Workspace)/digests/images.json'))['shilpa-backend'])")"
+                  # Read by readEnvironmentVariable() in the .bicepparam files (a .bicepparam cannot be mixed with inline overrides).
+                  export SHILPA_WEB_IMAGE="$web" SHILPA_BACKEND_IMAGE="$backend"
+                  url="$(az deployment group create --resource-group "$(TARGET_AZURE_RG)" --name "shilpa-$(Build.BuildId)" \
+                    --template-file infra/main.bicep --parameters infra/params/${{ target.paramsFile }} \
+                    --query properties.outputs.webUrl.value -o tsv)"
+                  echo "##vso[task.setvariable variable=webUrl;isOutput=true]$url"
+            - task: AzureCLI@2
+              displayName: Smoke test (/v1/health)
+              inputs:
+                azureSubscription: ${{ target.serviceConnection }}
+                scriptType: bash
+                scriptLocation: inlineScript
+                inlineScript: |
+                  set -euo pipefail
+                  url="$(deploy.webUrl)"
+                  for i in $(seq 1 30); do
+                    if curl -fsS --max-time 10 "$url/v1/health" | python3 -c "import json,sys;sys.exit(0 if json.load(sys.stdin).get('ok') else 1)"; then
+                      echo "healthy after $i attempt(s)"; exit 0
+                    fi
+                    sleep 10
+                  done
+                  echo "smoke test failed: $url/v1/health"; exit 1

@@ -1,0 +1,12 @@
+{
+  "analyzers": {
+    "core": {
+      "rules": {
+        "use-recent-api-versions": { "level": "warning" },
+        "no-hardcoded-env-urls": { "level": "warning" },
+        "outputs-should-not-contain-secrets": { "level": "error" },
+        "secure-secrets-in-params": { "level": "error" }
+      }
+    }
+  }
+}
