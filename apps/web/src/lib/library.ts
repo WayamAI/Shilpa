@@ -39,11 +39,8 @@ const COMPLEX_THUMB = "/imagery/sh-card-02-complex-part-128.webp";
     Model thumbnails come from the API first: the THUMB artifact the CAD worker
     renders for every version (thumb_artifact_id on the model). Models without
     one (versions older than the worker change and not yet backfilled with
-    `python -m shilpa.thumbs backfill`) fall back to the static renders of the
-    head version, named <model_id>-v<n> (scripts/render_model_thumbs.py), then
-    to the icon. */
+    `python -m shilpa.thumbs backfill`) show the category icon. */
 const THUMB_DIR = "/thumbs/catalog";
-const MODEL_THUMB_DIR = "/thumbs/models";
 
 async function loadRendered(dir: string): Promise<Set<string>> {
   try {
@@ -91,11 +88,10 @@ function fromGenerator(g: CatalogGenerator, rendered: Set<string>): LibraryItem 
 
 const KIND_LABEL: Record<string, string> = { part: "Part", sheet_metal: "Sheet metal", assembly: "Assembly", product: "Product" };
 
-function fromModel(m: ModelSummary, project: Project, rendered: Set<string>, fromApi: string | null): LibraryItem {
+function fromModel(m: ModelSummary, project: Project, fromApi: string | null): LibraryItem {
   const complex = m.kind === "assembly" || m.kind === "product";
   const what = KIND_LABEL[m.kind ?? "part"] ?? "Part";
-  const file = `${m.id}-v${m.head_number}`;
-  const own = fromApi != null || (m.head_number != null && rendered.has(file));
+  const own = fromApi != null;
   return {
     id: `model:${m.id}`,
     name: m.name,
@@ -106,24 +102,19 @@ function fromModel(m: ModelSummary, project: Project, rendered: Set<string>, fro
     family: what,
     version: m.head_number,
     href: `/projects/${project.id}`,
-    thumb: fromApi ?? (own ? `${MODEL_THUMB_DIR}/${file}.webp` : complex ? COMPLEX_THUMB : NATIVE_THUMB),
+    thumb: fromApi ?? (complex ? COMPLEX_THUMB : NATIVE_THUMB),
     thumbKind: own ? "render" : "icon",
     haystack: [m.name, what, project.name].join(" ").toLowerCase(),
   };
 }
 
 export async function loadLibrary(): Promise<LibraryItem[]> {
-  const [catalog, projects, rendered, modelRendered] = await Promise.all([
-    catalogApi.list(),
-    api.projects(),
-    loadRendered(THUMB_DIR),
-    loadRendered(MODEL_THUMB_DIR),
-  ]);
+  const [catalog, projects, rendered] = await Promise.all([catalogApi.list(), api.projects(), loadRendered(THUMB_DIR)]);
   const details = await Promise.all(projects.filter((p) => p.model_count > 0).map((p) => api.project(p.id)));
   const models = await Promise.all(
     details.flatMap((d) =>
       d.models.map(async (m) =>
-        fromModel(m, d, modelRendered, m.thumb_artifact_id ? await apiThumb(m.thumb_artifact_id) : null),
+        fromModel(m, d, m.thumb_artifact_id ? await apiThumb(m.thumb_artifact_id) : null),
       ),
     ),
   );
