@@ -7,7 +7,7 @@ import { Badge, Button, EmptyState, KeyValue, NumberInput } from "@/components/u
 import { downloadArtifact, paramValue, type Check, type Version } from "@/lib/api";
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-5 mb-2 text-xs tracking-[0.08em] text-muted-text uppercase first:mt-0">{children}</h3>;
+  return <h3 className="mt-5 mb-2 text-xs font-semibold text-body first:mt-0">{children}</h3>;
 }
 
 function humanize(name: string) {
@@ -226,7 +226,7 @@ export function VersionsPanel({
 }) {
   return (
     <div>
-    <p className="mb-2 text-xs tracking-[0.08em] text-muted-text uppercase">
+    <p className="mb-2 text-xs font-semibold text-body">
       {versions.length} version{versions.length === 1 ? "" : "s"} · each change is a new immutable version
     </p>
     <ol className="flex flex-col gap-2">

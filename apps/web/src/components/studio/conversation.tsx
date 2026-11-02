@@ -364,7 +364,7 @@ function SpecCard({
     <section className="rounded-lg border border-line bg-bg" aria-label="Requirements" data-testid="spec-card">
       <header className="flex items-start justify-between gap-3 border-b border-line px-3.5 py-2.5">
         <div className="min-w-0">
-          <p className="text-xs tracking-[0.08em] text-muted-text uppercase">
+          <p className="text-xs font-semibold text-body">
             {isDrawing ? "Read from drawing" : "Requirements"} · {r.family} · {r.units}
           </p>
           <p className="mt-0.5 text-sm text-ink">{r.summary}</p>
@@ -528,7 +528,7 @@ function JobCard({ entry }: { entry?: { job: Job; events: JobEvent[] } }) {
   return (
     <section className="rounded-lg border border-line bg-bg" aria-label="Job progress" data-testid="job-card" data-state={job.state}>
       <header className="flex items-center justify-between gap-3 border-b border-line px-3.5 py-2">
-        <span className="text-xs tracking-[0.08em] text-muted-text uppercase">
+        <span className="text-xs font-semibold text-body">
           {JOB_LABEL[job.kind] ?? "Generate"} · {job.id.slice(0, 8)}
         </span>
         <Badge tone={tone}>{done ? job.state : "running"}</Badge>

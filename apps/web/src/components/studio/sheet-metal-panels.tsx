@@ -7,7 +7,7 @@ import type { FlatPattern, Viewer, ViewerCheck } from "@/lib/api";
 import { fmtValue } from "@/lib/assembly";
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-5 mb-2 text-xs tracking-[0.08em] text-muted-text uppercase first:mt-0">{children}</h3>;
+  return <h3 className="mt-5 mb-2 text-xs font-semibold text-body first:mt-0">{children}</h3>;
 }
 
 const n = (v: number, d = 2) => +v.toFixed(d);

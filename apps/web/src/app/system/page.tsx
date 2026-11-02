@@ -78,7 +78,7 @@ export default function SystemPage() {
               ) : (
                 <p className="text-xs text-muted-text">No jobs yet.</p>
               )}
-              <h3 className="mt-5 mb-2 text-xs tracking-[0.08em] text-muted-text uppercase">Supported operations · build123d</h3>
+              <h3 className="mt-5 mb-2 text-xs font-semibold text-body">Supported operations · build123d</h3>
               <div className="flex flex-wrap gap-1.5">
                 {ops.map((op) => (
                   <span key={op} className="rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-xs text-muted-text">

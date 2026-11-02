@@ -10,7 +10,7 @@ import { checkDetail, checkTitle, groupLabel, isWarning, partsTree } from "@/lib
 import type { Highlight } from "./assembly-viewer";
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-5 mb-2 text-xs tracking-[0.08em] text-muted-text uppercase first:mt-0">{children}</h3>;
+  return <h3 className="mt-5 mb-2 text-xs font-semibold text-body first:mt-0">{children}</h3>;
 }
 
 function Swatch({ color }: { color: string | null }) {
@@ -47,7 +47,7 @@ export function PartsTree({
   const failing = useMemo(() => failingInstances(viewer), [viewer]);
   return (
     <div>
-      <p className="mb-2 text-xs tracking-[0.08em] text-muted-text uppercase">
+      <p className="mb-2 text-xs font-semibold text-body">
         {viewer.instances.length} part{viewer.instances.length === 1 ? "" : "s"} · {viewer.mates.length} mate{viewer.mates.length === 1 ? "" : "s"} ·
         DOF {viewer.dof.computed ?? "—"}
       </p>
@@ -113,7 +113,7 @@ export function BomTable({ viewer, onSelect }: { viewer: Viewer; onSelect: (id: 
   const mass = viewer.bom.reduce((n, l) => n + (l.mass_g ?? 0) * l.quantity, 0);
   return (
     <div>
-      <p className="mb-2 text-xs tracking-[0.08em] text-muted-text uppercase">
+      <p className="mb-2 text-xs font-semibold text-body">
         {viewer.bom.length} line{viewer.bom.length === 1 ? "" : "s"} · {total} item{total === 1 ? "" : "s"}
         {withMass ? ` · ${(mass / 1000).toFixed(2)} kg` : ""}
       </p>

@@ -152,9 +152,9 @@ export function DrawingReview({
           <table className="w-full">
             <thead className="sticky top-0 bg-bg">
               <tr className="border-b border-line text-left">
-                <th className="px-4 py-2 text-xs font-medium tracking-[0.08em] text-muted-text uppercase">Value</th>
-                <th className="py-2 text-xs font-medium tracking-[0.08em] text-muted-text uppercase">Printed</th>
-                <th className="py-2 pr-5 pl-4 text-right text-xs font-medium tracking-[0.08em] text-muted-text uppercase">Check</th>
+                <th className="px-4 py-2 text-xs font-semibold text-body">Value</th>
+                <th className="py-2 text-xs font-semibold text-body">Printed</th>
+                <th className="py-2 pr-5 pl-4 text-right text-xs font-semibold text-body">Check</th>
               </tr>
             </thead>
             <tbody>

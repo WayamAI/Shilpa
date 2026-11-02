@@ -91,7 +91,7 @@ function AssemblyWorkspace({ version, versions, canWrite, busy, freecadAvailable
                   <PartsTree viewer={viewer} selected={selected} hovered={hovered} onHover={setHovered} onSelect={select} />
                   {product && viewer.joints.length ? (
                     <>
-                      <h3 className="mt-5 mb-2 text-xs tracking-[0.08em] text-muted-text uppercase">Joints</h3>
+                      <h3 className="mt-5 mb-2 text-xs font-semibold text-body">Joints</h3>
                       {jointsPanel}
                     </>
                   ) : null}

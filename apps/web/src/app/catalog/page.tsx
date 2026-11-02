@@ -167,7 +167,7 @@ function Suggestions({ matches, onPick }: { matches: CatalogMatch[]; onPick: (m:
   if (!matches.length) return null;
   return (
     <div className="mb-3" data-testid="catalog-matches">
-      <p className="mb-1 text-xs tracking-[0.08em] text-muted-text uppercase">Exact part</p>
+      <p className="mb-1 text-xs font-semibold text-body">Exact part</p>
       <ul className="flex flex-col gap-1">
         {matches.map((m) => (
           <li key={`${m.generator}|${JSON.stringify(m.params)}`}>
@@ -352,7 +352,7 @@ export default function CatalogPage() {
               <nav aria-label="Catalogue parts" className="flex flex-col gap-4" data-testid="catalog-list">
                 {groups.map(({ family, items }) => (
                   <div key={family}>
-                    <p className="mb-1 text-xs tracking-[0.08em] text-muted-text uppercase">
+                    <p className="mb-1 text-xs font-semibold text-body">
                       {family} <span className="tabular">· {items.length}</span>
                     </p>
                     <ul className="flex flex-col">
