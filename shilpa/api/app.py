@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -14,7 +15,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -49,6 +50,13 @@ from .auth import Principal, principal, require_write, seed_dev_identities
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    from .. import settings as cfg
+    from ..logging_setup import configure_logging
+    from ..telemetry import setup_telemetry
+
+    cfg.enforce_startup()  # hosted environments refuse forbidden or missing settings before serving anything
+    setup_telemetry(_app)
+    configure_logging(cfg.hosting.env, cfg.hosting.log_level)
     init_db()
     if settings.auth_mode == "dev":
         seed_dev_identities()
@@ -108,6 +116,38 @@ def _owned(s, p: Principal, cls, obj_id: str, what: str):
 
 
 # ---------------------------------------------------------------- meta
+
+
+@app.get("/v1/health/live")
+def health_live():
+    return {"ok": True}
+
+
+@app.get("/v1/health/ready")
+def health_ready():
+    from ..health import readiness
+
+    ok, body = readiness()
+    return JSONResponse(status_code=200 if ok else 503, content={"ok": ok, **body})
+
+
+@app.middleware("http")
+async def _access_log(request: Request, call_next):
+    from .. import settings as cfg
+
+    if not cfg.hosting.is_hosted or request.url.path.startswith("/v1/health"):
+        return await call_next(request)
+    t0 = time.perf_counter()
+    status = 500
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        return response
+    finally:  # path only, never the query string or headers
+        logging.getLogger("shilpa.access").info("request", extra={
+            "method": request.method, "path": request.url.path, "status": status,
+            "duration_ms": round((time.perf_counter() - t0) * 1000, 1),
+            "trace_id": request.headers.get("x-trace-id")})
 
 
 @app.get("/v1/health")
@@ -284,22 +324,23 @@ def create_upload(project_id: str, file: UploadFile = File(...), p: Principal = 
         raise _err(413, "too_large", f"uploads are limited to {MAX_BYTES // (1024 * 1024)} MB")
     upload_id = str(uuid.uuid4())
     prefix = f"tenants/{p.tenant_id}/projects/{project_id}/uploads/{upload_id}"
-    original = blobs.path(f"{prefix}/original.bin")  # never the client's file name: no path tricks
-    original.parent.mkdir(parents=True, exist_ok=True)
-    original.write_bytes(data)
     base = (file.filename or "drawing").replace("\\", "/").rsplit("/", 1)[-1]  # display only; never a path
     safe_name = "".join(ch for ch in base[-120:] if ch.isalnum() or ch in "._- ").lstrip(". ") or "drawing"
     with tx() as s:
         s.add(Upload(id=upload_id, tenant_id=p.tenant_id, project_id=project_id, filename=safe_name,
                      sha256=hashlib.sha256(data).hexdigest(), bytes=len(data), state="quarantined", blob_prefix=prefix,
                      created_by=p.user_id))
-    out = blobs.path(f"{prefix}/pages")
-    try:
-        subprocess.run([sys.executable, "-E", "-s", "-m", "shilpa.drawings.ingest", str(original), str(out)], cwd=str(ROOT),
-                       env=_scrubbed_env(), timeout=90, capture_output=True, check=False)
-        result = json.loads((out / "ingest.json").read_text(encoding="utf-8"))
-    except Exception as exc:  # timeout or crash in the parser process
-        result = {"ok": False, "error": f"the file could not be processed ({type(exc).__name__})"}
+    with blobs.workdir(prefix) as work:  # local scratch (the blob directory itself on the local backend)
+        original = work / "original.bin"  # never the client's file name: no path tricks
+        original.write_bytes(data)
+        out = work / "pages"
+        try:
+            subprocess.run([sys.executable, "-E", "-s", "-m", "shilpa.drawings.ingest", str(original), str(out)], cwd=str(ROOT),
+                           env=_scrubbed_env(), timeout=90, capture_output=True, check=False)
+            result = json.loads((out / "ingest.json").read_text(encoding="utf-8"))
+        except Exception as exc:  # timeout or crash in the parser process
+            result = {"ok": False, "error": f"the file could not be processed ({type(exc).__name__})"}
+        blobs.push_dir(work, prefix)  # original, pages and ingest.json reach the store before the upload is marked ready
     with tx() as s:
         u = s.get(Upload, upload_id)
         if result.get("ok"):
@@ -319,14 +360,27 @@ def get_upload(upload_id: str, p: Principal = Depends(principal)):
         return _upload_out(_owned(s, p, Upload, upload_id, "upload"))
 
 
+def _blob_response(key: str, media: str, filename: str | None = None):
+    """Serve one blob: a file response from local disk, otherwise streamed from the store (never a storage URL)."""
+    local = blobs.local_path(key)
+    if local is not None:
+        return FileResponse(local, media_type=media, filename=filename)
+    if not blobs.exists(key):
+        raise _err(404, "not_found", "artifact bytes missing")
+    headers = {"Content-Length": str(blobs.size(key))}
+    if filename:
+        headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return StreamingResponse(blobs.stream(key), media_type=media, headers=headers)
+
+
 @app.get("/v1/uploads/{upload_id}/pages/{number}")
 def upload_page(upload_id: str, number: int, p: Principal = Depends(principal)):
     with tx() as s:
         u = _owned(s, p, Upload, upload_id, "upload")
         if u.state != "ready" or not 1 <= number <= len(u.pages["pages"]):
             raise _err(404, "not_found", "page not found")
-        path = blobs.path(f"{u.blob_prefix}/pages/page-{number}.png")
-    return FileResponse(path, media_type="image/png")
+        key = f"{u.blob_prefix}/pages/page-{number}.png"
+    return _blob_response(key, "image/png")
 
 
 # ---------------------------------------------------------------- specifications
@@ -363,14 +417,15 @@ def create_specification(project_id: str, body: SpecIn, p: Principal = Depends(p
             upload = _owned(s, p, Upload, body.upload_id, "upload")
             if upload.project_id != project_id or upload.state != "ready":
                 raise _err(422, "upload_not_ready", f"upload is {upload.state}")
-            ingested, page_dir = dict(upload.pages), blobs.path(f"{upload.blob_prefix}/pages")
+            ingested, pages_prefix = dict(upload.pages), f"{upload.blob_prefix}/pages"
     b = settings.budgets
     budget = Budget(input_tokens=b.input_tokens, output_tokens=b.output_tokens, deadline=time.time() + 180)
     t0 = time.time()
     if upload is not None:
         from ..drawings.extract import extract, to_requirements
 
-        req = to_requirements(extract(ingested, page_dir, budget, body.prompt))
+        with blobs.view(pages_prefix) as page_dir:  # a local directory on either backend
+            req = to_requirements(extract(ingested, page_dir, budget, body.prompt))
     else:
         req = planner.extract_requirements(body.prompt, budget)
     req["_usage"] = {"input_tokens": budget.used_input, "output_tokens": budget.used_output, "ms": round((time.time() - t0) * 1000),
@@ -666,10 +721,10 @@ def _version_out(s, v: ModelVersion, full: bool = False) -> dict:
         out["validation"] = v.validation
         feats = next((a for a in arts if a.format == "FEATURES"), None)
         if feats:
-            out["features"] = json.loads(blobs.path(feats.blob_key).read_text(encoding="utf-8"))
+            out["features"] = json.loads(blobs.read_bytes(feats.blob_key).decode("utf-8"))
         viewer = next((a for a in arts if a.format == "VIEWER"), None)
         if viewer and blobs.exists(viewer.blob_key):
-            out["viewer"] = json.loads(blobs.path(viewer.blob_key).read_text(encoding="utf-8"))
+            out["viewer"] = json.loads(blobs.read_bytes(viewer.blob_key).decode("utf-8"))
     return out
 
 
@@ -788,7 +843,7 @@ def create_export(version_id: str, body: ExportIn, p: Principal = Depends(princi
                 art = s.scalars(select(Artifact).where(Artifact.version_id == v.id, Artifact.format == "ASSEMBLY_SPEC")).first()
                 if art is None:
                     raise _err(422, "unsupported_operation", "this product version has no assembly spec to export")
-                spec = json.loads(blobs.path(art.blob_key).read_text(encoding="utf-8"))
+                spec = json.loads(blobs.read_bytes(art.blob_key).decode("utf-8"))
             job, _ = _create_job(s, p, project_id=m.project_id, kind="export", key=f"export:{v.id}:{body.format}",
                                  input={"exec": "assembly", "spec": spec, "freecad": True, "export_of": v.id, "format": body.format},
                                  model_id=m.id, base_version_id=v.id)
@@ -820,15 +875,13 @@ def download(artifact_id: str, p: Principal = Depends(principal)):
         a = _owned(s, p, Artifact, artifact_id, "artifact")
         v = s.get(ModelVersion, a.version_id)
         m = s.get(Model, v.model_id)
-        path = blobs.path(a.blob_key)
+        key = a.blob_key
         media, ext = MEDIA.get(a.format, ("application/octet-stream", "bin"))
         safe_name = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in (m.name or "model"))[:60]
         suffix = {"BOM_CSV": "bom", "BOM_JSON": "bom", "DXF": "flat", "PRODUCT_BOM_CSV": "product_bom", "PRODUCT_BOM_JSON": "product_bom",
                   "RENDER_SIDE": "side", "RENDER_ISO": "iso", "THUMB": "thumb"}.get(a.format, a.format.lower())
         fname = f"{safe_name}_v{v.number}.{ext}" if a.format in NAMED_FORMATS else f"{safe_name}_v{v.number}_{suffix}.{ext}"
-    if not path.exists():
-        raise _err(404, "not_found", "artifact bytes missing")
-    return FileResponse(path, media_type=media, filename=fname)
+    return _blob_response(key, media, fname)
 
 
 @app.get("/v1/usage")

@@ -64,8 +64,12 @@ def principal(authorization: str | None = Header(default=None)) -> Principal:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(401, detail={"code": "unauthenticated", "message": "missing bearer token"})
     token = authorization.split(" ", 1)[1].strip()
+    if settings.auth_mode == "entra":
+        from . import entra
+
+        return entra.resolve(entra.validate_token(token))
     if settings.auth_mode != "dev":
-        raise HTTPException(401, detail={"code": "unauthenticated", "message": "Entra validation not configured"})
+        raise HTTPException(401, detail={"code": "unauthenticated", "message": "unknown auth mode"})
     if not token.startswith("dev:"):
         raise HTTPException(401, detail={"code": "unauthenticated", "message": "invalid token"})
     email = token[4:]

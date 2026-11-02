@@ -1,4 +1,4 @@
-"""Content-addressed result cache for structured model calls (sqlite file in the var dir).
+"""Content-addressed result cache for structured model calls (a table in the application database).
 
 The key is a sha256 over provider, model, schema name and hash, the full system prompt and the user content, so
 any change to the prompt text, examples, model or input is a miss. Entries expire after a TTL and the table is
@@ -9,9 +9,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sqlite3
 import time
-from pathlib import Path
+
+from sqlalchemy import Float, String, Text, delete, func, select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Mapped, mapped_column
+
+from ..db import Base, SessionLocal, engine
 
 
 def sha(text: str) -> str:
@@ -29,55 +33,76 @@ def cache_key(provider: str, model: str | None, schema_name: str, schema: dict, 
     return sha("\x1f".join(parts))
 
 
-class LLMCache:
-    def __init__(self, path: Path, ttl_s: int = 7 * 24 * 3600, max_entries: int = 2000):
-        self.path, self.ttl_s, self.max_entries = Path(path), ttl_s, max_entries
+class LLMCacheEntry(Base):
+    """One cached reply. Disposable: created on demand, never migrated, safe to truncate at any time."""
 
-    def _conn(self) -> sqlite3.Connection:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        c = sqlite3.connect(self.path, timeout=10)
-        c.execute("CREATE TABLE IF NOT EXISTS llm_cache (key TEXT PRIMARY KEY, value TEXT NOT NULL, created REAL NOT NULL)")
-        return c
+    __tablename__ = "llm_cache"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+    created: Mapped[float] = mapped_column(Float, index=True)
+
+
+_ready = False
+
+
+def _ensure_table() -> None:
+    global _ready
+    if not _ready:
+        LLMCacheEntry.__table__.create(engine, checkfirst=True)
+        _ready = True
+
+
+class LLMCache:
+    """Same semantics as the former sqlite file: TTL on read, oldest-first eviction beyond ``max_entries``.
+    Works on SQLite and PostgreSQL, and is shared by every replica. Any database error is a miss."""
+
+    def __init__(self, ttl_s: int = 7 * 24 * 3600, max_entries: int = 2000):
+        self.ttl_s, self.max_entries = ttl_s, max_entries
 
     def get(self, key: str) -> dict | None:
         """The stored entry ({"data", "input_tokens", "output_tokens"}) or None (missing or expired)."""
         try:
-            c = self._conn()
-            try:
-                row = c.execute("SELECT value, created FROM llm_cache WHERE key=?", (key,)).fetchone()
+            _ensure_table()
+            with SessionLocal() as s:
+                row = s.get(LLMCacheEntry, key)
                 if row is None:
                     return None
-                if time.time() - row[1] > self.ttl_s:
-                    c.execute("DELETE FROM llm_cache WHERE key=?", (key,))
-                    c.commit()
+                if time.time() - row.created > self.ttl_s:
+                    s.delete(row)
+                    s.commit()
                     return None
-                return json.loads(row[0])
-            finally:
-                c.close()
-        except (sqlite3.Error, OSError, ValueError):
+                return json.loads(row.value)
+        except (SQLAlchemyError, OSError, ValueError):
             return None  # a broken cache must never break a request
 
     def put(self, key: str, entry: dict) -> None:
         try:
-            c = self._conn()
-            try:
-                c.execute("INSERT OR REPLACE INTO llm_cache (key, value, created) VALUES (?,?,?)",
-                          (key, json.dumps(entry, default=str), time.time()))
-                c.execute("DELETE FROM llm_cache WHERE created < ?", (time.time() - self.ttl_s,))
-                c.execute("DELETE FROM llm_cache WHERE key IN "
-                          "(SELECT key FROM llm_cache ORDER BY created DESC LIMIT -1 OFFSET ?)", (self.max_entries,))
-                c.commit()
-            finally:
-                c.close()
-        except (sqlite3.Error, OSError):
+            _ensure_table()
+            now = time.time()
+            with SessionLocal() as s:
+                s.merge(LLMCacheEntry(key=key, value=json.dumps(entry, default=str), created=now))
+                s.execute(delete(LLMCacheEntry).where(LLMCacheEntry.created < now - self.ttl_s))
+                s.flush()
+                if s.scalar(select(func.count()).select_from(LLMCacheEntry)) > self.max_entries:
+                    keep = select(LLMCacheEntry.key).order_by(LLMCacheEntry.created.desc()).limit(self.max_entries)
+                    s.execute(delete(LLMCacheEntry).where(LLMCacheEntry.key.not_in(keep.scalar_subquery())))
+                s.commit()
+        except (SQLAlchemyError, OSError):
             pass
 
     def count(self) -> int:
         try:
-            c = self._conn()
-            try:
-                return c.execute("SELECT COUNT(*) FROM llm_cache").fetchone()[0]
-            finally:
-                c.close()
-        except (sqlite3.Error, OSError):
+            _ensure_table()
+            with SessionLocal() as s:
+                return s.scalar(select(func.count()).select_from(LLMCacheEntry)) or 0
+        except (SQLAlchemyError, OSError):
             return 0
+
+    def clear(self) -> None:
+        try:
+            _ensure_table()
+            with SessionLocal() as s:
+                s.execute(delete(LLMCacheEntry))
+                s.commit()
+        except (SQLAlchemyError, OSError):
+            pass

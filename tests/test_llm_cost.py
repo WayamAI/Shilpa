@@ -118,8 +118,11 @@ def test_stage_model_lookup():
 
 
 @pytest.fixture
-def cache(tmp_path):
-    return LLMCache(tmp_path / "c.sqlite", ttl_s=3600, max_entries=100)
+def cache():
+    c = LLMCache(ttl_s=3600, max_entries=100)
+    c.clear()
+    yield c
+    c.clear()
 
 
 def test_cache_hit_costs_zero_tokens_and_is_flagged(cache):
@@ -164,13 +167,13 @@ def test_cache_can_be_disabled(cache, monkeypatch):
     assert len(fake.requests) == 2 and cache.count() == 0
 
 
-def test_fakes_do_not_touch_the_real_cache_without_use_cache(tmp_path, monkeypatch):
-    with_settings(monkeypatch, var_dir=tmp_path)
+def test_fakes_do_not_touch_the_real_cache_without_use_cache(monkeypatch):
+    before = LLMCache().count()
     fake = FakeClient({"a": 1})
     with llm.use_client(fake):
         call(budget())
         call(budget())
-    assert len(fake.requests) == 2 and not (tmp_path / "llm_cache.sqlite").exists()
+    assert len(fake.requests) == 2 and LLMCache().count() == before
 
 
 def test_rejected_replies_are_not_cached(cache):
@@ -186,15 +189,18 @@ def test_rejected_replies_are_not_cached(cache):
         assert cache.count() == 1
 
 
-def test_ttl_and_size_bounds(tmp_path):
-    expired = LLMCache(tmp_path / "t.sqlite", ttl_s=-1)
+def test_ttl_and_size_bounds():
+    LLMCache().clear()
+    expired = LLMCache(ttl_s=-1)
     expired.put("k", {"data": {}})
     assert expired.get("k") is None
-    small = LLMCache(tmp_path / "s.sqlite", ttl_s=3600, max_entries=3)
+    small = LLMCache(ttl_s=3600, max_entries=3)
+    small.clear()
     for i in range(6):
         small.put(f"k{i}", {"data": {"i": i}})
         time.sleep(0.01)
     assert small.count() == 3 and small.get("k5") is not None and small.get("k0") is None
+    small.clear()
 
 
 # ------------------------------------------------------------------ 4. provenance and cost

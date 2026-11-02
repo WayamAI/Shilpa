@@ -70,7 +70,7 @@ def use_client(fake: Any) -> Iterator[Any]:
         _client_override = prev
 
 
-# Result cache. Real calls use the sqlite file in the var dir; a fake client (tests) only caches when a test
+# Result cache. Real calls use the llm_cache table in the application database; a fake client (tests) only caches when a test
 # installs a cache explicitly with ``use_cache``, so fakes never read or write the developer's real cache.
 _cache_override: LLMCache | None = None
 
@@ -92,7 +92,7 @@ def _active_cache() -> LLMCache | None:
         return _cache_override
     if _client_override is not None:
         return None
-    return LLMCache(settings.var_dir / "llm_cache.sqlite", settings.llm_cache_ttl_s, settings.llm_cache_max_entries)
+    return LLMCache(settings.llm_cache_ttl_s, settings.llm_cache_max_entries)
 
 
 def _record(budget: "Budget", *, purpose: str, input_tokens: int, output_tokens: int, ms: int, model: str | None,

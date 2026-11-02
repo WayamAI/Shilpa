@@ -26,7 +26,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
-from .settings import settings
+from .settings import cloud, settings
 
 
 def uid() -> str:
@@ -249,23 +249,64 @@ class AuditEvent(Base):
 
 
 settings.var_dir.mkdir(parents=True, exist_ok=True)
-_is_sqlite = settings.database_url.startswith("sqlite")
-engine = create_engine(
-    settings.database_url,
-    connect_args={"check_same_thread": False, "timeout": 30} if _is_sqlite else {},
-    pool_pre_ping=True,
-)
 
-if _is_sqlite:
 
-    @event.listens_for(engine, "connect")
-    def _sqlite_pragmas(conn, _):
-        cur = conn.cursor()
-        cur.execute("PRAGMA journal_mode=WAL")
-        cur.execute("PRAGMA foreign_keys=ON")
-        cur.execute("PRAGMA busy_timeout=30000")
-        cur.close()
+def normalise_database_url(url: str) -> str:
+    """postgres:// and postgresql:// mean the psycopg 3 driver here; SQLAlchemy would otherwise pick psycopg2."""
+    for prefix in ("postgresql://", "postgres://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+    return url
 
+
+def _entra_token() -> str:
+    """An Entra access token for Azure Database for PostgreSQL (managed identity / developer login)."""
+    global _credential
+    if _credential is None:
+        from azure.identity import DefaultAzureCredential
+
+        _credential = DefaultAzureCredential()
+    return _credential.get_token(cloud.db_entra_scope).token
+
+
+_credential = None
+
+
+def make_engine(url: str | None = None):
+    """Build the engine. SQLite keeps its local pragmas; PostgreSQL gets a bounded pre-pinged pool and, with
+    DATABASE_AUTH=entra, a fresh Entra token as the password on every new connection."""
+    url = normalise_database_url(url or settings.database_url)
+    if url.startswith("sqlite"):
+        eng = create_engine(url, connect_args={"check_same_thread": False, "timeout": 30}, pool_pre_ping=True)
+
+        @event.listens_for(eng, "connect")
+        def _sqlite_pragmas(conn, _):
+            cur = conn.cursor()
+            cur.execute("PRAGMA journal_mode=WAL")
+            cur.execute("PRAGMA foreign_keys=ON")
+            cur.execute("PRAGMA busy_timeout=30000")
+            cur.close()
+
+        return eng
+    eng = create_engine(
+        url,
+        pool_pre_ping=True,
+        pool_size=cloud.db_pool_size,
+        max_overflow=cloud.db_max_overflow,
+        pool_timeout=cloud.db_pool_timeout_s,
+        pool_recycle=cloud.db_pool_recycle_s,
+        connect_args={"connect_timeout": cloud.db_connect_timeout_s},
+    )
+    if cloud.database_auth == "entra":
+
+        @event.listens_for(eng, "do_connect")
+        def _entra_password(dialect, conn_rec, cargs, cparams):
+            cparams["password"] = _entra_token()  # per connection; the credential caches and refreshes tokens
+
+    return eng
+
+
+engine = make_engine()
 
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
@@ -275,9 +316,23 @@ _ADDED_COLUMNS = [("specifications", "upload_id", "VARCHAR(36)"), ("models", "ki
 
 
 def init_db() -> None:
-    Base.metadata.create_all(engine)
     from sqlalchemy import inspect, text
 
+    if engine.dialect.name == "postgresql":
+        # Several replicas start together: serialise schema creation with a session-level advisory lock.
+        with engine.connect() as lock:
+            lock.execute(text("SELECT pg_advisory_lock(727001)"))
+            try:
+                _create_schema(inspect, text)
+            finally:
+                lock.execute(text("SELECT pg_advisory_unlock(727001)"))
+                lock.commit()
+        return
+    _create_schema(inspect, text)
+
+
+def _create_schema(inspect, text) -> None:
+    Base.metadata.create_all(engine)
     insp = inspect(engine)
     with engine.begin() as conn:
         for table, column, ddl in _ADDED_COLUMNS:

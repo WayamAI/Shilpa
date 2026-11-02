@@ -133,3 +133,131 @@ class Settings:
 
 
 settings = Settings()
+
+
+# ============================================================================================================
+# Hosting block (azure hosting plan, step 3): environment name, Entra ID and telemetry settings, startup guard.
+# Kept separate from ``Settings`` above. Read at call time through ``hosting`` so tests can replace it.
+# ============================================================================================================
+ENVIRONMENTS = ("local", "dev", "staging", "production")
+
+
+class ConfigError(RuntimeError):
+    """The process refuses to start: a setting is forbidden or missing in this environment."""
+
+
+def _csv(name: str) -> tuple[str, ...]:
+    return tuple(x.strip() for x in os.getenv(name, "").split(",") if x.strip())
+
+
+def _flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    return default if raw is None else raw.strip().lower() in ("1", "true", "on", "yes")
+
+
+@dataclass(frozen=True)
+class HostingSettings:
+    env: str = os.getenv("SHILPA_ENV", "local").strip().lower()
+    # Entra ID access-token validation (used when SHILPA_AUTH_MODE=entra)
+    entra_tenant_id: str = os.getenv("SHILPA_ENTRA_TENANT_ID", "").strip()
+    entra_audiences: tuple[str, ...] = field(default_factory=lambda: _csv("SHILPA_ENTRA_AUDIENCE"))
+    entra_required_scope: str = os.getenv("SHILPA_ENTRA_REQUIRED_SCOPE", "").strip()
+    entra_required_role: str = os.getenv("SHILPA_ENTRA_REQUIRED_ROLE", "").strip()
+    entra_authority: str = os.getenv("SHILPA_ENTRA_AUTHORITY", "https://login.microsoftonline.com").rstrip("/")
+    entra_jwks_url: str = os.getenv("SHILPA_ENTRA_JWKS_URL", "").strip()  # default derived from authority + tenant
+    entra_leeway_s: int = _int("SHILPA_ENTRA_LEEWAY_S", 60)
+    entra_jwks_ttl_s: int = _int("SHILPA_ENTRA_JWKS_TTL_S", 3600)
+    entra_auto_provision: bool = _flag("SHILPA_ENTRA_AUTO_PROVISION", False)
+    entra_default_role: str = os.getenv("SHILPA_ENTRA_DEFAULT_ROLE", "project_viewer").strip()
+    # Telemetry
+    appinsights_connection_string: str = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "").strip()
+    log_level: str = os.getenv("SHILPA_LOG_LEVEL", "INFO").strip().upper()
+
+    @property
+    def is_hosted(self) -> bool:
+        return self.env != "local"
+
+    @property
+    def entra_jwks_uri(self) -> str:
+        return self.entra_jwks_url or f"{self.entra_authority}/{self.entra_tenant_id}/discovery/v2.0/keys"
+
+    @property
+    def entra_issuers(self) -> tuple[str, ...]:
+        """Accepted ``iss`` values: v2.0 and v1.0 token formats for the configured tenant."""
+        t = self.entra_tenant_id
+        return (f"{self.entra_authority}/{t}/v2.0", f"https://sts.windows.net/{t}/")
+
+
+def startup_problems(h: HostingSettings | None = None, s: Settings | None = None) -> list[str]:
+    """Every reason this configuration must not start, each naming the variable. Empty means fine."""
+    h, s = h or hosting, s or settings
+    if h.env not in ENVIRONMENTS:
+        return [f"SHILPA_ENV={h.env!r} is not one of {', '.join(ENVIRONMENTS)}"]
+    problems: list[str] = []
+    if h.env != "local":
+        if s.llm_provider == "ollama":
+            problems.append(f"SHILPA_LLM_PROVIDER=ollama is not allowed when SHILPA_ENV={h.env}: engineering data "
+                            "must not go to a non-Azure model host (use SHILPA_LLM_PROVIDER=azure)")
+        if s.auth_mode == "dev":
+            problems.append(f"SHILPA_AUTH_MODE=dev is not allowed when SHILPA_ENV={h.env} (use SHILPA_AUTH_MODE=entra)")
+        elif s.auth_mode != "entra":
+            problems.append(f"SHILPA_AUTH_MODE={s.auth_mode!r} is not valid (entra)")
+        if s.database_url.startswith("sqlite"):
+            problems.append(f"DATABASE_URL must point at PostgreSQL when SHILPA_ENV={h.env} (it is unset or SQLite)")
+        if s.llm_provider not in ("azure", "ollama"):
+            problems.append(f"SHILPA_LLM_PROVIDER={s.llm_provider!r} is not valid (azure)")
+        if s.llm_enabled and s.llm_provider == "azure":
+            if not s.aoai_endpoint:
+                problems.append("AZURE_OPENAI_ENDPOINT is required (or set SHILPA_LLM=off)")
+            if not s.aoai_deployment:
+                problems.append("AZURE_OPENAI_DEPLOYMENT is required (or set SHILPA_LLM=off)")
+    if s.auth_mode == "entra":
+        if not h.entra_tenant_id:
+            problems.append("SHILPA_ENTRA_TENANT_ID is required when SHILPA_AUTH_MODE=entra")
+        if not h.entra_audiences:
+            problems.append("SHILPA_ENTRA_AUDIENCE is required when SHILPA_AUTH_MODE=entra (API app id URI and/or client id)")
+        if not (h.entra_required_scope or h.entra_required_role):
+            problems.append("SHILPA_ENTRA_REQUIRED_SCOPE or SHILPA_ENTRA_REQUIRED_ROLE is required when SHILPA_AUTH_MODE=entra")
+    if h.entra_auto_provision and h.entra_default_role not in ("org_admin", "project_editor", "project_viewer", "ops_admin"):
+        problems.append(f"SHILPA_ENTRA_DEFAULT_ROLE={h.entra_default_role!r} is not a known role")
+    return problems
+
+
+def enforce_startup(h: HostingSettings | None = None, s: Settings | None = None) -> None:
+    problems = startup_problems(h, s)
+    if problems:
+        raise ConfigError("Refusing to start:\n  - " + "\n  - ".join(problems))
+
+
+hosting = HostingSettings()
+
+
+# ============================================================================================================
+# Cloud adapters block (azure hosting plan, step 2): PostgreSQL pooling/auth, blob backend, queue backend.
+# Defaults are the local ones (SQLite file, filesystem blobs, database queue). Read through ``cloud``.
+# ============================================================================================================
+@dataclass(frozen=True)
+class CloudSettings:
+    # PostgreSQL (DATABASE_URL stays the connection string; these tune the pool and auth)
+    database_auth: str = os.getenv("DATABASE_AUTH", "password").strip().lower()  # password | entra
+    db_pool_size: int = _int("SHILPA_DB_POOL_SIZE", 5)
+    db_max_overflow: int = _int("SHILPA_DB_MAX_OVERFLOW", 5)
+    db_pool_timeout_s: int = _int("SHILPA_DB_POOL_TIMEOUT_S", 30)
+    db_pool_recycle_s: int = _int("SHILPA_DB_POOL_RECYCLE_S", 1800)  # below the ~60 min Entra token lifetime
+    db_connect_timeout_s: int = _int("SHILPA_DB_CONNECT_TIMEOUT_S", 10)
+    db_entra_scope: str = os.getenv("DATABASE_ENTRA_SCOPE", "https://ossrdbms-aad.database.windows.net/.default")
+    # Blob storage: local | azure
+    blob_backend: str = os.getenv("SHILPA_BLOB_BACKEND", "local").strip().lower()
+    blob_account_url: str = os.getenv("SHILPA_BLOB_ACCOUNT_URL", "").strip()  # https://<account>.blob.core.windows.net
+    blob_container: str = os.getenv("SHILPA_BLOB_CONTAINER", "artifacts").strip()
+    blob_connection_string: str = os.getenv("SHILPA_BLOB_CONNECTION_STRING", "").strip()  # Azurite / emulator only
+    blob_workdir: str = os.getenv("SHILPA_WORKDIR", "").strip()  # scratch root for staging; default: system temp
+    # Queue: db | servicebus
+    queue_backend: str = os.getenv("SHILPA_QUEUE_BACKEND", "db").strip().lower()
+    servicebus_namespace: str = os.getenv("SHILPA_SERVICEBUS_NAMESPACE", "").strip()  # <ns>.servicebus.windows.net
+    servicebus_connection_string: str = os.getenv("SHILPA_SERVICEBUS_CONNECTION_STRING", "").strip()  # emulator only
+    servicebus_queue_prefix: str = os.getenv("SHILPA_SERVICEBUS_QUEUE_PREFIX", "").strip()
+    servicebus_wait_s: float = float(os.getenv("SHILPA_SERVICEBUS_WAIT_S", 1))
+
+
+cloud = CloudSettings()

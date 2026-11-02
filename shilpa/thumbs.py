@@ -180,12 +180,13 @@ def backfill(force: bool = False) -> tuple[int, int]:
     done = skipped = 0
     for model_id, tenant, project, version, existing in todo:
         prefix = blobs.version_prefix(tenant, project, version)
-        out = write_thumb(blobs.path(prefix))
-        if out is None:
+        with blobs.view(prefix) as d:  # a local directory on either backend (downloaded on Azure)
+            data = render_dir(d)
+        if data is None:
             skipped += 1
             print(f"skip {model_id} version={version}")
             continue
-        data = out.read_bytes()
+        blobs.write_bytes(f"{prefix}/{THUMB_FILE}", data)
         sha = hashlib.sha256(data).hexdigest()
         with tx() as s:
             art = s.get(Artifact, existing) if existing else None

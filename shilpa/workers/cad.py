@@ -148,21 +148,25 @@ def handle_cad(r: queue.Received) -> None:
         transition_event(s, job_id, "attempt.started", {"attempt": attempt_no, "worker": WORKER_ID})
 
     staging_key = blobs.staging_prefix(tenant, project, job_id, attempt_no)
-    out_dir = blobs.path(staging_key)
-    cancel_flag = out_dir.parent / f"cancel-{attempt_no}.flag"
-    stop = threading.Event()
-    renewer = threading.Thread(target=_renew_loop, args=(r, job_id, stop, cancel_flag), daemon=True)
-    renewer.start()
-    reporter = threading.Thread(target=_progress_loop, args=(job_id, attempt_no, out_dir / kinds.PROGRESS_FILE, stop), daemon=True)
-    reporter.start()
-    try:
-        result, cpu_s = run_geometry(recipe, out_dir, cancel_flag, kind, options)
-    finally:
-        stop.set()
-        renewer.join(timeout=5)
-        reporter.join(timeout=5)
-    if result.get("ok") and not is_export:
-        _stage_thumb(out_dir)
+    # Build in a local directory (the blob directory itself locally, scratch space on Azure) and upload to the
+    # staging prefix only when the geometry succeeded. Nothing is visible to users until finish() commits rows.
+    with blobs.workdir(staging_key) as out_dir:
+        cancel_flag = out_dir.parent / f"cancel-{attempt_no}.flag"
+        stop = threading.Event()
+        renewer = threading.Thread(target=_renew_loop, args=(r, job_id, stop, cancel_flag), daemon=True)
+        renewer.start()
+        reporter = threading.Thread(target=_progress_loop, args=(job_id, attempt_no, out_dir / kinds.PROGRESS_FILE, stop), daemon=True)
+        reporter.start()
+        try:
+            result, cpu_s = run_geometry(recipe, out_dir, cancel_flag, kind, options)
+        finally:
+            stop.set()
+            renewer.join(timeout=5)
+            reporter.join(timeout=5)
+        if result.get("ok") and not is_export:
+            _stage_thumb(out_dir)
+        if result.get("ok"):
+            blobs.push_dir(out_dir, staging_key)
     finish(job_id, attempt_no, recipe, result, cpu_s, staging_key)
 
 
@@ -232,7 +236,7 @@ def publish_export(s, job: Job, attempt_no: int, result: dict, staging_key: str,
         blobs.copy(f"{staging_key}/{name}", key)
         sha = {a["format"]: a for a in result.get("artifacts", [])}
         s.add(Artifact(tenant_id=job.tenant_id, version_id=v.id, format=fmt, blob_key=key,
-                       sha256=sha.get(fmt, {}).get("sha256") or "", bytes=blobs.path(key).stat().st_size))
+                       sha256=sha.get(fmt, {}).get("sha256") or "", bytes=blobs.size(key)))
     checks = [c for c in (result.get("validation") or {}).get("checks", []) if c["name"].startswith("freecad")]
     transition(s, job, "succeeded", result_version_id=v.id, **common,
                event_data={"version_id": v.id, "format": fmt, "attempt": attempt_no, "checks": len(checks)})
@@ -275,9 +279,8 @@ def publish(s, job: Job, attempt_no: int, recipe: dict, result: dict, staging_ke
                        change_summary=(job.input or {}).get("change_summary") or _auto_summary(job)))
     s.flush()  # version row before its artifact rows (same transaction)
     for fmt, name in copied:
-        p = blobs.path(f"{vprefix}/{name}")
         s.add(Artifact(tenant_id=job.tenant_id, version_id=version_id, format=fmt, blob_key=f"{vprefix}/{name}",
-                       sha256=sha.get(fmt, {}).get("sha256") or "", bytes=p.stat().st_size))
+                       sha256=sha.get(fmt, {}).get("sha256") or "", bytes=blobs.size(f"{vprefix}/{name}")))
     res = s.execute(update(Model).where(Model.id == model.id, Model.head_revision == model.head_revision)
                     .values(head_version_id=version_id, head_revision=model.head_revision + 1))
     if res.rowcount != 1:

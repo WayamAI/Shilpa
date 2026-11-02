@@ -4,6 +4,8 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
     "azure-identity>=1.26.0",
+    "azure-servicebus==7.15.0",
+    "azure-storage-blob==12.31.1",
     "bd-vslot>=0.0.2",
     "bd-warehouse>=0.4.0",
     "build123d==0.13.0",
@@ -12,8 +14,10 @@ dependencies = [
     "jsonschema>=4.23",
     "openai>=3.35.1",
     "pillow>=13.0.0",
+    "PyJWT[crypto]==2.15.1",
     "py-gearworks>=0.0.24",
     "pydantic>=2.14.1",
+    "psycopg[binary]==3.3.6",
     "pymupdf>=1.28.2",
     "python-dotenv>=1.2.4",
     "python-multipart>=0.0.32",
@@ -22,6 +26,10 @@ dependencies = [
     "trimesh>=5.1.1",
     "uvicorn[standard]>=0.54.0",
 ]
+
+[project.optional-dependencies]
+# Application Insights export (hosted environments); a no-op without it.
+telemetry = ["azure-monitor-opentelemetry==1.8.11"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

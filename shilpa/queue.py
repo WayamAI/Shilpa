@@ -13,11 +13,11 @@ import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from .db import OutboxEvent, QueueMessage, SessionLocal, now, tx
-from .settings import settings
+from .settings import cloud, settings
 
 QUEUES = ("plan", "cad")
 
@@ -29,6 +29,7 @@ class Received:
     body: dict
     lock_token: str
     delivery_count: int
+    handle: object = None  # backend-specific message object (Service Bus); None for the database queue
 
 
 def enqueue_outbox(session, queue: str, message: dict) -> None:
@@ -37,8 +38,29 @@ def enqueue_outbox(session, queue: str, message: dict) -> None:
     session.add(OutboxEvent(queue=queue, message=message))
 
 
+def _sb():
+    from . import queue_servicebus
+
+    return queue_servicebus.get()
+
+
+def ping() -> None:
+    """Readiness probe: the database queue's table must be readable; Service Bus must accept a sender link."""
+    if _use_sb():
+        _sb().ping()
+        return
+    with tx() as s:
+        s.scalar(select(func.count()).select_from(QueueMessage).where(QueueMessage.state == "locked"))
+
+
+def _use_sb() -> bool:
+    return cloud.queue_backend == "servicebus"
+
+
 def send(queue: str, message_id: str, body: dict) -> bool:
     """Returns False when the message_id was already sent (duplicate detection)."""
+    if _use_sb():
+        return _sb().send(queue, message_id, body)
     try:
         with tx() as s:
             s.add(QueueMessage(queue=queue, message_id=message_id, body=body))
@@ -48,6 +70,20 @@ def send(queue: str, message_id: str, body: dict) -> bool:
 
 
 def publish_outbox(limit: int = 50) -> int:
+    """Dispatch unpublished outbox rows to the queue backend. The outbox always lives in the database.
+
+    On PostgreSQL the batch is claimed with FOR UPDATE SKIP LOCKED so concurrent dispatchers take disjoint rows;
+    a crash between send and commit re-sends, which message_id duplicate detection absorbs."""
+    if _dialect() == "postgresql":
+        n = 0
+        with tx() as s:
+            rows = s.scalars(select(OutboxEvent).where(OutboxEvent.published.is_(False)).order_by(OutboxEvent.created_at)
+                             .limit(limit).with_for_update(skip_locked=True)).all()
+            for r in rows:
+                send(r.queue, r.id, r.message)
+                r.published = True
+                n += 1
+        return n
     with tx() as s:
         rows = s.scalars(select(OutboxEvent).where(OutboxEvent.published.is_(False)).order_by(OutboxEvent.created_at).limit(limit)).all()
         items = [(r.id, r.queue, r.message) for r in rows]
@@ -60,36 +96,50 @@ def publish_outbox(limit: int = 50) -> int:
     return n
 
 
+def _dialect() -> str:
+    from .db import engine
+
+    return engine.dialect.name
+
+
 def receive(queue: str) -> Received | None:
     """Peek-lock one message. Expired locks become visible again."""
-    t = now()
+    if _use_sb():
+        return _sb().receive(queue)
     s = SessionLocal()
     try:
-        cand = s.scalars(
-            select(QueueMessage)
-            .where(QueueMessage.queue == queue)
-            .where(or_(QueueMessage.state == "ready", (QueueMessage.state == "locked") & (QueueMessage.locked_until < t)))
-            .order_by(QueueMessage.id)
-            .limit(5)
-        ).all()
-        for m in cand:
+        for _ in range(20):
+            t = now()
+            # FOR UPDATE SKIP LOCKED on PostgreSQL: concurrent receivers never block on, or double-claim, a row.
+            # SQLAlchemy omits the clause on SQLite, where the compare-and-swap below is the guard.
+            m = s.scalars(
+                select(QueueMessage)
+                .where(QueueMessage.queue == queue)
+                .where(or_(QueueMessage.state == "ready", (QueueMessage.state == "locked") & (QueueMessage.locked_until < t)))
+                .order_by(QueueMessage.id)
+                .limit(1)
+                .with_for_update(skip_locked=True)
+            ).first()
+            if m is None:
+                s.rollback()
+                return None
             if m.delivery_count >= settings.max_delivery_count:
                 s.execute(update(QueueMessage).where(QueueMessage.id == m.id).values(state="dead", dead_reason="max delivery count exceeded"))
                 s.commit()
                 continue
-            token = str(uuid.uuid4())
+            token, prior = str(uuid.uuid4()), m.delivery_count  # read before the UPDATE: the session synchronises m afterwards
             # Compare-and-swap on the previous lock token so only one receiver wins.
             res = s.execute(
                 update(QueueMessage)
                 .where(QueueMessage.id == m.id)
-                .where(QueueMessage.lock_token.is_(m.lock_token) if m.lock_token is None else QueueMessage.lock_token == m.lock_token)
+                .where(QueueMessage.lock_token.is_(None) if m.lock_token is None else QueueMessage.lock_token == m.lock_token)
                 .where(QueueMessage.state.in_(("ready", "locked")))
                 .values(state="locked", lock_token=token, locked_until=t + timedelta(seconds=settings.lock_duration_s),
                         delivery_count=QueueMessage.delivery_count + 1)
             )
             s.commit()
             if res.rowcount == 1:
-                return Received(m.id, queue, m.body, token, m.delivery_count + 1)
+                return Received(m.id, queue, m.body, token, prior + 1)
         return None
     finally:
         s.close()
@@ -102,16 +152,24 @@ def _by_lock(r: Received, **values) -> bool:
 
 
 def renew(r: Received) -> bool:
+    if _use_sb():
+        return _sb().renew(r)
     return _by_lock(r, locked_until=now() + timedelta(seconds=settings.lock_duration_s))
 
 
 def complete(r: Received) -> bool:
+    if _use_sb():
+        return _sb().complete(r)
     return _by_lock(r, state="done", lock_token=None)
 
 
 def abandon(r: Received) -> bool:
+    if _use_sb():
+        return _sb().abandon(r)
     return _by_lock(r, state="ready", lock_token=None, locked_until=None)
 
 
 def dead_letter(r: Received, reason: str) -> bool:
+    if _use_sb():
+        return _sb().dead_letter(r, reason)
     return _by_lock(r, state="dead", dead_reason=reason[:2000])
