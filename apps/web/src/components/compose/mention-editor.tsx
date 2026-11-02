@@ -5,7 +5,7 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 
 
 import { Badge, Spinner } from "@/components/ui";
 import { catalogApi, errText, type CatalogPort } from "@/lib/api";
-import { matches, type LibraryItem } from "@/lib/library";
+import { composable, matches, type LibraryItem } from "@/lib/library";
 
 /**
  * Prompt with @ mentions (spec §2.3, Paper · 05 Composer · @ picker open).
@@ -41,18 +41,27 @@ export function MentionEditor({
   library,
   tokens,
   onTokens,
+  draft,
+  onDraft: setDraft,
+  onSubmit,
   disabled = false,
 }: {
   library: LibraryItem[] | null;
   tokens: Token[];
   onTokens: (tokens: Token[]) => void;
+  /** The text being typed after the last chip. Controlled so the page can send it. */
+  draft: string;
+  onDraft: (draft: string) => void;
+  /** Enter with the picker closed. */
+  onSubmit?: () => void;
   disabled?: boolean;
 }) {
-  const [draft, setDraft] = useState("");
   const [open, setOpen] = useState(false);
   const [level, setLevel] = useState<Level | null>(null);
   const [active, setActive] = useState(0);
   const [replaceAt, setReplaceAt] = useState<number | null>(null);
+  /* Ctrl/Cmd+A selects the whole prompt, chips included, so Backspace or Delete clears it all. */
+  const [allSelected, setAllSelected] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const listId = useId();
 
@@ -67,7 +76,7 @@ export function MentionEditor({
   }, [tokens, query]);
 
   const fromLibrary = useMemo(
-    () => (library ?? []).filter((i) => !inComposition.some((c) => c.id === i.id) && matches(i, query)).slice(0, 8),
+    () => (library ?? []).filter((i) => composable(i) && !inComposition.some((c) => c.id === i.id) && matches(i, query)).slice(0, 8),
     [library, inComposition, query],
   );
 
@@ -128,6 +137,19 @@ export function MentionEditor({
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+      setAllSelected(tokens.length > 0);
+      return;
+    }
+    if (allSelected) {
+      setAllSelected(false);
+      if (event.key === "Backspace" || event.key === "Delete") {
+        event.preventDefault();
+        onTokens([]);
+        setDraft("");
+        return;
+      }
+    }
     if (open) {
       const opt = options[activeIndex];
       if (event.key === "ArrowDown") setActive((activeIndex + 1) % Math.max(1, options.length));
@@ -140,6 +162,11 @@ export function MentionEditor({
       } else if (event.key === "Escape") close();
       else return;
       event.preventDefault();
+      return;
+    }
+    if (event.key === "Enter" && onSubmit && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      onSubmit();
       return;
     }
     if (event.key === "Backspace" && draft === "" && tokens.length) {
@@ -181,7 +208,7 @@ export function MentionEditor({
               type="button"
               onClick={() => reopen(i)}
               aria-label={`${t.label}, change reference`}
-              className={`inline-flex items-center rounded-sm px-2 py-0.5 text-lg font-semibold whitespace-nowrap ${t.item.kind === "complex" ? "bg-complex-soft text-complex-text" : "bg-basic-soft text-basic-text"}`}
+              className={`inline-flex items-center rounded-sm px-2 py-0.5 text-lg font-semibold whitespace-nowrap ${allSelected ? "ring-2 ring-action" : ""} ${t.item.kind === "complex" ? "bg-complex-soft text-complex-text" : "bg-basic-soft text-basic-text"}`}
             >
               {t.label}
             </button>
@@ -201,6 +228,7 @@ export function MentionEditor({
           }}
           onKeyDown={onKeyDown}
           onBlur={(e) => {
+            setAllSelected(false);
             if (!e.relatedTarget?.closest?.("[data-picker]")) close();
           }}
           placeholder={tokens.length ? "" : "Type @ to pick a part, then say what to do with it"}

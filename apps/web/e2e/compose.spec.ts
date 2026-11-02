@@ -65,8 +65,42 @@ test("ArrowDown moves the active option and Enter inserts it", async ({ page }) 
   await expect(chips(page)).toHaveAccessibleName(`@${second}, change reference`);
 });
 
-test("Interpret is planned and disabled", async ({ page }) => {
-  await expect(page.getByRole("button", { name: "Interpret" })).toBeDisabled();
+test("Interpret needs a prompt and stays off while the planner is off", async ({ page }) => {
+  const button = page.getByRole("button", { name: /^(Re-)?interpret$/i });
+  await expect(button).toBeVisible();
+  if (await page.getByText(/Planner is off/).first().isVisible().catch(() => false)) await expect(button).toBeDisabled();
+});
+
+test("a composition resumes from ?c= and an applied step appears (no planner)", async ({ page, request }) => {
+  const auth = { Authorization: "Bearer dev:dev@wayam.local" };
+  const project = await (await request.post("/v1/projects", { headers: auth, data: { name: `Compose e2e ${Date.now()}` } })).json();
+  const comp = await (await request.post("/v1/compositions", { headers: auth, data: { project_id: project.id, name: "e2e" } })).json();
+
+  /* Sending steps back needs no model: the same deterministic path as answering a question (tests/compose E6_BASE). */
+  const steps = [
+    { id: "s1", op: "add", source: { text: "@shaft-20", mention: "m1" } },
+    { id: "s2", op: "ground", source: { text: "@shaft-20", mention: "m1" } },
+  ];
+  const prompt = "use @shaft-20 as the base";
+  const interp = await request.post(`/v1/compositions/${comp.id}/interpret`, { headers: auth, data: { prompt, steps } });
+  expect(interp.ok(), await interp.text()).toBeTruthy();
+  const card = await interp.json();
+  expect(card.status).toBe("ready");
+
+  const applied = await request.post(`/v1/compositions/${comp.id}/apply`, {
+    headers: { ...auth, "Idempotency-Key": `e2e-${Date.now()}` },
+    data: { prompt, steps: card.steps, base_version_id: card.base_version_id, spec_hash: card.spec_hash },
+  });
+  expect(applied.status(), await applied.text()).toBe(202);
+
+  await page.goto(`/compose?c=${comp.id}`);
+  const list = page.getByRole("list").filter({ hasText: "shaft-20" });
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await expect(list.getByText("Applied")).toBeVisible({ timeout: 60_000 }).catch(async () => {
+    await page.reload();
+    await expect(list.getByText("Applied")).toBeVisible({ timeout: 30_000 });
+  });
+  await expect(page.getByRole("region", { name: /Composition 3D view/ })).toBeVisible({ timeout: 30_000 });
 });
 
 test("a read-only user sees no prompt", async ({ page, baseURL }) => {

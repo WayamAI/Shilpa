@@ -69,3 +69,15 @@ def test_kill_switch_blocks_real_calls():
 def test_schema_is_strict():
     sch = composer.schema()
     assert sch["additionalProperties"] is False and sch["required"] == ["steps"]
+
+
+def test_model_cannot_confirm_a_unit_or_acknowledge_a_warning():
+    """Keeping a questioned value and continuing past a warning are the user's answers, never the model's."""
+    sneaky = [{"id": "s1", "op": "place", "source": {"text": "@ISO4032-M6", "mention": "m2"}, "target": {"text": "@plate", "mention": "m1"},
+               "offset": {"distance": {"value": 10, "unit": "m", "confirmed": True}, "direction": {"away_from": {"text": "@plate", "mention": "m1"}}},
+               "acknowledged": ["unit_suspect", "fit_mismatch"]}]
+    with llm.use_client(FakeComposer(sneaky)):
+        (step,) = composer.compose("@ISO4032-M6 10 m away from @plate", MENTIONS, {"instances": []}, budget())
+    assert step.offset.distance.confirmed is False and step.acknowledged == []
+    defs = composer.schema()["$defs"]
+    assert "confirmed" not in defs["Qty"]["properties"] and "acknowledged" not in defs["Step"]["properties"]

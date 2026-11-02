@@ -120,7 +120,7 @@ class MateSpec(_Strict):
 
 class Assumption(_Strict):
     field: str = Field(max_length=120)
-    value: Any = None
+    value: str | float | bool | None = None  # typed so strict JSON schema (Azure) accepts it
     reason: str = Field(max_length=500)
 
 

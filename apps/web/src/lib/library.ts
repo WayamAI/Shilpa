@@ -133,3 +133,8 @@ export function matches(item: LibraryItem, query: string): boolean {
   const hay = item.haystack.replace(/×/g, "x");
   return q.split(/\s+/).every((t) => hay.includes(t));
 }
+
+/** Compose P0 builds native parts from a part recipe: sheet metal, assemblies and products cannot be mentioned yet. */
+export function composable(item: LibraryItem): boolean {
+  return item.source !== "native" || item.family === KIND_LABEL.part;
+}

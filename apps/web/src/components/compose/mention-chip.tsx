@@ -12,7 +12,7 @@ const KIND: Record<MentionKind, string> = {
 
 export function MentionChip({ children, kind = "basic", className = "" }: { children: string; kind?: MentionKind; className?: string }) {
   return (
-    <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-md font-semibold whitespace-nowrap ${KIND[kind]} ${className}`}>
+    <span title={children} className={`inline-block max-w-full truncate rounded-sm px-2 py-0.5 align-bottom text-md font-semibold whitespace-nowrap ${KIND[kind]} ${className}`}>
       {children.startsWith("@") ? children : `@${children}`}
     </span>
   );

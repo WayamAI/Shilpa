@@ -30,7 +30,7 @@ test("recent complex parts shows rows or an empty state", async ({ page }) => {
 });
 
 test("the Home nav link is live and the page fits a phone", async ({ page }) => {
-  await expect(page.getByRole("complementary", { name: "Sidebar" }).getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("complementary", { name: "Sidebar" }).getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   expect(await overflowX(page)).toBeLessThanOrEqual(0);

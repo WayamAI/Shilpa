@@ -132,6 +132,7 @@ def test_e4_insert_into_every_hole_with_fit_question():
     assert {i["ref"]["params"]["size"] for i in both["spec"]["instances"] if i.get("ref", {}).get("generator") == "nut.hex"} == {"M6-1", "M8-1.25"}
     warn = s.interpret(E4[0], card["steps"], answers=b["options"][2]["patch"], fresh=False)
     assert warn["status"] == "ready" and warn["warnings"][0]["code"] == "fit_mismatch"
+    assert warn["counts"]["instances_added"] == 6 and warn["counts"]["mates_added"] == 6  # continuing still inserts every nut
     from shilpa.assembly.build import build_assembly
 
     built = build_assembly(one["spec"])
@@ -252,3 +253,16 @@ def test_patches_are_restricted():
     with pytest.raises(ValueError):
         apply_patches(st, [{"step": "s9", "set": {"quantity": 2}}])
     assert apply_patches(st, [{"step": "s1", "set": {"quantity": 2}}])[0].quantity == 2
+
+
+def test_add_then_place_replays_to_the_same_instances():
+    """The model often writes "add @x" then "place @x" in one prompt. Replaying that applied history must reuse the
+    added instance, exactly as the first interpretation did (it used to make a second, floating copy)."""
+    s = Session()
+    s.apply(s.interpret(*E1))
+    add_place = [{"id": "s1", "op": "add", "source": ref("@nema17", "m1")}, *copy.deepcopy(E2[1])]
+    card = s.apply(s.interpret(E2[0], add_place))
+    assert card["counts"]["instances_added"] == 1
+    prog, reports = Expander(s.lib).run(s.applied, set())
+    assert sorted(prog.instances) == sorted(card["spec"]["instances"][i]["id"] for i in range(len(card["spec"]["instances"])))
+    assert not [b for r in reports for b in r.blockers]

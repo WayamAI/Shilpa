@@ -144,7 +144,10 @@ class Expander:
         self.prog = Program()
         self.reports: list[StepReport] = []
         self.new_ids: set[str] = set()
-        self._added_now: set[str] = set()  # instances created by add steps in the steps being interpreted
+        # Instances created so far, applied steps included: replaying "add @washer" then "place @washer" must reuse
+        # the added washer exactly as the first interpretation did (only new steps were tracked before, so replay
+        # made a second, floating washer; found by evals/compose_live.py).
+        self._added_now: set[str] = set()
 
     # ------------------------------------------------------------ entry point
 
@@ -248,8 +251,7 @@ class Expander:
             iid = f"{base}_{k}"
         inst = InstanceState(iid, part.key, slug, part.label, step.id, copy_of=copy_of)
         self.prog.instances[iid] = inst
-        if step.id in self.new_ids:
-            self._added_now.add(iid)
+        self._added_now.add(iid)
         return inst
 
     def _source_instance(self, step: Step, ref: Ref, rep: StepReport) -> InstanceState:
@@ -701,7 +703,14 @@ class Expander:
         if size:
             bad = [h for h in holes if not _fits(size, h)]
             if bad:
-                self._fit_blocker(step, size, holes, bad, spart, target)
+                try:
+                    self._fit_blocker(step, size, holes, bad, spart, target)
+                except _StepError as exc:
+                    # Acknowledged ("All N, with a warning"): record it and still insert. Re-raising here would end the
+                    # step before any instance is added, so "continue anyway" built nothing (found by evals/compose_live.py).
+                    if "fit_mismatch" not in step.acknowledged:
+                        raise
+                    rep.warnings.append({"code": "fit_mismatch", "message": exc.blocker.message + " (continued at your request)"})
         seat = step.seat or "entry"
         if step.seat is None:
             rep.assumptions.append({"field": "seat", "value": "entry", "reason": "seated on the face the hole is drilled from"})

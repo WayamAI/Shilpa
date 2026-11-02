@@ -215,6 +215,64 @@ export const api = {
     req<{ artifact_id: string | null; job: Job | null }>("POST", `/v1/versions/${versionId}/exports`, { format }),
 };
 
+// --- composition (docs/compose.md) ---------------------------------------------------
+
+export type CompositionSummary = {
+  id: string; project_id: string; name: string; model_id: string | null; head_version_id: string | null;
+  created_at: string; step_count: number; applied_steps: number; pending: boolean;
+};
+export type StepStatus = "pending" | "applied" | "failed";
+/** An IR step as the API sends it back; the client treats it as opaque and returns it unchanged. */
+export type IrStep = Record<string, unknown> & { id: string; op: string };
+export type CompositionCounts = { instances_added: number; mates_added: number; instances_total: number; mates_total: number };
+export type CompositionStepRow = {
+  id: string; number: number; prompt: string; status: StepStatus; job_id: string | null; base_version_id: string | null;
+  result_version_id: string | null; spec_hash: string | null; ir: { steps: IrStep[] }; reading: string | null;
+  counts: CompositionCounts | null; warnings: ComposeWarning[]; assumptions: ComposeAssumption[]; created_at: string; finished_at: string | null;
+};
+export type ComposeRef = {
+  text: string; mention?: string | null; source?: "native" | "catalog" | "instance" | null; item?: string | null; version?: string | null;
+  instance?: string | null;
+};
+export type ComposeMentionIn = { text: string; ref: { item?: string; version?: string; generator?: string; params?: Record<string, unknown> } };
+export type ComposeQuantity = {
+  step_id: string; field: string; as_typed: string | null; value: number; unit: string; mm: number | null; normalised: string; provenance: string;
+};
+export type ComposeAssumption = { step_id: string; field: string; value: unknown; reason: string; by?: string | null };
+export type ComposeFilter = {
+  step_id: string; text: string; path: string; filter: { attr: string; op: string; value: unknown; unit?: string | null }[]; count: number; of: number;
+};
+export type ComposeMention = {
+  id: string; text: string; status: "ok" | "ambiguous" | "unknown" | "invalid"; label: string; message: string; ref: ComposeRef | null;
+  candidates: { label: string; ref: Record<string, unknown> }[];
+};
+export type ComposePatch = { step: string; set?: Record<string, unknown> | null; acknowledge?: string | null; append_step?: Record<string, unknown> | null };
+export type ComposeBlocker = {
+  id: string; step_id: string; code: string; message: string; field: string | null; blocking: boolean;
+  options: { label: string; patch: ComposePatch[] }[];
+};
+export type ComposeWarning = { step_id: string; code: string; message: string };
+export type InterpretationCard = {
+  ir_version: string; composition_id: string; base_version_id: string | null; status: "ready" | "blocked" | "empty"; reading: string;
+  readings: { step_id: string; op: string; text: string; instances_added: string[]; mates_added: string[] }[];
+  counts: CompositionCounts; quantities: ComposeQuantity[]; assumptions: ComposeAssumption[]; filters: ComposeFilter[];
+  mentions: ComposeMention[]; blockers: ComposeBlocker[]; warnings: ComposeWarning[]; steps: IrStep[]; spec_hash: string | null;
+  llm: { used: boolean; purpose?: string; llm_calls?: number; cost_usd?: number; cost_unpriced_calls?: number }; disclaimer: string;
+};
+export type ComposeApplyOut = { step: CompositionStepRow; job: Job };
+
+export const composeApi = {
+  create: (project_id: string, name: string) => req<CompositionSummary>("POST", "/v1/compositions", { project_id, name }),
+  get: (id: string) => req<CompositionSummary>("GET", `/v1/compositions/${id}`),
+  forProject: (projectId: string) => req<CompositionSummary[]>("GET", `/v1/projects/${projectId}/compositions`),
+  steps: (id: string) => req<CompositionStepRow[]>("GET", `/v1/compositions/${id}/steps`),
+  /** Model call when `steps` is absent; deterministic re-interpretation when a card's steps come back with `answers`. */
+  interpret: (id: string, body: { prompt: string; mentions?: ComposeMentionIn[]; steps?: IrStep[]; answers?: ComposePatch[] }) =>
+    req<InterpretationCard>("POST", `/v1/compositions/${id}/interpret`, body),
+  apply: (id: string, body: { prompt: string; steps: IrStep[]; base_version_id: string | null; spec_hash: string | null }, idempotencyKey: string) =>
+    req<ComposeApplyOut>("POST", `/v1/compositions/${id}/apply`, body, { "Idempotency-Key": idempotencyKey }),
+};
+
 export async function uploadDrawing(projectId: string, file: File): Promise<UploadInfo> {
   const form = new FormData();
   form.append("file", file);
