@@ -59,16 +59,16 @@ AKS, Redis and a second orchestration engine are deliberately out (blueprint §5
 | 4 | **Infrastructure**: Bicep modules (network, ACR, Key Vault, identities and roles, Postgres, Storage, Service Bus, Log Analytics + App Insights, Container Apps env, apps, jobs, Azure OpenAI account and deployments, budgets) and per-environment parameters | agent | `az bicep build` and `what-if` clean against a dev subscription **[Verify]** |
 | 5 | **Pipeline**: Azure DevOps YAML — lint, typecheck, pytest, golden corpus, e2e, secret scan, image build, SBOM, vulnerability scan, push by digest, deploy dev, smoke, promote | agent | Dry-run on a branch |
 | 6 | Studio sign-in with MSAL (Entra) replacing dev identities in hosted environments | next | e2e against staging |
-| 7 | Compose API (interpret/apply), import pipeline, needs-you inbox | product | spec P0–P2 exit criteria |
+| 7 | Compose API (interpret/apply), import pipeline, needs-you inbox | product | spec P0 to P2 exit criteria |
 
-Steps 1–5 can run in parallel; 6 depends on 3 and 4.
+Steps 1 to 5 can run in parallel; 6 depends on 3 and 4.
 
 ## 5. Operations
 
 - **Health**: liveness (process up) and readiness (DB reachable, queue reachable, storage reachable; planner status reported but not required).
 - **Alerts**: queue age, dead letters, job failure rate, CAD validity rate, API 5xx, p95 latency, budget at 50/80/100%.
 - **Targets** (blueprint §18, engineering not contractual): API p95 < 1 s; simple CAD p95 < 60 s worker time; text-to-CAD p95 < 3 min; pilot 99.5% API availability, RPO ≤ 24 h, RTO ≤ 8 h.
-- **Backups**: PostgreSQL PITR (7–35 days), Blob soft delete and versioning, a restore drill before the external pilot.
+- **Backups**: PostgreSQL PITR (7 to 35 days), Blob soft delete and versioning, a restore drill before the external pilot.
 - **Cost**: per-job cost is now recorded (`budget.calls[*].cost_usd`) once prices are set (`SHILPA_MODEL_PRICES`). Report cost per successful job. Azure budgets alert; admission control in the app stops spend.
 
 ## 6. Open questions

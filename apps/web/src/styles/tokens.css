@@ -43,7 +43,7 @@
   --color-complex-soft: #eaefff;
 
   /* Text variants, added for WCAG AA. The Paper hues fall below 4.5:1
-     as 12–13 px text on their soft tints; same hue, darkened to
+     as 12 to 13 px text on their soft tints; same hue, darkened to
      at least 4.6:1 on the tint. */
   --color-muted-text: #676b74;
   --color-action-text: #c04509;

@@ -4,7 +4,7 @@ import Link from "next/link";
 export function Mark({ size = 24 }: { size?: 24 | 26 | 32 | 48 }) {
   const radius = size <= 26 ? "rounded-[6px]" : size === 32 ? "rounded-[8px]" : "rounded-[12px]";
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- 1–3 KB static webp, no optimisation needed
+    // eslint-disable-next-line @next/next/no-img-element -- 1 to 3 KB static webp, no optimisation needed
     <img
       src={size > 32 ? "/brand/shilpa-mark-128.webp" : "/brand/shilpa-mark-64.webp"}
       alt=""
