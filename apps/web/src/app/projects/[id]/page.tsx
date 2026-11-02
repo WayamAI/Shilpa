@@ -8,8 +8,7 @@ import { use, useCallback, useEffect, useRef, useState } from "react";
 import { Conversation, type ChatItem, type JobState } from "@/components/studio/conversation";
 import { KindWorkspace } from "@/components/studio/kind-workspace";
 import { ExportPanel, ParamsPanel, ValidationPanel, VersionsPanel } from "@/components/studio/part-panels";
-import { Button, Tabs } from "@/components/ui/controls";
-import { EmptyState, Panel, Select, StatusBadge } from "@/components/ui/primitives";
+import { Badge, Button, EmptyState, Panel, Select, Tabs } from "@/components/ui";
 import { useSession } from "@/context/session-context";
 import { api, errText, streamJob, type Job, type ModelKind, type ProjectDetail, type Spec, type Version } from "@/lib/api";
 
@@ -114,7 +113,7 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
     try {
       trackJob(await api.editParams(version.model_id, version.id, changes));
     } catch (e) {
-      say({ kind: "system", text: errText(e), tone: "error" });
+      say({ kind: "system", text: errText(e), tone: "fail" });
     }
   }
 
@@ -123,7 +122,7 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
     try {
       trackJob(await api.restore(version.model_id, headId, id));
     } catch (e) {
-      say({ kind: "system", text: errText(e), tone: "error" });
+      say({ kind: "system", text: errText(e), tone: "fail" });
     }
   }
 
@@ -134,7 +133,7 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
       if (r.job) trackJob(r.job);
       else setVersion(await api.version(version.id));
     } catch (e) {
-      say({ kind: "system", text: errText(e), tone: "error" });
+      say({ kind: "system", text: errText(e), tone: "fail" });
     }
   }
 
@@ -170,7 +169,7 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
           </div>
           {version ? (
             <span className="hidden shrink-0 items-center gap-2 sm:flex">
-              <StatusBadge tone={version.validation_passed ? "success" : "error"}>
+              <Badge tone={version.validation_passed ? "pass" : "fail"}>
                 {isPart
                   ? version.validation_passed
                     ? "geometry validated"
@@ -178,8 +177,8 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
                   : version.validation_passed
                     ? "all checks passed"
                     : "checks failed"}
-              </StatusBadge>
-              <StatusBadge tone="neutral">not reviewed for release</StatusBadge>
+              </Badge>
+              <Badge tone="neutral">not reviewed for release</Badge>
             </span>
           ) : null}
         </div>
@@ -193,7 +192,8 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
                 setModelId(e.target.value);
                 loadModel(e.target.value).catch((err) => setError(errText(err)));
               }}
-              className="h-8 max-w-[260px] rounded-full border border-line bg-surface-2 text-xs font-semibold text-body outline-none"
+              size="sm"
+              className="max-w-[260px]"
             >
               {!modelId ? <option value="">New part</option> : null}
               {project.models.map((m) => (
@@ -211,7 +211,7 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
             </Button>
           ) : null}
           {activeJob && canWrite ? (
-            <Button size="sm" variant="tertiary" onClick={() => api.cancel(activeJob.id)}>
+            <Button size="sm" variant="ghost" onClick={() => api.cancel(activeJob.id)}>
               Cancel job
             </Button>
           ) : null}
@@ -241,7 +241,6 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
           >
             {version ? (
               <div className="flex min-h-0 flex-1 flex-col">
-                <div className="shrink-0 border-b border-line px-4 py-2.5">
                   <Tabs<Tab>
                     label="Part details"
                     value={tab}
@@ -253,7 +252,6 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
                       { id: "export", label: "Export" },
                     ]}
                   />
-                </div>
                 <div className="min-h-0 flex-1 overflow-y-auto p-4">
                   {tab === "params" ? (
                     <ParamsPanel key={version.id} version={version} editable={canWrite && isHead && !activeJob} isHead={isHead} onApply={applyParams} />

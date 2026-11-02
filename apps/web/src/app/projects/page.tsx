@@ -6,9 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { PageBody, PageHeader } from "@/components/layout/page-header";
-import { Button, TextInput } from "@/components/ui/controls";
-import { InfoPopover } from "@/components/ui/info-popover";
-import { EmptyState, KpiTile, Panel } from "@/components/ui/primitives";
+import { Button, EmptyState, InfoPopover, Metric, Panel, TextInput } from "@/components/ui";
 import { useSession } from "@/context/session-context";
 import { api, errText, type Project, type Usage } from "@/lib/api";
 
@@ -83,15 +81,14 @@ export default function ProjectsPage() {
       <PageBody>
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-            <KpiTile label="Projects" value={projects ? String(projects.length) : "—"} hint={me?.tenant_name} />
-            <KpiTile label="Parts" value={projects ? String(models) : "—"} hint="across all projects" />
-            <KpiTile
+            <Metric label="Projects" value={projects ? String(projects.length) : "—"} hint={me?.tenant_name} />
+            <Metric label="Parts" value={projects ? String(models) : "—"} hint="across all projects" />
+            <Metric
               label="Jobs completed"
               value={jobs === null ? "—" : String(succeeded)}
               hint={jobs ? `${Math.round((succeeded / jobs) * 100)}% of ${jobs} jobs` : undefined}
-              tone="success"
             />
-            <KpiTile
+            <Metric
               label="Planner tokens"
               value={tokens ? `${Math.round((tokens.input_tokens + tokens.output_tokens) / 1000)}k` : "—"}
               hint={tokens ? `${tokens.events} model calls` : "no model calls yet"}
@@ -117,7 +114,6 @@ export default function ProjectsPage() {
             {error ? <p className="p-4 text-xs text-fail-text">{error}</p> : null}
             {projects && shown.length === 0 ? (
               <EmptyState
-                mark={<Box size={22} strokeWidth={1.5} className="text-muted" aria-hidden />}
                 title={projects.length === 0 ? "No projects yet" : "No projects match"}
                 detail={projects.length === 0 ? "Create a project to start your first part." : undefined}
               />

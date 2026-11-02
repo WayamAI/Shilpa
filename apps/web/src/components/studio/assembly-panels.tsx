@@ -3,8 +3,7 @@
 import { Download, FileBox, Pause, Play, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Button, IconButton } from "@/components/ui/controls";
-import { EmptyState, StatusBadge, StatusDot } from "@/components/ui/primitives";
+import { Badge, Button, Dot, EmptyState, IconButton } from "@/components/ui";
 import { downloadArtifact, type Version, type Viewer, type ViewerCheck, type ViewerJoint } from "@/lib/api";
 import { checkDetail, checkTitle, groupLabel, isWarning, partsTree } from "@/lib/assembly";
 
@@ -81,7 +80,7 @@ export function PartsTree({
                 </span>
                 {failing.has(inst.id) ? (
                   <span title="Involved in a failed check" className="shrink-0">
-                    <StatusDot tone="error" />
+                    <Dot tone="fail" />
                   </span>
                 ) : null}
               </button>
@@ -193,20 +192,20 @@ export function ChecksPanel({
     <div data-testid="checks-panel">
       <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="shrink-0">
-          <StatusBadge tone={viewer.passed ? "success" : "error"}>
+          <Badge tone={viewer.passed ? "pass" : "fail"}>
             {viewer.passed && !failed.length ? `all ${viewer.checks.length} checks passed` : `${failed.length} of ${viewer.checks.length} failed`}
-          </StatusBadge>
+          </Badge>
         </span>
         {warnings.length ? (
           <span className="shrink-0">
-            <StatusBadge tone="warning">
+            <Badge tone="consent">
               {warnings.length} warning{warnings.length === 1 ? "" : "s"}
-            </StatusBadge>
+            </Badge>
           </span>
         ) : null}
         <span className="text-xs text-muted-text">measured on the placed solids</span>
         {highlight ? (
-          <Button size="sm" variant="tertiary" className="ml-auto" onClick={() => onHighlight(null)}>
+          <Button size="sm" variant="ghost" className="ml-auto" onClick={() => onHighlight(null)}>
             <X size={13} strokeWidth={1.75} aria-hidden />
             Clear highlight
           </Button>
@@ -247,7 +246,7 @@ export function ChecksPanel({
                       <span className="block text-xs text-muted-text tabular [overflow-wrap:anywhere]">{checkDetail(c)}</span>
                     </span>
                     <span className="shrink-0">
-                      <StatusBadge tone={c.passed ? "success" : warn ? "warning" : "error"}>{c.passed ? "pass" : warn ? "warn" : "fail"}</StatusBadge>
+                      <Badge tone={c.passed ? "pass" : warn ? "consent" : "fail"}>{c.passed ? "pass" : warn ? "warn" : "fail"}</Badge>
                     </span>
                   </button>
                 </li>

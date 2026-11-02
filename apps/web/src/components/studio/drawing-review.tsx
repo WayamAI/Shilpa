@@ -3,8 +3,7 @@
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { Button, Dialog, NumberInput } from "@/components/ui/controls";
-import { StatusBadge } from "@/components/ui/primitives";
+import { Badge, Button, Dialog, NumberInput } from "@/components/ui";
 import { api, errText, fetchBlob, type DrawingDim, type Spec } from "@/lib/api";
 
 /**
@@ -67,15 +66,16 @@ export function DrawingReview({
 
   return (
     <Dialog
+      size="xl"
       title="Review values read from the drawing"
-      subtitle={
+      description={
         <span>
           {tb.part_name ?? "Drawing"} · units {tb.units ?? "?"} · scale {tb.scale ?? "?"}
           {drawing.views.length ? ` · ${drawing.views.join(", ")}` : ""}
         </span>
       }
       onClose={onClose}
-      footer={
+      actions={
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-xs text-muted-text">
             {reviewed
@@ -185,9 +185,9 @@ export function DrawingReview({
                     <span className="block text-xs text-muted-text">{d.meaning}</span>
                   </td>
                   <td className="py-2.5 pr-5 pl-4 text-right">
-                    {d.verified === true ? <StatusBadge tone="success">text ✓</StatusBadge> : null}
-                    {d.verified === false ? <StatusBadge tone="error">mismatch</StatusBadge> : null}
-                    {d.verified === null ? <StatusBadge tone="neutral">scan</StatusBadge> : null}
+                    {d.verified === true ? <Badge tone="pass">text ✓</Badge> : null}
+                    {d.verified === false ? <Badge tone="fail">mismatch</Badge> : null}
+                    {d.verified === null ? <Badge tone="neutral">scan</Badge> : null}
                     {d.confidence !== "high" ? <span className="mt-1 block text-xs text-consent-text">{d.confidence} confidence</span> : null}
                     {d.review !== "unreviewed" ? <span className="mt-1 block text-xs text-pass-text">{d.review}</span> : null}
                   </td>

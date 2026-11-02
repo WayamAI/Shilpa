@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
-import { StatusDot } from "@/components/ui/primitives";
+import { Dot } from "@/components/ui";
 import { useSession } from "@/context/session-context";
 import { navItemForPath } from "@/lib/navigation";
 
@@ -31,7 +31,7 @@ export function TopBar({ onMenu, title }: { onMenu?: () => void; title?: string 
             className="hidden h-8 items-center gap-2 rounded-full border border-line bg-surface-2 px-3 text-xs font-semibold text-muted-text sm:flex"
             title={disabled ? "Azure OpenAI planner (disabled with SHILPA_LLM=off)" : "Azure OpenAI planner"}
           >
-            <StatusDot tone={health.llm_configured ? "success" : disabled ? "neutral" : "warning"} />
+            <Dot tone={health.llm_configured ? "pass" : disabled ? "neutral" : "consent"} />
             Planner
             <span className="text-muted-text">·</span>
             <span className={health.llm_configured ? "text-pass-text" : disabled ? "text-muted-text" : "text-consent-text"}>

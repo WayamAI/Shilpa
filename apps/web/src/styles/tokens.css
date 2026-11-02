@@ -54,6 +54,8 @@
   --color-basic-text: #0b7978;
   --color-complex-text: #3b5bdb;
   --color-on-action: #ffffff;
+  /* Destructive fill: Paper uses --color-fail (3.91:1 with white text),
+     so filled destructive buttons use the AA text shade. */
 
   /* Action states (from the Paper gradient's end stop). */
   --color-action-hover: #b53e07;
@@ -63,9 +65,12 @@
   --radius-md: 8px;
   --radius-panel: 10px; /* Paper tables and sidebar status card */
   --radius-lg: 12px;
+  --radius-xl: 14px; /* Paper dialogs and state cards */
   --radius-full: 999px;
   --shadow-action: 0 1px 2px #b53e0740;
   --shadow-popover: 0 12px 32px #1018281f, 0 2px 6px #10182814;
+  --shadow-dialog: 0 16px 40px #10182826;
+  --shadow-toolbar: 0 1px 2px #1018280f;
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -79,6 +84,8 @@
   --text-xs--line-height: 16px;
   --text-sm: 13px;
   --text-sm--line-height: 16px;
+  --text-prose: 13px; /* Paper dialog and empty-state body */
+  --text-prose--line-height: 19px;
   --text-md: 14px;
   --text-md--line-height: 18px;
   --text-brand: 15px;
@@ -86,6 +93,10 @@
   --text-brand--letter-spacing: -0.01em;
   --text-lg: 16px;
   --text-lg--line-height: 20px;
+  --text-heading: 17px; /* Paper empty-state title */
+  --text-heading--line-height: 22px;
+  --text-title: 18px; /* Paper dialog title */
+  --text-title--line-height: 22px;
   --text-xl: 20px;
   --text-xl--line-height: 24px;
   --text-xl--letter-spacing: -0.01em;

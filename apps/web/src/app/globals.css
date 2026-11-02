@@ -110,3 +110,24 @@ h4 {
     scroll-behavior: auto !important;
   }
 }
+
+/* Overlay entrances. Opacity and a few px of travel only; every use is
+   wrapped in motion-safe:, and durations are 0 under reduced motion. */
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes overlay-in {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@keyframes drawer-left {
+  from { transform: translateX(-100%); }
+}
+@keyframes drawer-right {
+  from { transform: translateX(100%); }
+}

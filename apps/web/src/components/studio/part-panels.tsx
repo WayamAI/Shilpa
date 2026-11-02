@@ -3,8 +3,7 @@
 import { Download, FileBox, RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { Button, KeyValue, NumberInput } from "@/components/ui/controls";
-import { EmptyState, StatusBadge } from "@/components/ui/primitives";
+import { Badge, Button, EmptyState, KeyValue, NumberInput } from "@/components/ui";
 import { downloadArtifact, paramValue, type Check, type Version } from "@/lib/api";
 
 function Caption({ children }: { children: React.ReactNode }) {
@@ -63,7 +62,7 @@ export function ParamsPanel({
                   </label>
                   {meta.source && meta.source !== "user" ? (
                     <span className="ml-1.5 align-middle">
-                      <StatusBadge tone={meta.source === "drawing" ? "info" : "warning"}>{meta.source}</StatusBadge>
+                      <Badge tone={meta.source === "drawing" ? "complex" : "consent"}>{meta.source}</Badge>
                     </span>
                   ) : null}
                 </th>
@@ -87,7 +86,7 @@ export function ParamsPanel({
             Apply as new version
           </Button>
           {Object.keys(changes).length > 0 ? (
-            <Button variant="tertiary" size="sm" onClick={() => setDraft({})}>
+            <Button variant="ghost" size="sm" onClick={() => setDraft({})}>
               Reset
             </Button>
           ) : null}
@@ -170,7 +169,7 @@ export function ValidationPanel({ version }: { version: Version }) {
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="shrink-0">
-          <StatusBadge tone={v.passed ? "success" : "error"}>{v.passed ? "all checks passed" : `${failed.length} failed`}</StatusBadge>
+          <Badge tone={v.passed ? "pass" : "fail"}>{v.passed ? "all checks passed" : `${failed.length} failed`}</Badge>
         </span>
         <span className="text-xs text-muted-text">measured on the re-imported STEP</span>
       </div>
@@ -199,7 +198,7 @@ export function ValidationPanel({ version }: { version: Version }) {
                 <span className="block truncate text-xs text-muted-text">{c.note}</span>
               ) : null}
             </span>
-            <StatusBadge tone={c.passed ? "success" : "error"}>{c.passed ? "pass" : "fail"}</StatusBadge>
+            <Badge tone={c.passed ? "pass" : "fail"}>{c.passed ? "pass" : "fail"}</Badge>
           </li>
         ))}
       </ul>
@@ -244,11 +243,11 @@ export function VersionsPanel({
               <div className="flex items-center justify-between gap-2">
                 <button type="button" onClick={() => onOpen(v.id)} className="flex min-w-0 items-baseline gap-2 text-left outline-none">
                   <span className="text-md font-semibold text-ink">v{v.number}</span>
-                  {i === 0 ? <StatusBadge tone="info">latest</StatusBadge> : null}
+                  {i === 0 ? <Badge tone="complex">latest</Badge> : null}
                   <span className="truncate text-xs text-muted-text">{new Date(v.created_at).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}</span>
                 </button>
                 {i > 0 && canRestore ? (
-                  <Button size="sm" variant="tertiary" onClick={() => onRestore(v.id)} title="Restore as a new version">
+                  <Button size="sm" variant="ghost" onClick={() => onRestore(v.id)} title="Restore as a new version">
                     <RotateCcw size={13} strokeWidth={1.75} aria-hidden />
                     Restore
                   </Button>

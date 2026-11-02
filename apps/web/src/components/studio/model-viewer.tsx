@@ -2,13 +2,12 @@
 
 import { GizmoHelper, GizmoViewport, Grid, OrbitControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { Box, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-import { EmptyState } from "@/components/ui/primitives";
-import { IconButton } from "@/components/ui/controls";
+import { EmptyState, IconButton } from "@/components/ui";
 import { fetchBlob } from "@/lib/api";
 
 // glTF from the CAD worker is in metres with Y up. The scene works in millimetres
@@ -162,7 +161,6 @@ export default function ModelViewer({ glbId, size }: { glbId: string | null; siz
       {!glbId ? (
         <div className="absolute inset-0 flex items-center justify-center">
           <EmptyState
-            mark={<Box size={24} strokeWidth={1.5} className="text-muted" aria-hidden />}
             title="No part yet"
             detail="Describe a part, upload a drawing, or start from a reference part."
           />

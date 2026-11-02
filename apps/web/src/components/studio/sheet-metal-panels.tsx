@@ -2,8 +2,7 @@
 
 import { useMemo } from "react";
 
-import { KeyValue } from "@/components/ui/controls";
-import { EmptyState, StatusBadge } from "@/components/ui/primitives";
+import { Badge, EmptyState, KeyValue } from "@/components/ui";
 import type { FlatPattern, Viewer, ViewerCheck } from "@/lib/api";
 import { fmtValue } from "@/lib/assembly";
 
@@ -208,7 +207,7 @@ export function SheetChecks({ viewer }: { viewer: Viewer }) {
               </span>
             </span>
             <span className="shrink-0">
-              <StatusBadge tone={c.passed ? "success" : "error"}>{c.passed ? "pass" : "fail"}</StatusBadge>
+              <Badge tone={c.passed ? "pass" : "fail"}>{c.passed ? "pass" : "fail"}</Badge>
             </span>
           </li>
         );
@@ -218,9 +217,9 @@ export function SheetChecks({ viewer }: { viewer: Viewer }) {
   return (
     <div data-testid="sheet-checks">
       <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <StatusBadge tone={viewer.passed ? "success" : "error"}>
+        <Badge tone={viewer.passed ? "pass" : "fail"}>
           {viewer.passed ? `all ${viewer.checks.length} checks passed` : `${failed.length} of ${viewer.checks.length} failed`}
-        </StatusBadge>
+        </Badge>
         <span className="text-xs text-muted-text">folded solid and flat pattern</span>
       </div>
       <Caption>Shop rules · {rules.filter((c) => c.passed).length}/{rules.length}</Caption>

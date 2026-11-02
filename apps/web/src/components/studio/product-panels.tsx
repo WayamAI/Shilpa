@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { KeyValue } from "@/components/ui/controls";
-import { EmptyState, StatusBadge, type StatusTone } from "@/components/ui/primitives";
+import { Badge, type BadgeTone, EmptyState, KeyValue } from "@/components/ui";
 import { fetchBlob, type ProductInfo, type Version } from "@/lib/api";
 import { fmtValue } from "@/lib/assembly";
 
@@ -11,8 +10,8 @@ function Caption({ children }: { children: React.ReactNode }) {
   return <h3 className="mt-5 mb-2 text-xs tracking-[0.08em] text-muted-text uppercase first:mt-0">{children}</h3>;
 }
 
-const STATUS_TONE: Record<string, StatusTone> = { passed: "success", repaired: "info", unresolved: "error" };
-const SOURCE_TONE: Record<string, StatusTone> = { user: "neutral", router: "info", derived: "neutral", table: "neutral", default: "warning" };
+const STATUS_TONE: Record<string, BadgeTone> = { passed: "pass", repaired: "complex", unresolved: "fail" };
+const SOURCE_TONE: Record<string, BadgeTone> = { user: "neutral", router: "complex", derived: "neutral", table: "neutral", default: "consent" };
 const humanize = (s: string) => s.replace(/_/g, " ");
 
 /**
@@ -26,7 +25,7 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
   return (
     <div data-testid="router-panel">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <StatusBadge tone={STATUS_TONE[product.status] ?? "neutral"}>{product.status}</StatusBadge>
+        <Badge tone={STATUS_TONE[product.status] ?? "neutral"}>{product.status}</Badge>
         <span className="text-xs text-muted-text">
           {router ? `${router.iterations.length} round${router.iterations.length === 1 ? "" : "s"} · ${router.seconds} s` : ""}
         </span>
@@ -46,7 +45,7 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
               <span className="text-xs text-ink">Round {it.iteration + 1}</span>
               <span className="flex items-center gap-2">
                 <span className="text-xs tabular text-muted-text">{it.seconds} s</span>
-                <StatusBadge tone={it.passed ? "success" : "error"}>{it.passed ? "pass" : `${it.failed.length} failed`}</StatusBadge>
+                <Badge tone={it.passed ? "pass" : "fail"}>{it.passed ? "pass" : `${it.failed.length} failed`}</Badge>
               </span>
             </div>
             {it.failed.length ? <p className="mt-1 text-xs text-fail-text [overflow-wrap:anywhere]">Failed: {it.failed.map(humanize).join(", ")}</p> : null}
@@ -55,7 +54,7 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
               <ul className="mt-1.5 flex flex-col gap-1">
                 {it.actions.map((a, k) => (
                   <li key={k} className="text-xs text-body">
-                    <StatusBadge tone="info">{a.level}</StatusBadge> <span className="text-ink">{humanize(a.param)}</span> → {fmtValue(a.new)}
+                    <Badge tone="complex">{a.level}</Badge> <span className="text-ink">{humanize(a.param)}</span> → {fmtValue(a.new)}
                     <span className="block text-xs text-muted-text">{a.reason}</span>
                   </li>
                 ))}
@@ -127,7 +126,7 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
                     {p.unit ? ` ${p.unit}` : ""}
                   </td>
                   <td className="w-16 py-1.5 text-right">
-                    <StatusBadge tone={SOURCE_TONE[p.source] ?? "neutral"}>{p.source}</StatusBadge>
+                    <Badge tone={SOURCE_TONE[p.source] ?? "neutral"}>{p.source}</Badge>
                   </td>
                 </tr>
               ))}

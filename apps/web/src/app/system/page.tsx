@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { PageBody, PageHeader } from "@/components/layout/page-header";
-import { KeyValue } from "@/components/ui/controls";
-import { KpiTile, Panel, SplitRow, StatusBadge, StatusDot } from "@/components/ui/primitives";
+import { Badge, Dot, KeyValue, Metric, Panel, SplitRow } from "@/components/ui";
 import { useSession } from "@/context/session-context";
 import { api, type Usage } from "@/lib/api";
 
@@ -30,23 +29,21 @@ export default function SystemPage() {
       <PageBody>
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-            <KpiTile
+            <Metric
               label="Planner"
               value={health ? (health.llm_configured ? "Online" : plannerOff ? "Disabled" : "Off") : "—"}
               hint={plannerOff ? "SHILPA_LLM=off · no model calls" : (health?.llm_deployment ?? "Azure OpenAI not configured")}
-              tone={health?.llm_configured ? "success" : plannerOff ? "neutral" : "warning"}
             />
-            <KpiTile label="Model calls" value={llm ? String(llm.events) : "0"} hint={llm ? `${(llm.input_tokens / 1000).toFixed(1)}k in · ${(llm.output_tokens / 1000).toFixed(1)}k out` : undefined} />
-            <KpiTile label="CAD compute" value={cpu ? `${Math.round(cpu.cpu_seconds)}s` : "0s"} hint={cpu ? `${cpu.events} geometry runs` : undefined} />
-            <KpiTile
+            <Metric label="Model calls" value={llm ? String(llm.events) : "0"} hint={llm ? `${(llm.input_tokens / 1000).toFixed(1)}k in · ${(llm.output_tokens / 1000).toFixed(1)}k out` : undefined} />
+            <Metric label="CAD compute" value={cpu ? `${Math.round(cpu.cpu_seconds)}s` : "0s"} hint={cpu ? `${cpu.events} geometry runs` : undefined} />
+            <Metric
               label="Job success"
               value={total ? `${Math.round(((jobs.succeeded ?? 0) / total) * 100)}%` : "—"}
               hint={total ? `${jobs.succeeded ?? 0} of ${total} jobs` : "no jobs yet"}
-              tone="success"
             />
           </div>
 
-          <SplitRow ratio="1/1.4">
+          <SplitRow>
             <Panel title="Services">
               <ul className="flex flex-col">
                 {[
@@ -64,13 +61,13 @@ export default function SystemPage() {
                 ].map((s) => (
                   <li key={s.name} className="flex items-center justify-between gap-3 border-b border-line py-2.5 last:border-b-0">
                     <span className="flex min-w-0 items-center gap-2.5">
-                      <StatusDot tone={s.ok ? "success" : "warning"} />
+                      <Dot tone={s.ok ? "pass" : "consent"} />
                       <span className="min-w-0">
                         <span className="block text-sm text-ink">{s.name}</span>
                         <span className="block truncate text-xs text-muted-text">{s.detail}</span>
                       </span>
                     </span>
-                    <StatusBadge tone={s.ok ? "success" : "warning"}>{s.ok ? "available" : "unavailable"}</StatusBadge>
+                    <Badge tone={s.ok ? "pass" : "consent"}>{s.ok ? "available" : "unavailable"}</Badge>
                   </li>
                 ))}
               </ul>

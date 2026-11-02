@@ -3,8 +3,7 @@
 import { FileUp, SendHorizontal, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { Button, NumberInput, Textarea } from "@/components/ui/controls";
-import { Select, StatusBadge, StatusDot, type StatusTone } from "@/components/ui/primitives";
+import { Badge, type BadgeTone, Button, Dot, NumberInput, Select, Textarea } from "@/components/ui";
 import { useSession } from "@/context/session-context";
 import { api, errText, uploadDrawing, type Example, type Job, type JobEvent, type Route, type Spec, type Starters, type Version } from "@/lib/api";
 
@@ -12,7 +11,7 @@ import { DrawingReview } from "./drawing-review";
 
 export type ChatItem =
   | { kind: "user"; text: string }
-  | { kind: "system"; text: string; tone?: "error" }
+  | { kind: "system"; text: string; tone?: "fail" }
   | { kind: "spec"; spec: Spec }
   | { kind: "job"; jobId: string };
 
@@ -78,12 +77,12 @@ export function Conversation({
         return;
       }
       if (route.kind !== "part" || !llm) {
-        say({ kind: "system", text: routeMessage(route, llm), tone: route.supported ? undefined : "error" });
+        say({ kind: "system", text: routeMessage(route, llm), tone: route.supported ? undefined : "fail" });
         return;
       }
       say({ kind: "spec", spec: await api.createSpec(projectId, t) });
     } catch (e) {
-      say({ kind: "system", text: errText(e), tone: "error" });
+      say({ kind: "system", text: errText(e), tone: "fail" });
     } finally {
       setSending(false);
     }
@@ -102,7 +101,7 @@ export function Conversation({
       setText("");
       say({ kind: "spec", spec: await api.specFromUpload(projectId, up.id, note) });
     } catch (e) {
-      say({ kind: "system", text: errText(e), tone: "error" });
+      say({ kind: "system", text: errText(e), tone: "fail" });
     } finally {
       setSending(false);
     }
@@ -115,7 +114,7 @@ export function Conversation({
     try {
       trackJob(await api.runRecipe(projectId, ex.recipe));
     } catch (e) {
-      say({ kind: "system", text: errText(e), tone: "error" });
+      say({ kind: "system", text: errText(e), tone: "fail" });
     }
   }
 
@@ -128,7 +127,7 @@ export function Conversation({
       try {
         trackJob(await api.runProduct(projectId, { request: pr.request, spec: pr.spec, starter: pr.id }));
       } catch (e) {
-        say({ kind: "system", text: errText(e), tone: "error" });
+        say({ kind: "system", text: errText(e), tone: "fail" });
       }
       return;
     }
@@ -139,7 +138,7 @@ export function Conversation({
     try {
       trackJob(kind === "assembly" ? await api.runAssembly(projectId, st.spec, st.id) : await api.runSheetMetal(projectId, st.spec, st.id));
     } catch (e) {
-      say({ kind: "system", text: errText(e), tone: "error" });
+      say({ kind: "system", text: errText(e), tone: "fail" });
     }
   }
 
@@ -183,10 +182,10 @@ export function Conversation({
             ) : c.kind === "system" ? (
               <div
                 key={i}
-                role={c.tone === "error" ? "alert" : undefined}
+                role={c.tone === "fail" ? "alert" : undefined}
                 className={[
                   "rounded-lg border px-3.5 py-2.5 text-xs [overflow-wrap:anywhere]",
-                  c.tone === "error" ? "border-fail/40 bg-fail-soft text-fail-text" : "border-line bg-surface text-body",
+                  c.tone === "fail" ? "border-fail/40 bg-fail-soft text-fail-text" : "border-line bg-surface text-body",
                 ].join(" ")}
               >
                 {c.text}
@@ -249,7 +248,8 @@ export function Conversation({
                   value=""
                   disabled={busy}
                   onChange={(e) => runExample(e.target.value)}
-                  className="h-8 max-w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs font-semibold text-muted-text outline-none"
+                  size="sm"
+                  className="max-w-full"
                 >
                   <option value="">Reference parts…</option>
                   {examples.map((x) => (
@@ -264,7 +264,8 @@ export function Conversation({
                     value=""
                     disabled={busy}
                     onChange={(e) => runStarter(e.target.value)}
-                    className="h-8 w-full max-w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs font-semibold text-muted-text outline-none"
+                    size="sm"
+                    className="w-full"
                   >
                     <option value="">{starters.products?.length ? "Assemblies, sheet metal, products…" : "Assemblies and sheet metal…"}</option>
                     <optgroup label="Reference assemblies">
@@ -338,7 +339,7 @@ function SpecCard({
     try {
       onUpdate(await api.answerSpec(spec.id, spec.revision, nums, resolved));
     } catch (e) {
-      say({ kind: "system", text: errText(e), tone: "error" });
+      say({ kind: "system", text: errText(e), tone: "fail" });
     } finally {
       setBusy(false);
     }
@@ -350,13 +351,13 @@ function SpecCard({
       trackJob(await api.runSpec(projectId, spec.id));
       setStarted(true);
     } catch (e) {
-      say({ kind: "system", text: errText(e), tone: "error" });
+      say({ kind: "system", text: errText(e), tone: "fail" });
     } finally {
       setBusy(false);
     }
   }
 
-  const statusTone: Record<string, StatusTone> = { ready: "success", needs_review: "info", needs_clarification: "warning", unsupported: "error" };
+  const statusTone: Record<string, BadgeTone> = { ready: "pass", needs_review: "complex", needs_clarification: "consent", unsupported: "fail" };
   const statusLabel: Record<string, string> = { ready: "ready", needs_review: "review drawing", needs_clarification: "needs answers", unsupported: "not supported" };
 
   return (
@@ -368,7 +369,7 @@ function SpecCard({
           </p>
           <p className="mt-0.5 text-sm text-ink">{r.summary}</p>
         </div>
-        <StatusBadge tone={statusTone[spec.status] ?? "neutral"}>{statusLabel[spec.status] ?? spec.status}</StatusBadge>
+        <Badge tone={statusTone[spec.status] ?? "neutral"}>{statusLabel[spec.status] ?? spec.status}</Badge>
       </header>
       <div className="px-3.5 py-2.5">
         <table className="w-full">
@@ -407,7 +408,7 @@ function SpecCard({
               <p key={i}>{c.description}</p>
             ))}
             {canWrite ? (
-              <Button size="sm" variant="tertiary" className="mt-1 -ml-3" disabled={busy} onClick={() => submit(true)}>
+              <Button size="sm" variant="ghost" className="mt-1 -ml-3" disabled={busy} onClick={() => submit(true)}>
                 I have corrected the values
               </Button>
             ) : null}
@@ -512,10 +513,10 @@ function routeMessage(route: Route, llm: boolean): string {
   return `${what}${disabled}${next[route.kind] ?? ""}`;
 }
 
-function eventTone(type: string): StatusTone {
-  if (type === "state.succeeded") return "success";
-  if (type === "state.failed") return "error";
-  if (type === "attempt.failed") return "warning";
+function eventTone(type: string): BadgeTone {
+  if (type === "state.succeeded") return "pass";
+  if (type === "state.failed") return "fail";
+  if (type === "attempt.failed") return "consent";
   return "neutral";
 }
 
@@ -523,20 +524,20 @@ function JobCard({ entry }: { entry?: { job: Job; events: JobEvent[] } }) {
   if (!entry) return null;
   const { job, events } = entry;
   const done = ["succeeded", "failed", "cancelled"].includes(job.state);
-  const tone: StatusTone = job.state === "succeeded" ? "success" : job.state === "failed" ? "error" : job.state === "cancelled" ? "neutral" : "info";
+  const tone: BadgeTone = job.state === "succeeded" ? "pass" : job.state === "failed" ? "fail" : job.state === "cancelled" ? "neutral" : "complex";
   return (
     <section className="rounded-lg border border-line bg-bg" aria-label="Job progress" data-testid="job-card" data-state={job.state}>
       <header className="flex items-center justify-between gap-3 border-b border-line px-3.5 py-2">
         <span className="text-xs tracking-[0.08em] text-muted-text uppercase">
           {JOB_LABEL[job.kind] ?? "Generate"} · {job.id.slice(0, 8)}
         </span>
-        <StatusBadge tone={tone}>{done ? job.state : "running"}</StatusBadge>
+        <Badge tone={tone}>{done ? job.state : "running"}</Badge>
       </header>
       <ol className="px-3.5 py-2.5">
         {events.map((e) => (
           <li key={e.id} className="flex items-start gap-2.5 py-0.5 text-xs text-body [overflow-wrap:anywhere]">
             <span className="mt-[7px]">
-              <StatusDot tone={eventTone(e.type)} />
+              <Dot tone={eventTone(e.type)} />
             </span>
             <span className={e.type === "state.failed" ? "text-fail-text" : undefined}>{(EVENT_TEXT[e.type] ?? (() => e.type))(e.data)}</span>
           </li>

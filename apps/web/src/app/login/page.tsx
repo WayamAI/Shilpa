@@ -5,8 +5,7 @@ import { useState, type FormEvent } from "react";
 
 import { Logo } from "@/components/layout/logo";
 import { HeroDrawing } from "@/components/studio/hero-drawing";
-import { Button, Field } from "@/components/ui/controls";
-import { Select } from "@/components/ui/primitives";
+import { Button, Field, Select } from "@/components/ui";
 import { DEV_USERS, writeSession } from "@/lib/session";
 
 /** Sign-in (Chronos layout). Local development uses seeded dev identities. */
@@ -54,7 +53,7 @@ export default function LoginPage() {
                 name="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                className="h-11 w-full rounded-full border border-line bg-surface-2 text-sm text-ink outline-none"
+                className="w-full"
               >
                 {DEV_USERS.map((u) => (
                   <option key={u.email} value={u.email}>

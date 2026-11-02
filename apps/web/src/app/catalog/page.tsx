@@ -1,12 +1,11 @@
 "use client";
 
-import { Download, Library, Search } from "lucide-react";
+import { Download, Search } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { PageBody, PageHeader } from "@/components/layout/page-header";
-import { Button, KeyValue, NumberInput, Tabs, TextInput } from "@/components/ui/controls";
-import { EmptyState, Panel, Select, StatusBadge, StatusDot } from "@/components/ui/primitives";
+import { Badge, Button, Dot, EmptyState, KeyValue, NumberInput, Panel, Select, Tabs, TextInput } from "@/components/ui";
 import {
   catalogApi,
   downloadCatalogStep,
@@ -23,8 +22,7 @@ const PartViewer = dynamic(() => import("@/components/studio/part-viewer"), {
   loading: () => <EmptyState title="Loading the 3D view…" />,
 });
 
-const SELECT =
-  "h-8 w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs text-ink outline-none";
+const SELECT = "w-full";
 
 // ---------------------------------------------------------------- schema helpers
 
@@ -103,7 +101,7 @@ function ParamField({
   let control;
   if (name === "material") {
     control = (
-      <Select aria-label={label(name, prop)} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} className={SELECT}>
+      <Select aria-label={label(name, prop)} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} className={SELECT} size="sm">
         <option value="">{p.default ? `default (${String(p.default)})` : "none (no mass)"}</option>
         {materials.map((m) => (
           <option key={m} value={m}>
@@ -119,7 +117,7 @@ function ParamField({
     );
   } else if (p.enum) {
     control = (
-      <Select aria-label={label(name, prop)} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} className={SELECT}>
+      <Select aria-label={label(name, prop)} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} className={SELECT} size="sm">
         <option value="">{nullable && (p.default === null || p.default === undefined) ? "auto" : `default (${show(p.default)})`}</option>
         {p.enum.map((e) => (
           <option key={String(e)} value={String(e)}>
@@ -312,13 +310,13 @@ export default function CatalogPage() {
         <div className="flex min-h-0 flex-col gap-4 xl:h-[calc(100vh-190px)] xl:flex-row">
           {/* Narrow screens pick from a grouped list so the 3D view stays near the top. */}
           <div className="flex flex-col gap-2 xl:hidden">
-            <TextInput aria-label="Type a part" placeholder="Type a part: M6x20 socket head, 6204-2RS…" value={query} onChange={(e) => setQuery(e.target.value)} className="!h-10 text-xs" />
+            <TextInput aria-label="Type a part" placeholder="Type a part: M6x20 socket head, 6204-2RS…" value={query} onChange={(e) => setQuery(e.target.value)} />
             <Suggestions matches={suggestions} onPick={applyMatch} />
             <Select
               aria-label="Part"
               value={selected ?? ""}
               onChange={(e) => pick(e.target.value)}
-              className="h-10 w-full min-w-0 rounded-full border border-line bg-surface-2 text-xs text-ink outline-none"
+              className="w-full"
             >
               {(catalog?.families ?? []).map((f) => (
                 <optgroup key={f} label={f}>
@@ -412,13 +410,14 @@ export default function CatalogPage() {
                 ) : null}
               </div>
             ) : (
-              <EmptyState mark={<Library size={24} strokeWidth={1.5} className="text-muted" aria-hidden />} title="Pick a part" />
+              <EmptyState title="Pick a part" />
             )}
           </Panel>
 
           <Panel title={current ? String(meta.designation ?? current.name) : "Part"} className="xl:w-[26rem] xl:shrink-0">
             <div className="mb-3">
               <Tabs<Tab>
+                inset={false}
                 label="Part details"
                 value={tab}
                 onChange={setTab}
@@ -470,9 +469,9 @@ export default function CatalogPage() {
                         }`}
                       >
                         <span className="flex items-center gap-2">
-                          <StatusDot tone={p.on_geometry ? "success" : "error"} />
+                          <Dot tone={p.on_geometry ? "pass" : "fail"} />
                           <span className="truncate text-xs text-ink">{p.name}</span>
-                          <StatusBadge tone="neutral">{p.kind}</StatusBadge>
+                          <Badge tone="neutral">{p.kind}</Badge>
                         </span>
                         {p.label ? <span className="mt-0.5 block truncate text-xs text-muted-text">{p.label}</span> : null}
                         {Object.keys(p.contract).length ? (

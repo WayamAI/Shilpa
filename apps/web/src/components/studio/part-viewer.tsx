@@ -6,8 +6,7 @@ import { RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 
-import { IconButton } from "@/components/ui/controls";
-import { EmptyState } from "@/components/ui/primitives";
+import { EmptyState, IconButton } from "@/components/ui";
 import type { CatalogPort, PartMesh } from "@/lib/api";
 
 import { usePalette, webglAvailable } from "./model-viewer";

@@ -3,8 +3,7 @@
 import dynamic from "next/dynamic";
 import { useState } from "react";
 
-import { Tabs } from "@/components/ui/controls";
-import { EmptyState, Panel } from "@/components/ui/primitives";
+import { EmptyState, Panel, Tabs } from "@/components/ui";
 import type { Version } from "@/lib/api";
 
 import { BomTable, ChecksPanel, JointsPanel, KindExportPanel, PartsTree } from "./assembly-panels";
@@ -80,14 +79,12 @@ function AssemblyWorkspace({ version, versions, canWrite, busy, freecadAvailable
       >
         {viewer ? (
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="shrink-0 border-b border-line px-4 py-2.5">
               <Tabs<AsmTab>
                 label="Assembly details"
                 value={tab}
                 onChange={setTab}
                 tabs={tabs}
               />
-            </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               {tab === "parts" ? (
                 <>
@@ -169,7 +166,6 @@ function SheetMetalWorkspace({ version, versions, canWrite, busy, freecadAvailab
       >
         {viewer ? (
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="shrink-0 border-b border-line px-4 py-2.5">
               <Tabs<SheetTab>
                 label="Sheet-metal details"
                 value={tab}
@@ -181,7 +177,6 @@ function SheetMetalWorkspace({ version, versions, canWrite, busy, freecadAvailab
                   { id: "export", label: "Export" },
                 ]}
               />
-            </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               {tab === "bends" ? (
                 <BendTable viewer={viewer} selectedBend={bend} onSelectBend={setBend} />

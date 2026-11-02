@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter_Tight } from "next/font/google";
 
 import { ShellGate } from "@/components/layout/app-shell";
+import { ToastProvider } from "@/components/ui";
 
 import "./globals.css";
 
@@ -21,7 +22,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${interTight.variable} h-full antialiased`}
     >
       <body className="h-full overflow-hidden">
-        <ShellGate>{children}</ShellGate>
+        <ToastProvider>
+          <ShellGate>{children}</ShellGate>
+        </ToastProvider>
       </body>
     </html>
   );

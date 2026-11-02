@@ -2,12 +2,11 @@
 
 import { GizmoHelper, GizmoViewport, Grid, OrbitControls } from "@react-three/drei";
 import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Boxes, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
-import { IconButton } from "@/components/ui/controls";
-import { EmptyState } from "@/components/ui/primitives";
+import { EmptyState, IconButton } from "@/components/ui";
 import { fetchBlob, type MeshSet, type Viewer } from "@/lib/api";
 import { posedMatrices } from "@/lib/assembly";
 
@@ -268,7 +267,7 @@ export default function AssemblyViewer({
       ) : null}
       {!meshesId ? (
         <div className="absolute inset-0 flex items-center justify-center">
-          <EmptyState mark={<Boxes size={24} strokeWidth={1.5} className="text-muted" aria-hidden />} title="No preview meshes" />
+          <EmptyState title="No preview meshes" />
         </div>
       ) : null}
       {current?.error ? <p className="absolute inset-x-0 bottom-3 text-center text-xs text-fail-text">Preview failed: {current.error}</p> : null}
