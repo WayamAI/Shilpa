@@ -2,20 +2,24 @@ import path from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
-const DRAWINGS = path.resolve(__dirname, "../../../evals/drawings");
+import { signIn } from "./helpers";
 
-async function signIn(page: Page, email = "dev@wayam.local") {
-  await page.goto("/login");
-  await page.getByLabel("Engineer").selectOption(email);
-  await page.getByRole("button", { name: "Enter studio" }).click();
-  await expect(page).toHaveURL(/\/projects$/);
-}
+const DRAWINGS = path.resolve(__dirname, "../../../evals/drawings");
 
 async function newProject(page: Page, name: string) {
   await page.getByLabel("New project name").fill(name);
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { level: 2, name })).toBeVisible();
+}
+
+/** Click something that enqueues a job, then wait for that new job (not an earlier one) to succeed. */
+async function runJob(page: Page, start: () => Promise<void>, timeout = 120_000) {
+  const cards = page.getByTestId("job-card");
+  const before = await cards.count();
+  await start();
+  await expect(cards).toHaveCount(before + 1);
+  await lastJobSucceeds(page, timeout);
 }
 
 /** Wait for the newest job card to finish and assert it succeeded. */
@@ -39,8 +43,11 @@ test("sign-in gate redirects and admits the dev engineer", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await signIn(page);
   const online = await plannerOnline(page);
-  await expect(page.getByTitle(/^Azure OpenAI planner/)).toContainText(online ? "Online" : /Disabled|Not configured/);
-  await expect(page.getByRole("heading", { name: "Projects", level: 2, exact: true })).toBeVisible();
+  // The rail's engine status reports the planner.
+  await expect(page.getByRole("link", { name: "Engine status, open system status" })).toContainText(
+    online ? /Planner · (?!disabled|not configured)/ : /Planner · (disabled|not configured)/,
+  );
+  await expect(page.getByRole("heading", { name: "Projects", level: 1, exact: true })).toBeVisible();
 });
 
 test("reference part, parameter edit, restore and FreeCAD export", async ({ page }) => {
@@ -59,23 +66,20 @@ test("reference part, parameter edit, restore and FreeCAD export", async ({ page
   // Parameter edit: width 100 -> new version, holes stay 10 mm from the edges.
   await page.getByRole("tab", { name: "Parameters" }).click();
   await page.getByLabel("width").fill("100");
-  await page.getByRole("button", { name: "Apply as new version" }).click();
-  await lastJobSucceeds(page);
+  await runJob(page, () => page.getByRole("button", { name: "Apply as new version" }).click());
   await expect(sizeChip(page)).toHaveText("100 × 40 × 8 mm");
 
   // Versions: two exist; restore v1 as v3.
   await page.getByRole("tab", { name: "Versions" }).click();
   await expect(page.getByText("2 versions")).toBeVisible();
-  await page.getByRole("button", { name: "Restore" }).click();
-  await lastJobSucceeds(page);
+  await runJob(page, () => page.getByRole("button", { name: "Restore" }).click());
   await expect(sizeChip(page)).toHaveText("80 × 40 × 8 mm");
   await page.getByRole("tab", { name: "Versions" }).click();
   await expect(page.getByText("3 versions")).toBeVisible();
 
   // Native FreeCAD export derivative.
   await page.getByRole("tab", { name: "Export" }).click();
-  await page.getByRole("button", { name: "Create FreeCAD file" }).click();
-  await lastJobSucceeds(page, 180_000);
+  await runJob(page, () => page.getByRole("button", { name: "Create FreeCAD file" }).click(), 180_000);
   await expect(page.getByRole("button", { name: "Download FreeCAD" })).toBeVisible();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download STEP" }).click();
@@ -135,22 +139,19 @@ test("another tenant cannot open a project", async ({ page, context }) => {
   await expect(page.getByText("This project could not be opened")).toBeVisible();
 });
 
-test("theme toggle persists across reloads", async ({ page }) => {
-  await signIn(page);
-  const html = page.locator("html");
-  const start = await html.getAttribute("data-theme");
-  await page.getByRole("button", { name: start === "dark" ? "Switch to light" : "Switch to dark" }).click();
-  const flipped = start === "dark" ? "light" : "dark";
-  await expect(html).toHaveAttribute("data-theme", flipped);
-  await page.reload();
-  await expect(html).toHaveAttribute("data-theme", flipped);
-  await page.getByRole("button", { name: flipped === "dark" ? "Switch to light" : "Switch to dark" }).click();
-});
-
 test("sign out returns to sign-in", async ({ page }) => {
   await signIn(page);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: /^Account/ }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.goto("/projects");
   await expect(page).toHaveURL(/\/login$/);
+});
+
+test("the account menu switches between dev users", async ({ page }) => {
+  await signIn(page);
+  await page.getByRole("button", { name: /^Account/ }).click();
+  await expect(page.getByRole("menuitem", { name: /^Switch to / }).first()).toBeVisible();
+  await page.getByRole("menuitem", { name: /^Switch to / }).first().click();
+  await expect(page).toHaveURL(/\/projects$/);
 });

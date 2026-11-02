@@ -131,7 +131,7 @@ export default function LibraryPage() {
           </Select>
         </div>
         <span className="hidden flex-1 lg:block" />
-        <p className="hidden text-sm text-body lg:block">Thumbnails are placeholder renders</p>
+        <p className="hidden text-sm text-body lg:block">Catalog thumbnails render default parameters</p>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto" aria-live="polite" aria-busy={!items && !error}>

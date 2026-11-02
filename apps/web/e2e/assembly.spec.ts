@@ -1,18 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { signIn } from "./helpers";
+
 /**
  * Assemblies and sheet metal from the reference starters. None of this needs the AI
  * planner, so these tests run with SHILPA_LLM=off.
  */
 
 const SHOTS = "test-results/screens";
-
-async function signIn(page: Page, email = "dev@wayam.local") {
-  await page.goto("/login");
-  await page.getByLabel("Engineer").selectOption(email);
-  await page.getByRole("button", { name: "Enter studio" }).click();
-  await expect(page).toHaveURL(/\/projects$/);
-}
 
 async function newProject(page: Page, name: string) {
   await page.getByLabel("New project name").fill(name);
@@ -32,15 +27,6 @@ async function startFrom(page: Page, value: string) {
   await lastJobSucceeds(page);
 }
 
-async function setTheme(page: Page, theme: "light" | "dark") {
-  const html = page.locator("html");
-  if ((await html.getAttribute("data-theme")) !== theme) {
-    await page.getByRole("button", { name: theme === "dark" ? "Switch to dark" : "Switch to light" }).click();
-    await expect(html).toHaveAttribute("data-theme", theme);
-    await page.waitForTimeout(400); // let the 180 ms colour transitions settle before a screenshot
-  }
-}
-
 const viewer = (page: Page) => page.getByTestId("assembly-viewer").first();
 
 test("hinge: parts tree, BOM, checks, joint scrub and STEP download", async ({ page }) => {
@@ -56,8 +42,7 @@ test("hinge: parts tree, BOM, checks, joint scrub and STEP download", async ({ p
   // Selecting in the tree selects in the viewer.
   await tree.getByRole("treeitem").filter({ hasText: "lid" }).getByRole("button").click();
   await expect(viewer(page)).toHaveAttribute("data-selected", "lid");
-  await setTheme(page, "light");
-  await page.screenshot({ path: `${SHOTS}/hinge-parts-light.png` });
+  await page.screenshot({ path: `${SHOTS}/hinge-parts.png` });
 
   await page.getByRole("tab", { name: "BOM" }).click();
   await expect(page.getByTestId("bom-table").locator("tbody tr")).toHaveCount(3);
@@ -74,8 +59,6 @@ test("hinge: parts tree, BOM, checks, joint scrub and STEP download", async ({ p
   await page.getByLabel("hinge joint angle").fill("60");
   await expect(page.getByTestId("joint-value-hinge")).toHaveText("60 deg");
   await expect(viewer(page)).toHaveAttribute("data-joints", /"hinge":60/);
-  await setTheme(page, "dark");
-  await page.screenshot({ path: `${SHOTS}/hinge-joint-dark.png` });
   await page.getByRole("button", { name: "Reset hinge" }).click();
   await expect(page.getByTestId("joint-value-hinge")).toHaveText("0 deg");
 
@@ -85,7 +68,6 @@ test("hinge: parts tree, BOM, checks, joint scrub and STEP download", async ({ p
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download STEP" }).click();
   expect((await download).suggestedFilename()).toMatch(/\.step$/);
-  await setTheme(page, "light");
 });
 
 test("interfering golden: the clash is listed and highlighted", async ({ page }) => {
@@ -106,10 +88,7 @@ test("interfering golden: the clash is listed and highlighted", async ({ page })
   await page.getByRole("tab", { name: "Parts" }).click();
   await expect(page.getByTestId("parts-tree").getByTitle("Involved in a failed check")).toHaveCount(2);
   await page.getByRole("tab", { name: "Checks" }).click();
-  await page.screenshot({ path: `${SHOTS}/interference-light.png` });
-  await setTheme(page, "dark");
-  await page.screenshot({ path: `${SHOTS}/interference-dark.png` });
-  await setTheme(page, "light");
+  await page.screenshot({ path: `${SHOTS}/interference.png` });
 });
 
 test("sheet metal: folded part, flat pattern and bend table", async ({ page }) => {
@@ -123,12 +102,9 @@ test("sheet metal: folded part, flat pattern and bend table", async ({ page }) =
   await expect(page.getByTestId("flat-size")).toHaveText("100 × 80.163 mm");
   await expect(page.getByTestId("bend-table").locator("tbody tr")).toHaveCount(1);
   await expect(viewer(page)).toHaveAttribute("data-ready", "true");
-  await page.screenshot({ path: `${SHOTS}/sheet-metal-light.png` });
+  await page.screenshot({ path: `${SHOTS}/sheet-metal.png` });
   await page.getByRole("tab", { name: "Checks" }).click();
   await expect(page.getByTestId("sheet-checks").getByText(/^all \d+ checks passed$/)).toBeVisible();
-  await setTheme(page, "dark");
-  await page.screenshot({ path: `${SHOTS}/sheet-metal-dark.png` });
-  await setTheme(page, "light");
 
   await page.getByRole("tab", { name: "Export" }).click();
   const download = page.waitForEvent("download");
@@ -163,7 +139,6 @@ test.describe("narrow width", () => {
     await page.screenshot({ path: `${SHOTS}/narrow-assembly.png`, fullPage: true });
     await viewer(page).scrollIntoViewIfNeeded();
     await expect(viewer(page)).toHaveAttribute("data-ready", "true");
-    await page.waitForTimeout(500);
     await page.screenshot({ path: `${SHOTS}/narrow-assembly-viewer.png` });
 
     await startFrom(page, "sheet_metal:enclosure_tray");

@@ -22,26 +22,34 @@ export type LibraryItem = {
   version: number | null;
   href: string;
   thumb: string;
-  /** "render" is a part placeholder render; "icon" is the category object. */
+  /** "render" is a real render of the part's own geometry; "icon" is the category object. */
   thumbKind: "render" | "icon";
   /** Search haystack: name, summary, standard, family. */
   haystack: string;
 };
 
-/* Category art from the SH imagery set. These are placeholder renders, never
-   geometry: the library labels them as such. Only kinds that genuinely
-   match get a part render; the rest use the category icon. */
-const FAMILY_THUMB: Record<string, string> = {
-  Nuts: "/imagery/sh-th-03-hex-nut-m6-640.webp",
-  Screws: "/imagery/sh-th-05-cap-screw-640.webp",
-  Bearings: "/imagery/sh-th-06-bearing-6204-640.webp",
-};
+/* Category icons from the SH imagery set: the fallback when a part has no
+   render of its own. Never geometry. */
 const CATALOG_THUMB = "/imagery/sh-card-04-catalog-part-128.webp";
 const NATIVE_THUMB = "/imagery/sh-card-05-native-part-128.webp";
 const COMPLEX_THUMB = "/imagery/sh-card-02-complex-part-128.webp";
 
-function fromGenerator(g: CatalogGenerator): LibraryItem {
+/** Catalog thumbnails are real renders of each generator at default parameters
+    (tools/render_catalog_thumbs.py); index.json lists which ones exist. */
+const THUMB_DIR = "/thumbs/catalog";
+
+async function loadRendered(): Promise<Set<string>> {
+  try {
+    const res = await fetch(`${THUMB_DIR}/index.json`);
+    return res.ok ? new Set((await res.json()) as string[]) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function fromGenerator(g: CatalogGenerator, rendered: Set<string>): LibraryItem {
   const family = g.family ?? null;
+  const own = rendered.has(g.name);
   return {
     id: `catalog:${g.name}`,
     name: g.name,
@@ -52,8 +60,8 @@ function fromGenerator(g: CatalogGenerator): LibraryItem {
     family,
     version: null,
     href: `/catalog?gen=${encodeURIComponent(g.name)}`,
-    thumb: (family && FAMILY_THUMB[family]) || CATALOG_THUMB,
-    thumbKind: family && FAMILY_THUMB[family] ? "render" : "icon",
+    thumb: own ? `${THUMB_DIR}/${encodeURIComponent(g.name)}.webp` : CATALOG_THUMB,
+    thumbKind: own ? "render" : "icon",
     haystack: [g.name, g.summary, g.standard, family].filter(Boolean).join(" ").toLowerCase(),
   };
 }
@@ -80,10 +88,10 @@ function fromModel(m: ModelSummary, project: Project): LibraryItem {
 }
 
 export async function loadLibrary(): Promise<LibraryItem[]> {
-  const [catalog, projects] = await Promise.all([catalogApi.list(), api.projects()]);
+  const [catalog, projects, rendered] = await Promise.all([catalogApi.list(), api.projects(), loadRendered()]);
   const details = await Promise.all(projects.filter((p) => p.model_count > 0).map((p) => api.project(p.id)));
   const models = details.flatMap((d) => d.models.map((m) => fromModel(m, d)));
-  const parts = catalog.generators.filter((g) => g.listed !== false).map(fromGenerator);
+  const parts = catalog.generators.filter((g) => g.listed !== false).map((g) => fromGenerator(g, rendered));
   /* Your own models first, then the catalog. */
   return [...models, ...parts];
 }

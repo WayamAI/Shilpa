@@ -17,7 +17,7 @@ function Badges({ item }: { item: LibraryItem }) {
 
 function Thumb({ item, className }: { item: LibraryItem; className: string }) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- static placeholder webp; decorative
+    // eslint-disable-next-line @next/next/no-img-element -- static webp thumbnail; decorative
     <img src={item.thumb} alt="" loading="lazy" decoding="async" draggable={false} className={`object-contain ${className}`} />
   );
 }
