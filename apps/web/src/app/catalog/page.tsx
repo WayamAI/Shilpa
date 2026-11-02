@@ -210,7 +210,10 @@ export default function CatalogPage() {
       .list()
       .then((c) => {
         setCatalog(c);
-        setSelected((s) => s ?? c.generators[0]?.name ?? null);
+        /* ?gen=<name> deep link from the library. */
+        const wanted = new URLSearchParams(window.location.search).get("gen");
+        const linked = c.generators.find((g) => g.name === wanted)?.name;
+        setSelected((s) => s ?? linked ?? c.generators[0]?.name ?? null);
       })
       .catch((e) => setError(errText(e)));
   }, []);

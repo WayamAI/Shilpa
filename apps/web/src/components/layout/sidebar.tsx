@@ -24,13 +24,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { me, health } = useSession();
   const active = navItemForPath(pathname);
 
-  /* ⌘K / Ctrl+K opens parts search. [Assumption] Search is the catalog's
-     part lookup until the library screen ships. */
+  /* ⌘K / Ctrl+K opens parts search in the library. */
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        router.push("/catalog");
+        router.push("/library");
       }
     }
     document.addEventListener("keydown", onKey);
@@ -45,7 +44,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <Link
-        href="/catalog"
+        href="/library"
         onClick={onNavigate}
         className="mb-3 flex h-8 shrink-0 items-center gap-2 rounded-md border border-line bg-bg px-2.5 text-sm text-muted-text transition-colors duration-fast hover:border-line-strong"
       >

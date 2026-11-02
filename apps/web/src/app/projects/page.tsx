@@ -114,6 +114,8 @@ export default function ProjectsPage() {
             {error ? <p className="p-4 text-xs text-fail-text">{error}</p> : null}
             {projects && shown.length === 0 ? (
               <EmptyState
+                image="/imagery/sh-card-26-project-128.webp"
+                imageSize={48}
                 title={projects.length === 0 ? "No projects yet" : "No projects match"}
                 detail={projects.length === 0 ? "Create a project to start your first part." : undefined}
               />

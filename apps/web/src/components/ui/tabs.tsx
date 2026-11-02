@@ -93,27 +93,34 @@ export function TabPanel({ idPrefix, id, children, className = "" }: { idPrefix:
   );
 }
 
-/** Segmented control (Paper · viewport toolbar): white tray, 3px inset, selected on surface-2. */
+/**
+ * Segmented control. toolbar (Paper · viewport toolbar): white tray, selected
+ * on surface-2, 12px. filter (Paper · library kind filter): surface-2 tray,
+ * selected raised on white, 13px.
+ */
 export function Segmented<T extends string>({
   options,
   value,
   onChange,
   label,
+  variant = "toolbar",
   className = "",
 }: {
   options: TabItem<T>[];
   value: T;
   onChange: (id: T) => void;
   label: string;
+  variant?: "toolbar" | "filter";
   className?: string;
 }) {
   const { refs, onKeyDown } = useRovingKeys(options, value, onChange);
+  const filter = variant === "filter";
   return (
     <div
       role="radiogroup"
       aria-label={label}
       onKeyDown={onKeyDown}
-      className={`inline-flex min-w-0 gap-0.5 rounded-md border border-line bg-bg p-[3px] shadow-toolbar ${className}`}
+      className={`inline-flex min-w-0 gap-0.5 rounded-md p-[3px] ${filter ? "bg-surface-2" : "border border-line bg-bg shadow-toolbar"} ${className}`}
     >
       {options.map((o, i) => {
         const selected = o.id === value;
@@ -129,11 +136,17 @@ export function Segmented<T extends string>({
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(o.id)}
             className={[
-              "min-w-0 truncate rounded-sm px-2.5 py-[5px] text-xs transition-colors duration-fast ease-out",
-              selected ? "bg-surface-2 font-semibold text-ink" : "text-body hover:text-ink",
+              "min-w-0 flex-auto truncate rounded-sm py-[5px] whitespace-nowrap transition-colors duration-fast ease-out",
+              filter ? "px-3 text-sm" : "px-2.5 text-xs",
+              selected
+                ? filter
+                  ? "bg-bg font-semibold text-ink shadow-raised"
+                  : "bg-surface-2 font-semibold text-ink"
+                : "text-body hover:text-ink",
             ].join(" ")}
           >
             {o.label}
+            {o.count !== undefined ? <span className="ml-1 tabular">{o.count}</span> : null}
           </button>
         );
       })}

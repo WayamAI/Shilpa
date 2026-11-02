@@ -233,7 +233,7 @@ export type SchemaProp = {
   maxItems?: number;
 };
 export type CatalogGenerator = {
-  name: string; family: string; summary: string; standard: string;
+  name: string; family: string; summary: string; standard: string; listed?: boolean;
   params: { properties: Record<string, SchemaProp>; required?: string[] };
 };
 export type Catalog = { families: string[]; generators: CatalogGenerator[]; materials: string[] };

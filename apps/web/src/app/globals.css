@@ -27,79 +27,81 @@
   border-radius: 3px;
 }
 
-/* =============================================================
-   BASE
-   ============================================================= */
+@layer base {
+  /* =============================================================
+     BASE
+     ============================================================= */
 
-html,
-body {
-  height: 100%;
-  overflow: hidden;
-  overscroll-behavior: none;
-}
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
 
-body {
-  background: var(--color-bg);
-  color: var(--color-body);
-  font-family: var(--font-ui);
-  font-size: 13px;
-  line-height: 16px;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  font-synthesis: none;
-}
+  body {
+    background: var(--color-bg);
+    color: var(--color-body);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-synthesis: none;
+  }
 
-::selection {
-  background: var(--color-action-soft);
-  color: var(--color-ink);
-}
+  ::selection {
+    background: var(--color-action-soft);
+    color: var(--color-ink);
+  }
 
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-line-strong) transparent;
-}
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
 
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--color-line-strong);
-  border-radius: 999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-muted);
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
-h1,
-h2,
-h3,
-h4 {
-  color: var(--color-ink);
-  font-weight: 600;
-  text-wrap: balance;
-}
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--color-ink);
+    font-weight: 600;
+    text-wrap: balance;
+  }
 
-/* One visible focus treatment for every control: a 2px action ring with a
-   white gap, shown for keyboard focus only. */
-:focus {
-  outline: none;
-}
-:focus-visible {
-  outline: none;
-}
-/* Containers that take focus programmatically (dialogs, drawers, <main>)
-   use tabindex=-1 and keep their own shadow. */
-:focus-visible:not([tabindex="-1"]) {
-  box-shadow: var(--focus-ring);
-}
+  /* One visible focus treatment for every control: a 2px action ring with a
+     white gap, shown for keyboard focus only. */
+  :focus {
+    outline: none;
+  }
+  :focus-visible {
+    outline: none;
+  }
+  /* Containers that take focus programmatically (dialogs, drawers, <main>)
+     use tabindex=-1 and keep their own shadow. */
+  :focus-visible:not([tabindex="-1"]) {
+    box-shadow: var(--focus-ring);
+  }
 
-[disabled],
-[aria-disabled="true"] {
-  cursor: not-allowed;
+  [disabled],
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 /* Reduced motion: no transforms, no loops, no smooth scroll. Token
