@@ -100,6 +100,9 @@
   --text-xl: 20px;
   --text-xl--line-height: 24px;
   --text-xl--letter-spacing: -0.01em;
+  --text-page: 24px; /* Paper mobile page title */
+  --text-page--line-height: 30px;
+  --text-page--letter-spacing: -0.02em;
   --text-2xl: 28px;
   --text-2xl--line-height: 34px;
   --text-2xl--letter-spacing: -0.02em;

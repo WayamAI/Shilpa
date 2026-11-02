@@ -40,7 +40,7 @@ export default function LoginPage() {
 
       <section className="flex min-h-0 w-full shrink-0 flex-col border-line bg-surface lg:w-[min(28rem,42%)] lg:border-l">
         <div className="flex items-center justify-between px-8 pt-6">
-          <Logo wordmark href={false} />
+          <Logo href={false} />
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col justify-center px-8 py-10">

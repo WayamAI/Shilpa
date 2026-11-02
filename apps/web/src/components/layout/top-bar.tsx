@@ -1,56 +1,60 @@
 "use client";
 
+import { Menu as MenuIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 
-import { Dot } from "@/components/ui";
-import { useSession } from "@/context/session-context";
+import { IconButton } from "@/components/ui";
 import { navItemForPath } from "@/lib/navigation";
 
-import { SidebarMenuButton } from "./sidebar";
+import { Mark } from "./logo";
+import { NeedsYouIcon } from "./nav-icons";
 
-/** Where you are, whether the planner is online, and who is signed in. */
-export function TopBar({ onMenu, title }: { onMenu?: () => void; title?: string }) {
+const DISCLAIMER = "Geometry validated · not reviewed for engineering release";
+
+/**
+ * Desktop header (Paper · 00 Shell template): 48px, breadcrumb left,
+ * the release disclaimer and the Needs-you bell right.
+ */
+export function TopBar({ title }: { title?: string }) {
   const pathname = usePathname();
-  const { me, health } = useSession();
-  const item = navItemForPath(pathname);
-  const disabled = health?.planner === "disabled";
-
+  const label = title ?? navItemForPath(pathname)?.label ?? "Shilpa";
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-4 sm:gap-4 sm:px-5">
-      <div className="flex min-w-0 items-center gap-2.5">
-        {onMenu ? <SidebarMenuButton onClick={onMenu} /> : null}
-        {item ? (
-          <span className="hidden text-xs tracking-[0.08em] text-muted-text uppercase sm:inline">{item.group}</span>
-        ) : null}
-        <h1 className="truncate text-lg font-semibold text-ink">{title ?? item?.label ?? "Shilpa"}</h1>
-      </div>
-
-      <div className="flex shrink-0 items-center gap-2">
-        {health ? (
-          <span
-            className="hidden h-8 items-center gap-2 rounded-full border border-line bg-surface-2 px-3 text-xs font-semibold text-muted-text sm:flex"
-            title={disabled ? "Azure OpenAI planner (disabled with SHILPA_LLM=off)" : "Azure OpenAI planner"}
-          >
-            <Dot tone={health.llm_configured ? "pass" : disabled ? "neutral" : "consent"} />
-            Planner
-            <span className="text-muted-text">·</span>
-            <span className={health.llm_configured ? "text-pass-text" : disabled ? "text-muted-text" : "text-consent-text"}>
-              {health.llm_configured ? "Online" : disabled ? "Disabled" : "Not configured"}
-            </span>
-          </span>
-        ) : null}
-        {me ? (
-          <span className="flex h-8 min-w-0 items-center gap-2 rounded-full border border-line bg-surface-2 py-1 pr-3 pl-1" title={`${me.email} · ${me.role}`}>
-            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-action text-xs text-on-action">
-              {me.name.slice(0, 1)}
-            </span>
-            <span className="hidden min-w-0 flex-col leading-none md:flex">
-              <span className="truncate text-xs font-semibold text-body">{me.name}</span>
-              <span className="truncate text-[11px] text-muted-text">{me.tenant_name}</span>
-            </span>
-          </span>
-        ) : null}
-      </div>
+    <header className="hidden h-12 shrink-0 items-center gap-3 border-b border-line bg-bg px-6 lg:flex">
+      <span className="min-w-0 truncate text-sm text-body">{label}</span>
+      <span className="flex-1" />
+      <span className="shrink-0 text-xs text-muted-text">{DISCLAIMER}</span>
+      <NeedsYouBell />
     </header>
+  );
+}
+
+/**
+ * Phone header (Paper · 03 Mobile): mark, 24px page title, then the menu
+ * button that opens the navigation drawer. The disclaimer moves under the
+ * title so it stays visible.
+ */
+export function MobileHeader({ onMenu, title }: { onMenu: () => void; title?: string }) {
+  const pathname = usePathname();
+  const label = title ?? navItemForPath(pathname)?.label ?? "Shilpa";
+  return (
+    <header className="flex shrink-0 flex-col gap-1 bg-bg px-4 pt-3 pb-2 lg:hidden">
+      <div className="flex items-center gap-2">
+        <Mark size={26} />
+        <span className="min-w-0 flex-1 truncate text-page font-semibold text-ink">{label}</span>
+        <IconButton label="Open navigation" onClick={onMenu}>
+          <MenuIcon size={18} strokeWidth={1.8} aria-hidden />
+        </IconButton>
+      </div>
+      <p className="text-caption text-muted-text">{DISCLAIMER}</p>
+    </header>
+  );
+}
+
+/** [Planned] Needs-you inbox. Shown disabled so the layout matches Paper. */
+function NeedsYouBell() {
+  return (
+    <IconButton label="Needs you (planned)" disabled className="disabled:opacity-100">
+      <NeedsYouIcon className="text-muted" />
+    </IconButton>
   );
 }

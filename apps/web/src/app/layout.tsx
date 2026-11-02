@@ -12,7 +12,7 @@ const interTight = Inter_Tight({ variable: "--font-inter-tight", subsets: ["lati
 export const metadata: Metadata = {
   title: "Shilpa — AI CAD Studio",
   description: "Engineering CAD from requests and drawings, with validated geometry.",
-  icons: { icon: "/brand/shilpa-mark.svg", apple: "/brand/shilpa-mark.svg" },
+  icons: { icon: "/brand/shilpa-mark-64.webp", apple: "/brand/shilpa-mark-128.webp" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
