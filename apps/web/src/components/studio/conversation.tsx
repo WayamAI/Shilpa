@@ -1,9 +1,9 @@
 "use client";
 
-import { FileUp, SendHorizontal, Sparkles } from "lucide-react";
+import { FileUp, SendHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { Badge, type BadgeTone, Button, Dot, NumberInput, Select, Textarea } from "@/components/ui";
+import { Badge, type BadgeTone, Button, Dot, NumberInput, Progress, Select, Textarea } from "@/components/ui";
 import { useSession } from "@/context/session-context";
 import { api, errText, uploadDrawing, type Example, type Job, type JobEvent, type Route, type Spec, type Starters, type Version } from "@/lib/api";
 
@@ -147,12 +147,13 @@ export function Conversation({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4" aria-live="polite">
+      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4" aria-live="polite" tabIndex={0} aria-label="Conversation">
         {chat.length === 0 ? (
-          <div className="flex flex-col gap-2 text-xs text-muted-text">
-            <Sparkles size={18} strokeWidth={1.5} className="text-muted" aria-hidden />
+          <div className="flex flex-col gap-2 text-sm text-body">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static decorative webp */}
+            <img src="/imagery/sh-card-28-greeting-128.webp" alt="" width={48} height={48} className="size-12" />
             {editTarget ? (
-              <p>Describe a change — “make it 100 mm wide and keep the holes 10 mm from the edges” — or edit parameters on the left.</p>
+              <p>Describe a change — “make it 100 mm wide and keep the holes 10 mm from the edges” — or edit parameters in the inspector.</p>
             ) : (
               <>
                 <p>
@@ -165,7 +166,7 @@ export function Conversation({
                   template: none of it needs the AI planner.
                 </p>
                 {plannerDisabled ? (
-                  <p className="rounded-lg border border-line bg-surface px-3 py-2 text-body" data-testid="planner-disabled">
+                  <p className="rounded-lg border border-line bg-surface px-3 py-2 text-xs text-body" data-testid="planner-disabled">
                     The AI planner is disabled on this server (SHILPA_LLM=off). Requests are routed and explained but not planned.
                   </p>
                 ) : null}
@@ -176,7 +177,7 @@ export function Conversation({
         <div className="flex flex-col gap-3">
           {chat.map((c, i) =>
             c.kind === "user" ? (
-              <div key={i} className="ml-8 self-end rounded-2xl rounded-br-md bg-surface-2 px-3.5 py-2.5 text-sm text-ink [overflow-wrap:anywhere]">
+              <div key={i} className="ml-8 self-end rounded-xl rounded-br-sm bg-surface-2 px-3.5 py-2.5 text-sm text-ink [overflow-wrap:anywhere]">
                 {c.text}
               </div>
             ) : c.kind === "system" ? (
@@ -298,11 +299,11 @@ export function Conversation({
                 ) : null}
               </>
             ) : null}
-            <span className="ml-auto hidden text-xs text-muted-text xl:inline">Ctrl+Enter to send</span>
+            <span className="ml-auto hidden text-xs text-muted-text sm:inline">Ctrl+Enter to send</span>
           </div>
         </div>
       ) : (
-        <p className="shrink-0 border-t border-line px-4 py-3 text-xs text-muted-text">Read-only role: you can view parts and download files.</p>
+        <p className="shrink-0 border-t border-line px-4 py-3 text-xs text-body">Read-only role: you can view parts and download files.</p>
       )}
     </div>
   );
@@ -361,9 +362,13 @@ function SpecCard({
   const statusLabel: Record<string, string> = { ready: "ready", needs_review: "review drawing", needs_clarification: "needs answers", unsupported: "not supported" };
 
   return (
-    <section className="rounded-lg border border-line bg-bg" aria-label="Requirements" data-testid="spec-card">
+    <section className="rounded-xl border border-line bg-bg" aria-label="Requirements" data-testid="spec-card">
       <header className="flex items-start justify-between gap-3 border-b border-line px-3.5 py-2.5">
-        <div className="min-w-0">
+        {spec.status === "needs_clarification" ? (
+          // eslint-disable-next-line @next/next/no-img-element -- static decorative webp
+          <img src="/imagery/sh-card-10-clarification-128.webp" alt="" width={32} height={32} className="size-8 shrink-0" />
+        ) : null}
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-body">
             {isDrawing ? "Read from drawing" : "Requirements"} · {r.family} · {r.units}
           </p>
@@ -378,7 +383,7 @@ function SpecCard({
               .filter((d) => d.value !== null)
               .map((d) => (
                 <tr key={d.name} title={d.evidence ?? ""} className="align-baseline">
-                  <td className="py-0.5 pr-2 text-xs text-muted-text capitalize">{d.name.replace(/_/g, " ")}</td>
+                  <td className="py-0.5 pr-2 text-xs text-body capitalize">{d.name.replace(/_/g, " ")}</td>
                   <td className="py-0.5 text-right text-xs tabular text-ink whitespace-nowrap">
                     {d.value} {d.kind === "count" ? "" : (d.unit ?? r.units)}
                   </td>
@@ -526,13 +531,18 @@ function JobCard({ entry }: { entry?: { job: Job; events: JobEvent[] } }) {
   const done = ["succeeded", "failed", "cancelled"].includes(job.state);
   const tone: BadgeTone = job.state === "succeeded" ? "pass" : job.state === "failed" ? "fail" : job.state === "cancelled" ? "neutral" : "complex";
   return (
-    <section className="rounded-lg border border-line bg-bg" aria-label="Job progress" data-testid="job-card" data-state={job.state}>
+    <section className="rounded-xl border border-line bg-bg" aria-label="Job progress" data-testid="job-card" data-state={job.state}>
       <header className="flex items-center justify-between gap-3 border-b border-line px-3.5 py-2">
         <span className="text-xs font-semibold text-body">
           {JOB_LABEL[job.kind] ?? "Generate"} · {job.id.slice(0, 8)}
         </span>
         <Badge tone={tone}>{done ? job.state : "running"}</Badge>
       </header>
+      {!done ? (
+        <div className="px-3.5 pt-3">
+          <Progress label={`${JOB_LABEL[job.kind] ?? "Generate"} job running`} />
+        </div>
+      ) : null}
       <ol className="px-3.5 py-2.5">
         {events.map((e) => (
           <li key={e.id} className="flex items-start gap-2.5 py-0.5 text-xs text-body [overflow-wrap:anywhere]">
@@ -542,7 +552,7 @@ function JobCard({ entry }: { entry?: { job: Job; events: JobEvent[] } }) {
             <span className={e.type === "state.failed" ? "text-fail-text" : undefined}>{(EVENT_TEXT[e.type] ?? (() => e.type))(e.data)}</span>
           </li>
         ))}
-        {!done ? <li className="py-0.5 pl-4 text-xs text-muted-text">…</li> : null}
+        {!done ? <li className="py-0.5 pl-4 text-xs text-body">…</li> : null}
       </ol>
     </section>
   );

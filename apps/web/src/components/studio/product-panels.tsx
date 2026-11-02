@@ -7,7 +7,7 @@ import { fetchBlob, type ProductInfo, type Version } from "@/lib/api";
 import { fmtValue } from "@/lib/assembly";
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-5 mb-2 text-xs font-semibold text-body first:mt-0">{children}</h3>;
+  return <h3 className="mt-6 mb-2 text-md first:mt-0">{children}</h3>;
 }
 
 const STATUS_TONE: Record<string, BadgeTone> = { passed: "pass", repaired: "complex", unresolved: "fail" };
@@ -26,7 +26,7 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
     <div data-testid="router-panel">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Badge tone={STATUS_TONE[product.status] ?? "neutral"}>{product.status}</Badge>
-        <span className="text-xs text-muted-text">
+        <span className="text-xs text-body">
           {router ? `${router.iterations.length} round${router.iterations.length === 1 ? "" : "s"} · ${router.seconds} s` : ""}
         </span>
       </div>
@@ -45,7 +45,7 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
               <span className="text-xs text-ink">Round {it.iteration + 1}</span>
               <span className="flex items-center gap-2">
                 <span className="text-xs tabular text-muted-text">{it.seconds} s</span>
-                <Badge tone={it.passed ? "pass" : "fail"}>{it.passed ? "pass" : `${it.failed.length} failed`}</Badge>
+                <Badge tone={it.passed ? "pass" : "fail"}>{it.passed ? "Pass" : `${it.failed.length} failed`}</Badge>
               </span>
             </div>
             {it.failed.length ? <p className="mt-1 text-xs text-fail-text [overflow-wrap:anywhere]">Failed: {it.failed.map(humanize).join(", ")}</p> : null}
@@ -55,7 +55,7 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
                 {it.actions.map((a, k) => (
                   <li key={k} className="text-xs text-body">
                     <Badge tone="complex">{a.level}</Badge> <span className="text-ink">{humanize(a.param)}</span> → {fmtValue(a.new)}
-                    <span className="block text-xs text-muted-text">{a.reason}</span>
+                    <span className="block text-xs text-body">{a.reason}</span>
                   </li>
                 ))}
               </ul>
@@ -76,7 +76,7 @@ export function RouterPanel({ product }: { product: ProductInfo }) {
                     {fmtValue(h.old)} → {fmtValue(h.new)}
                   </span>
                 </span>
-                <span className="block text-xs text-muted-text">
+                <span className="block text-xs text-body">
                   round {h.iteration} · {h.level}-level · {humanize(h.check)} · {h.reason}
                 </span>
               </li>
@@ -163,7 +163,7 @@ function Render({ id, label }: { id: string; label: string }) {
       ) : (
         <div className="aspect-[16/10] w-full" />
       )}
-      <figcaption className="border-t border-line px-3 py-1.5 text-xs text-muted-text">{label}</figcaption>
+      <figcaption className="border-t border-line px-3 py-1.5 text-xs text-body">{label}</figcaption>
     </figure>
   );
 }
@@ -180,7 +180,7 @@ export function RendersPanel({ version, product }: { version: Version; product: 
           {iso ? <Render id={iso.id} label="Iso view" /> : null}
         </div>
       ) : (
-        <EmptyState title="No renders" />
+        <EmptyState image="/imagery/sh-card-14-exports-128.webp" imageSize={48} title="No renders" detail="This run produced no side or iso render." />
       )}
       {product.timings_s ? (
         <>

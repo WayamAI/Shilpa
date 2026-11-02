@@ -2,14 +2,14 @@
 
 import { GizmoHelper, GizmoViewport, Grid, OrbitControls } from "@react-three/drei";
 import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
-import { RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
-import { EmptyState, IconButton } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { fetchBlob, type MeshSet, type Viewer } from "@/lib/api";
 import { posedMatrices } from "@/lib/assembly";
 
+import { ToolbarButton, ViewportCaption, ViewportToolbar } from "./chrome";
 import { usePalette, webglAvailable } from "./model-viewer";
 
 // Meshes arrive in part-local millimetres with Z up; each instance carries its
@@ -247,24 +247,22 @@ export default function AssemblyViewer({
         </GizmoHelper>
       </Canvas>
 
-      <div className="pointer-events-none absolute top-3 left-3 flex flex-wrap gap-2">
-        <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-muted-text">Units mm</span>
-        {viewer.size ? (
-          <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs tabular text-body" title="Assembled envelope">
-            {viewer.size.map((v) => +v.toFixed(2)).join(" × ")} mm
-          </span>
-        ) : null}
-        {hovered || selected ? (
-          <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-ink">{hovered ?? selected}</span>
-        ) : null}
+      <div className="absolute top-3 left-3 max-w-[calc(100%-24px)]">
+        <ViewportToolbar label="View">
+          <ToolbarButton onClick={() => setNonce((n) => n + 1)} disabled={!geoms} label="Fit view to assembly">
+            Fit
+          </ToolbarButton>
+          <ToolbarButton planned>Section</ToolbarButton>
+        </ViewportToolbar>
       </div>
-      {geoms ? (
-        <div className="absolute top-3 right-3">
-          <IconButton label="Reset view" onClick={() => setNonce((n) => n + 1)} className="bg-bg">
-            <RotateCcw size={14} strokeWidth={1.75} aria-hidden />
-          </IconButton>
-        </div>
+      {hovered || selected ? (
+        <div className="pointer-events-none absolute top-3 right-3 rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-ink">{hovered ?? selected}</div>
       ) : null}
+      <ViewportCaption
+        facts={viewer.size ? <span title="Assembled envelope">{viewer.size.map((v) => +v.toFixed(2)).join(" × ")} mm</span> : undefined}
+        hint="Click a part to select · drag to orbit"
+        className="pr-24"
+      />
       {!meshesId ? (
         <div className="absolute inset-0 flex items-center justify-center">
           <EmptyState title="No preview meshes" />

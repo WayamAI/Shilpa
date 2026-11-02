@@ -5,7 +5,8 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { PageBody, PageHeader } from "@/components/layout/page-header";
-import { Badge, Button, Dot, EmptyState, KeyValue, NumberInput, Panel, Select, Tabs, TextInput } from "@/components/ui";
+import { Inspector, Viewport, ViewportCaption } from "@/components/studio/chrome";
+import { Badge, Button, Checkbox, Dot, EmptyState, KeyValue, NumberInput, Panel, Select, Spinner, TextInput } from "@/components/ui";
 import {
   catalogApi,
   downloadCatalogStep,
@@ -113,7 +114,7 @@ function ParamField({
   } else if (p.type === "boolean") {
     const checked = value === undefined ? p.default === true : value === true;
     control = (
-      <input type="checkbox" aria-label={label(name, prop)} checked={checked} onChange={(e) => onChange(e.target.checked)} className="size-4 accent-current" />
+      <Checkbox aria-label={label(name, prop)} label="" checked={checked} onChange={(e) => onChange(e.target.checked)} />
     );
   } else if (p.enum) {
     control = (
@@ -150,10 +151,10 @@ function ParamField({
   }
   const hint = [limits(p), p.description].filter(Boolean).join(" · ");
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-line py-2 last:border-b-0">
+    <div className="flex items-center justify-between gap-3 border-t border-line py-2 last:border-b">
       <div className="min-w-0">
-        <p className="truncate text-xs text-ink">{label(name, prop)}</p>
-        {hint ? <p className="truncate text-xs text-muted-text" title={hint}>{hint}</p> : null}
+        <p className="text-sm text-ink">{label(name, prop)}</p>
+        {hint ? <p className="text-xs text-body [overflow-wrap:anywhere]">{hint}</p> : null}
       </div>
       <div className="flex max-w-[55%] shrink-0 justify-end">{control}</div>
     </div>
@@ -310,7 +311,7 @@ export default function CatalogPage() {
       />
       <PageBody>
         {error ? <p className="mb-3 text-xs text-fail-text">{error}</p> : null}
-        <div className="flex min-h-0 flex-col gap-4 xl:h-[calc(100vh-190px)] xl:flex-row">
+        <div className="flex min-h-0 flex-col gap-4 xl:h-[calc(100dvh-13rem)] xl:min-h-[560px] xl:flex-row">
           {/* Narrow screens pick from a grouped list so the 3D view stays near the top. */}
           <div className="flex flex-col gap-2 xl:hidden">
             <TextInput aria-label="Type a part" placeholder="Type a part: M6x20 socket head, 6204-2RS…" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -381,56 +382,73 @@ export default function CatalogPage() {
             </Panel>
           </div>
 
-          <Panel
-            title={gen ? gen.summary : "Preview"}
-            padded={false}
-            className="min-h-[420px] flex-1"
-            action={
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-text">
-                  <input type="checkbox" checked={showPorts} onChange={(e) => setShowPorts(e.target.checked)} className="size-3.5" />
-                  Ports
-                </label>
-                <Button size="sm" onClick={download} disabled={!current || downloading || !!buildError}>
-                  <Download size={14} strokeWidth={1.75} aria-hidden />
-                  {downloading ? "Exporting…" : "STEP"}
-                </Button>
-              </div>
-            }
-          >
-            {gen ? (
-              <div className="relative h-full min-h-[420px]">
-                <PartViewer mesh={current?.mesh ?? null} ports={current?.ports ?? []} showPorts={showPorts} selectedPort={port} busy={busy} />
-                {buildError ? (
-                  <p className="absolute inset-x-3 bottom-3 rounded-md border border-line bg-bg px-3 py-2 text-xs text-fail-text" data-testid="build-error">
-                    {buildError}
-                  </p>
-                ) : current ? (
-                  <p className="pointer-events-none absolute bottom-3 left-3 rounded-full border border-line bg-bg px-2.5 py-1 text-xs tabular text-body">
-                    {current.size.map((v) => +v.toFixed(2)).join(" × ")} mm · {(current.volume_mm3 / 1000).toFixed(1)} cm³ ·{" "}
-                    {current.timings_ms.build < 1 ? "cached" : `built in ${Math.round(current.timings_ms.build)} ms`}
-                  </p>
-                ) : null}
-              </div>
-            ) : (
-              <EmptyState title="Pick a part" />
-            )}
-          </Panel>
-
-          <Panel title={current ? String(meta.designation ?? current.name) : "Part"} className="xl:w-[26rem] xl:shrink-0">
-            <div className="mb-3">
-              <Tabs<Tab>
-                inset={false}
-                label="Part details"
-                value={tab}
-                onChange={setTab}
-                tabs={[
-                  { id: "params", label: "Parameters" },
-                  { id: "data", label: "Data" },
-                  { id: "ports", label: `Ports${current ? ` · ${current.ports.length}` : ""}` },
-                ]}
-              />
+          {/* Centre: title row and viewport (Paper 03 Part detail). */}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <h2 className="min-w-0 truncate text-xl">{gen ? gen.summary : "Preview"}</h2>
+              {gen ? (
+                <>
+                  <Badge tone="neutral">{gen.standard}</Badge>
+                  <Badge tone="basic">{gen.family}</Badge>
+                </>
+              ) : null}
+              <span className="hidden flex-1 sm:block" />
+              <Button
+                variant="primary"
+                onClick={download}
+                loading={downloading}
+                disabled={!current || downloading || !!buildError}
+                icon={<Download size={14} strokeWidth={2} aria-hidden />}
+              >
+                {downloading ? "Exporting…" : "Download STEP"}
+              </Button>
             </div>
+            <Viewport label="3D view" className="min-h-[340px] flex-1">
+              {gen ? (
+                <div className="relative h-full min-h-[340px]">
+                  <PartViewer
+                    mesh={current?.mesh ?? null}
+                    ports={current?.ports ?? []}
+                    showPorts={showPorts}
+                    onTogglePorts={() => setShowPorts((v) => !v)}
+                    selectedPort={port}
+                    busy={busy}
+                  />
+                  {buildError ? (
+                    <p className="absolute inset-x-3 bottom-3 rounded-md border border-line bg-bg px-3 py-2 text-xs text-fail-text" data-testid="build-error">
+                      {buildError}
+                    </p>
+                  ) : current ? (
+                    <ViewportCaption
+                      className="pr-24"
+                      facts={
+                        <>
+                          {current.size.map((v) => +v.toFixed(2)).join(" × ")} mm · {(current.volume_mm3 / 1000).toFixed(1)} cm³
+                        </>
+                      }
+                      hint={current.timings_ms.build < 1 ? "Cached" : `Built in ${Math.round(current.timings_ms.build)} ms`}
+                    />
+                  ) : null}
+                </div>
+              ) : (
+                <EmptyState image="/imagery/sh-card-04-catalog-part-128.webp" title="Pick a part" detail="Choose a standard part from the list to set its sizes." />
+              )}
+            </Viewport>
+          </div>
+
+          {/* Right: inspector with underline tabs. */}
+          <Inspector<Tab>
+            label="Part"
+            value={tab}
+            onChange={setTab}
+            side={false}
+            className="min-h-[320px] xl:w-[26rem] xl:shrink-0 xl:border-l"
+            tabs={[
+              { id: "params", label: "Parameters" },
+              { id: "data", label: "Data" },
+              { id: "ports", label: "Ports", count: current?.ports.length },
+            ]}
+          >
             {tab === "params" && gen ? (
               <div data-testid="param-form">
                 {Object.entries(gen.params.properties).map(([name, prop]) => (
@@ -455,7 +473,10 @@ export default function CatalogPage() {
                   ]}
                 />
               ) : (
-                <EmptyState title="Building…" />
+                <div className="flex items-center gap-2 text-sm text-body">
+                  <Spinner size={14} />
+                  Building…
+                </div>
               )
             ) : null}
             {tab === "ports" ? (
@@ -467,18 +488,16 @@ export default function CatalogPage() {
                         type="button"
                         onClick={() => setPort(port === p.name ? null : p.name)}
                         aria-pressed={port === p.name}
-                        className={`w-full border-b border-line px-1 py-2 text-left outline-none last:border-b-0 ${
-                          port === p.name ? "bg-surface-2" : "hover:bg-surface"
-                        }`}
+                        className={`w-full border-t border-line px-1 py-2.5 text-left last:border-b ${port === p.name ? "bg-action-soft" : "hover:bg-surface"}`}
                       >
                         <span className="flex items-center gap-2">
                           <Dot tone={p.on_geometry ? "pass" : "fail"} />
-                          <span className="truncate text-xs text-ink">{p.name}</span>
+                          <span className="truncate text-sm font-semibold text-ink">{p.name}</span>
                           <Badge tone="neutral">{p.kind}</Badge>
                         </span>
-                        {p.label ? <span className="mt-0.5 block truncate text-xs text-muted-text">{p.label}</span> : null}
+                        {p.label ? <span className="mt-0.5 block text-xs text-body [overflow-wrap:anywhere]">{p.label}</span> : null}
                         {Object.keys(p.contract).length ? (
-                          <span className="mt-0.5 block truncate text-xs tabular text-muted-text">
+                          <span className="mt-0.5 block text-xs tabular text-body [overflow-wrap:anywhere]">
                             {Object.entries(p.contract)
                               .filter(([k]) => k !== "kind" && k !== "straddle")
                               .map(([k, v]) => `${k} ${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
@@ -491,10 +510,13 @@ export default function CatalogPage() {
                   ))}
                 </ul>
               ) : (
-                <EmptyState title="Building…" />
+                <div className="flex items-center gap-2 text-sm text-body">
+                  <Spinner size={14} />
+                  Building…
+                </div>
               )
             ) : null}
-          </Panel>
+          </Inspector>
         </div>
       </PageBody>
     </>

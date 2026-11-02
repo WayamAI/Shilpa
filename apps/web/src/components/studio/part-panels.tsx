@@ -7,7 +7,7 @@ import { Badge, Button, EmptyState, KeyValue, NumberInput } from "@/components/u
 import { downloadArtifact, paramValue, type Check, type Version } from "@/lib/api";
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-5 mb-2 text-xs font-semibold text-body first:mt-0">{children}</h3>;
+  return <h3 className="mt-6 mb-2 text-md first:mt-0">{children}</h3>;
 }
 
 function humanize(name: string) {
@@ -106,16 +106,62 @@ export function ParamsPanel({
         </>
       ) : null}
 
-      <Caption>Features · {version.features?.length ?? 0}</Caption>
-      <ol className="flex flex-col">
-        {(version.features ?? []).map((f, i) => (
-          <li key={f.id} className="flex items-baseline gap-2 py-1">
-            <span className="w-5 shrink-0 text-right text-xs tabular text-muted-text">{i + 1}</span>
-            <code className="truncate text-xs text-ink">{f.id}</code>
-            <span className="truncate text-xs text-muted-text">{humanize(f.op)}</span>
-          </li>
-        ))}
-      </ol>
+    </div>
+  );
+}
+
+// --- features -------------------------------------------------------------------
+
+/** Paper part detail, Features tab: feature, operation, then metadata and "Used in". */
+export function FeaturesPanel({ version }: { version: Version }) {
+  const features = version.features ?? [];
+  const units = version.recipe?.units ?? "mm";
+  return (
+    <div className="flex flex-col gap-6">
+      <section aria-label="Features">
+        <h3 className="mb-2 text-md">
+          Features <span className="ml-1 font-normal text-body tabular">{features.length}</span>
+        </h3>
+        {features.length ? (
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th scope="col" className="h-7 w-9 text-right text-xs font-semibold text-body">#</th>
+                <th scope="col" className="h-7 pl-3 text-left text-xs font-semibold text-body">@ name</th>
+                <th scope="col" className="h-7 text-left text-xs font-semibold text-body">Operation</th>
+              </tr>
+            </thead>
+            <tbody>
+              {features.map((f, i) => (
+                <tr key={f.id} className="h-9 border-t border-line last:border-b">
+                  <td className="text-right text-xs tabular text-muted-text">{i + 1}</td>
+                  <td className="max-w-0 truncate pl-3 text-sm font-semibold text-ink">{f.id}</td>
+                  <td className="text-sm text-ink">{humanize(f.op)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="text-sm text-body">This version records no features.</p>
+        )}
+      </section>
+      <section aria-label="Metadata">
+        <h3 className="mb-2 text-md">Metadata</h3>
+        <KeyValue
+          rows={[
+            { label: "Version", value: `v${version.number}` },
+            { label: "Units", value: units },
+            { label: "Recipe hash", value: <span className="text-xs">{version.recipe_hash.slice(0, 12)}</span>, title: version.recipe_hash },
+            { label: "Engine", value: `build123d ${version.engine.build123d} · OCP ${version.engine.ocp}` },
+          ]}
+        />
+      </section>
+      <section aria-label="Used in">
+        <h3 className="mb-2 flex items-center gap-2 text-md">
+          Used in <Badge tone="consent">Planned</Badge>
+        </h3>
+        <p className="text-sm text-body">Complex parts that pin this part, with their pinned version, will be listed here.</p>
+      </section>
     </div>
   );
 }
@@ -167,11 +213,17 @@ export function ValidationPanel({ version }: { version: Version }) {
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="shrink-0">
-          <Badge tone={v.passed ? "pass" : "fail"}>{v.passed ? "all checks passed" : `${failed.length} failed`}</Badge>
-        </span>
-        <span className="text-xs text-muted-text">measured on the re-imported STEP</span>
+      <div className="mb-4 flex items-center gap-3">
+        {v.passed ? (
+          // eslint-disable-next-line @next/next/no-img-element -- static decorative webp
+          <img src="/imagery/sh-card-11-pass-128.webp" alt="" width={48} height={48} className="size-12 shrink-0" />
+        ) : null}
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="self-start">
+            <Badge tone={v.passed ? "pass" : "fail"}>{v.passed ? "all checks passed" : `${failed.length} failed`}</Badge>
+          </span>
+          <span className="text-xs text-body">Measured on the re-imported STEP</span>
+        </div>
       </div>
       {m ? (
         <KeyValue
@@ -185,24 +237,28 @@ export function ValidationPanel({ version }: { version: Version }) {
         />
       ) : null}
       <Caption>Checks · {v.checks.length}</Caption>
-      <ul className="flex flex-col">
+      <ul className="flex flex-col gap-1" aria-label="Checks">
         {v.checks.map((c: Check, i) => (
-          <li key={i} className="flex items-start justify-between gap-3 border-b border-line py-2 last:border-b-0" title={c.note ?? ""}>
+          <li
+            key={i}
+            className={`flex items-start justify-between gap-3 ${c.passed ? "border-b border-line py-2.5" : "rounded-lg border border-fail/40 bg-fail-soft px-3 py-2.5"}`}
+            title={c.note ?? ""}
+          >
             <span className="min-w-0">
-              <span className="block text-xs text-ink">{checkLabel(c.name)}</span>
+              <span className="block text-sm text-ink">{checkLabel(c.name)}</span>
               {c.requested !== null && c.requested !== undefined ? (
-                <span className="block truncate text-xs text-muted-text tabular">
-                  {fmt(c.requested)} → {fmt(c.actual)}
+                <span className="block text-xs text-body tabular [overflow-wrap:anywhere]">
+                  Oracle · {fmt(c.requested)} → {fmt(c.actual)}
                 </span>
               ) : c.note ? (
-                <span className="block truncate text-xs text-muted-text">{c.note}</span>
+                <span className="block text-xs text-body [overflow-wrap:anywhere]">{c.note}</span>
               ) : null}
             </span>
-            <Badge tone={c.passed ? "pass" : "fail"}>{c.passed ? "pass" : "fail"}</Badge>
+            <Badge tone={c.passed ? "pass" : "fail"}>{c.passed ? "Pass" : "Fail"}</Badge>
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-xs text-muted-text">
+      <p className="mt-4 text-xs text-body">
         A valid solid does not establish strength, fit or manufacturability. Tolerances are software comparison tolerances.
       </p>
     </div>
@@ -226,39 +282,40 @@ export function VersionsPanel({
 }) {
   return (
     <div>
-    <p className="mb-2 text-xs font-semibold text-body">
-      {versions.length} version{versions.length === 1 ? "" : "s"} · each change is a new immutable version
-    </p>
-    <ol className="flex flex-col gap-2">
-      {versions.map((v, i) => {
-        const active = v.id === current;
-        return (
-          <li key={v.id}>
-            <div
-              className={[
-                "rounded-lg border px-3 py-2.5 transition-colors duration-fast",
-                active ? "border-line-strong bg-surface" : "border-line hover:bg-surface",
-              ].join(" ")}
+      <p className="mb-2 text-xs text-body">
+        {versions.length} version{versions.length === 1 ? "" : "s"} · each change is a new immutable version
+      </p>
+      <ol className="flex flex-col">
+        {versions.map((v, i) => {
+          const active = v.id === current;
+          return (
+            <li
+              key={v.id}
+              aria-current={active ? "true" : undefined}
+              className={`flex items-center gap-2 border-t border-line py-1 last:border-b ${active ? "bg-surface" : ""}`}
             >
-              <div className="flex items-center justify-between gap-2">
-                <button type="button" onClick={() => onOpen(v.id)} className="flex min-w-0 items-baseline gap-2 text-left outline-none">
-                  <span className="text-md font-semibold text-ink">v{v.number}</span>
-                  {i === 0 ? <Badge tone="complex">latest</Badge> : null}
-                  <span className="truncate text-xs text-muted-text">{new Date(v.created_at).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}</span>
-                </button>
-                {i > 0 && canRestore ? (
-                  <Button size="sm" variant="ghost" onClick={() => onRestore(v.id)} title="Restore as a new version">
-                    <RotateCcw size={13} strokeWidth={1.75} aria-hidden />
-                    Restore
-                  </Button>
-                ) : null}
-              </div>
-              <p className="mt-1 text-xs text-muted-text">{v.change_summary || (v.parent_version_id ? "Edited" : "Initial generation")}</p>
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+              <button type="button" onClick={() => onOpen(v.id)} className="flex min-h-9 min-w-0 flex-1 items-center gap-3 rounded-sm text-left">
+                <span className="w-9 shrink-0 pl-1 text-sm font-semibold text-ink">v{v.number}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm text-ink [overflow-wrap:anywhere]">
+                    {v.change_summary || (v.parent_version_id ? "Edited" : "Initial generation")}
+                  </span>
+                  <span className="flex items-center gap-2 text-xs text-body">
+                    {new Date(v.created_at).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}
+                    {i === 0 ? <Badge tone="complex">latest</Badge> : null}
+                  </span>
+                </span>
+              </button>
+              {i > 0 && canRestore ? (
+                <Button size="sm" variant="ghost" onClick={() => onRestore(v.id)} title="Restore as a new version">
+                  <RotateCcw size={13} strokeWidth={1.75} aria-hidden />
+                  Restore
+                </Button>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
@@ -280,15 +337,15 @@ export function ExportPanel({ version, canExport, onExportFcstd }: { version: Ve
   const hasFcstd = version.artifacts.some((a) => a.format === "FCSTD");
   return (
     <div>
-      <p className="mb-3 text-xs text-muted-text">
+      <p className="mb-3 text-xs text-body">
         Source v{version.number} · build123d {version.engine.build123d} · OCP {version.engine.ocp}
       </p>
       <ul className="flex flex-col">
         {files.map((a) => (
-          <li key={a.id} className="flex items-center justify-between gap-3 border-b border-line py-2 last:border-b-0">
+          <li key={a.id} className="flex min-h-12 items-center justify-between gap-3 border-t border-line py-2 last:border-b">
             <span className="min-w-0">
-              <span className="block text-sm text-ink">{LABELS[a.format][0]}</span>
-              <span className="block truncate text-xs text-muted-text">
+              <span className="block text-sm font-semibold text-ink">{LABELS[a.format][0]}</span>
+              <span className="block text-xs text-body">
                 {LABELS[a.format][1]} · {(a.bytes / 1024).toFixed(1)} KB
               </span>
             </span>
@@ -300,17 +357,18 @@ export function ExportPanel({ version, canExport, onExportFcstd }: { version: Ve
         ))}
       </ul>
       {!hasFcstd ? (
-        <div className="mt-4 rounded-lg border border-line bg-surface p-3">
-          <div className="flex items-center gap-2">
-            <FileBox size={15} strokeWidth={1.75} className="text-muted" aria-hidden />
-            <span className="text-sm text-ink">Native FreeCAD file</span>
+        <div className="mt-4 flex items-start gap-3 rounded-lg border border-line bg-surface p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- static decorative webp */}
+          <img src="/imagery/sh-card-14-exports-128.webp" alt="" width={40} height={40} className="size-10 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink">Native FreeCAD file</p>
+            <p className="mt-0.5 text-xs text-body">
+              Builds Sketcher and PartDesign features driven by a Params sheet, then checks they match this version.
+            </p>
+            <Button size="sm" className="mt-3" icon={<FileBox size={13} strokeWidth={1.75} aria-hidden />} disabled={!canExport} onClick={onExportFcstd}>
+              Create FreeCAD file
+            </Button>
           </div>
-          <p className="mt-1 text-xs text-muted-text">
-            Builds Sketcher and PartDesign features driven by a Params sheet, then checks they match this version.
-          </p>
-          <Button size="sm" variant="primary" className="mt-3" disabled={!canExport} onClick={onExportFcstd}>
-            Create FreeCAD file
-          </Button>
         </div>
       ) : null}
     </div>

@@ -10,7 +10,7 @@ import { checkDetail, checkTitle, groupLabel, isWarning, partsTree } from "@/lib
 import type { Highlight } from "./assembly-viewer";
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-5 mb-2 text-xs font-semibold text-body first:mt-0">{children}</h3>;
+  return <h3 className="mt-6 mb-2 text-md first:mt-0">{children}</h3>;
 }
 
 function Swatch({ color }: { color: string | null }) {
@@ -47,7 +47,7 @@ export function PartsTree({
   const failing = useMemo(() => failingInstances(viewer), [viewer]);
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold text-body">
+      <p className="mb-2 text-xs text-body">
         {viewer.instances.length} part{viewer.instances.length === 1 ? "" : "s"} · {viewer.mates.length} mate{viewer.mates.length === 1 ? "" : "s"} ·
         DOF {viewer.dof.computed ?? "—"}
       </p>
@@ -113,7 +113,7 @@ export function BomTable({ viewer, onSelect }: { viewer: Viewer; onSelect: (id: 
   const mass = viewer.bom.reduce((n, l) => n + (l.mass_g ?? 0) * l.quantity, 0);
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold text-body">
+      <p className="mb-2 text-xs text-body">
         {viewer.bom.length} line{viewer.bom.length === 1 ? "" : "s"} · {total} item{total === 1 ? "" : "s"}
         {withMass ? ` · ${(mass / 1000).toFixed(2)} kg` : ""}
       </p>
@@ -191,6 +191,13 @@ export function ChecksPanel({
   return (
     <div data-testid="checks-panel">
       <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+        {viewer.passed && !failed.length ? (
+          // eslint-disable-next-line @next/next/no-img-element -- static decorative webp
+          <img src="/imagery/sh-card-11-pass-128.webp" alt="" width={40} height={40} className="size-10 shrink-0" />
+        ) : failed.some((c) => c.group.includes("interference")) ? (
+          // eslint-disable-next-line @next/next/no-img-element -- static decorative webp
+          <img src="/imagery/sh-card-12-interference-128.webp" alt="" width={40} height={40} className="size-10 shrink-0" />
+        ) : null}
         <span className="shrink-0">
           <Badge tone={viewer.passed ? "pass" : "fail"}>
             {viewer.passed && !failed.length ? `all ${viewer.checks.length} checks passed` : `${failed.length} of ${viewer.checks.length} failed`}
@@ -203,7 +210,7 @@ export function ChecksPanel({
             </Badge>
           </span>
         ) : null}
-        <span className="text-xs text-muted-text">measured on the placed solids</span>
+        <span className="text-xs text-body">Measured on the placed solids</span>
         {highlight ? (
           <Button size="sm" variant="ghost" className="ml-auto" onClick={() => onHighlight(null)}>
             <X size={13} strokeWidth={1.75} aria-hidden />
@@ -243,10 +250,10 @@ export function ChecksPanel({
                   >
                     <span className="min-w-0">
                       <span className="block text-xs text-ink [overflow-wrap:anywhere]">{checkTitle(c)}</span>
-                      <span className="block text-xs text-muted-text tabular [overflow-wrap:anywhere]">{checkDetail(c)}</span>
+                      <span className="block text-xs text-body tabular [overflow-wrap:anywhere]">{checkDetail(c)}</span>
                     </span>
                     <span className="shrink-0">
-                      <Badge tone={c.passed ? "pass" : warn ? "consent" : "fail"}>{c.passed ? "pass" : warn ? "warn" : "fail"}</Badge>
+                      <Badge tone={c.passed ? "pass" : warn ? "consent" : "fail"}>{c.passed ? "Pass" : warn ? "Warn" : "Fail"}</Badge>
                     </span>
                   </button>
                 </li>
@@ -416,10 +423,10 @@ export function KindExportPanel({
       </p>
       <ul className="flex flex-col">
         {files.map((a) => (
-          <li key={a.id} className="flex items-center justify-between gap-3 border-b border-line py-2 last:border-b-0">
+          <li key={a.id} className="flex min-h-12 items-center justify-between gap-3 border-t border-line py-2 last:border-b">
             <span className="min-w-0">
-              <span className="block text-sm text-ink">{KIND_LABELS[a.format][0]}</span>
-              <span className="block truncate text-xs text-muted-text">
+              <span className="block text-sm font-semibold text-ink">{KIND_LABELS[a.format][0]}</span>
+              <span className="block text-xs text-body">
                 {KIND_LABELS[a.format][1]} · {(a.bytes / 1024).toFixed(1)} KB
               </span>
             </span>
@@ -431,18 +438,19 @@ export function KindExportPanel({
         ))}
       </ul>
       {assembly && !hasFcstd ? (
-        <div className="mt-4 rounded-lg border border-line bg-surface p-3">
-          <div className="flex items-center gap-2">
-            <FileBox size={15} strokeWidth={1.75} className="text-muted" aria-hidden />
-            <span className="text-sm text-ink">Native FreeCAD assembly</span>
+        <div className="mt-4 flex items-start gap-3 rounded-lg border border-line bg-surface p-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- static decorative webp */}
+          <img src="/imagery/sh-card-14-exports-128.webp" alt="" width={40} height={40} className="size-10 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink">Native FreeCAD assembly</p>
+            <p className="mt-0.5 text-xs text-body">
+              One App::Link per instance and a native joint per mate; FreeCAD&apos;s solver re-places the parts and Shilpa checks the joints hold.
+            </p>
+            <Button size="sm" className="mt-3" icon={<FileBox size={13} strokeWidth={1.75} aria-hidden />} disabled={!canExport || !freecadAvailable} onClick={onExportFcstd}>
+              Create FreeCAD file
+            </Button>
+            {!freecadAvailable ? <p className="mt-2 text-xs text-body">FreeCAD is not installed on this server.</p> : null}
           </div>
-          <p className="mt-1 text-xs text-muted-text">
-            One App::Link per instance and a native joint per mate; FreeCAD&apos;s solver re-places the parts and Shilpa checks the joints hold.
-          </p>
-          <Button size="sm" variant="primary" className="mt-3" disabled={!canExport || !freecadAvailable} onClick={onExportFcstd}>
-            Create FreeCAD file
-          </Button>
-          {!freecadAvailable ? <p className="mt-2 text-xs text-muted-text">FreeCAD is not installed on this server.</p> : null}
         </div>
       ) : null}
     </div>

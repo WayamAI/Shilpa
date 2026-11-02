@@ -50,24 +50,35 @@ export default function SystemPage() {
                   { name: "API and job queue", detail: "FastAPI · SQLite · DB-backed queue", ok: !!health },
                   {
                     name: "Planner",
+                    image: "/imagery/sh-card-22-planner-128.webp",
                     detail: plannerOff ? "Disabled by SHILPA_LLM=off" : health?.llm_deployment ? `Azure OpenAI · ${health.llm_deployment}` : "Azure OpenAI",
                     ok: !!health?.llm_configured,
                   },
                   { name: "Assemblies and sheet metal", detail: "Placement, interference, sweep, flat pattern · no AI needed", ok: !!health },
                   { name: "Product templates", detail: health?.products_available ? "shilpa.product installed" : "Not installed yet", ok: !!health?.products_available },
-                  { name: "build123d engine", detail: `Open CASCADE · ${ops.length} operations`, ok: ops.length > 0 },
-                  { name: "FreeCAD engine", detail: "Native FCStd export", ok: !!health?.freecad_available },
+                  { name: "build123d engine", image: "/imagery/sh-card-21-kernel-128.webp", detail: `Open CASCADE · ${ops.length} operations`, ok: ops.length > 0 },
+                  { name: "FreeCAD engine", image: "/imagery/sh-card-23-freecad-adapter-128.webp", detail: "Native FCStd export", ok: !!health?.freecad_available },
                   { name: "Identity", detail: health?.auth_mode === "dev" ? "Local dev identities (Entra ID in Azure)" : "Entra ID", ok: !!me },
                 ].map((s) => (
-                  <li key={s.name} className="flex items-center justify-between gap-3 border-b border-line py-2.5 last:border-b-0">
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <Dot tone={s.ok ? "pass" : "consent"} />
+                  <li key={s.name} className="flex items-center justify-between gap-3 border-b border-line py-2 last:border-b-0">
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="flex size-8 shrink-0 items-center justify-center">
+                        {"image" in s && s.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- static decorative webp
+                          <img src={s.image} alt="" width={32} height={32} className="size-8" />
+                        ) : (
+                          <Dot tone={s.ok ? "pass" : "consent"} />
+                        )}
+                      </span>
                       <span className="min-w-0">
                         <span className="block text-sm text-ink">{s.name}</span>
                         <span className="block truncate text-xs text-muted-text">{s.detail}</span>
                       </span>
                     </span>
-                    <Badge tone={s.ok ? "pass" : "consent"}>{s.ok ? "available" : "unavailable"}</Badge>
+                    <span className="flex shrink-0 items-center gap-2">
+                      {"image" in s && s.image ? <Dot tone={s.ok ? "pass" : "consent"} /> : null}
+                      <Badge tone={s.ok ? "pass" : "consent"}>{s.ok ? "available" : "unavailable"}</Badge>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -76,14 +87,14 @@ export default function SystemPage() {
               {total ? (
                 <KeyValue rows={Object.entries(jobs).sort((a, b) => b[1] - a[1]).map(([state, n]) => ({ label: state, value: n }))} />
               ) : (
-                <p className="text-xs text-muted-text">No jobs yet.</p>
+                <p className="text-sm text-body">No jobs yet.</p>
               )}
-              <h3 className="mt-5 mb-2 text-xs font-semibold text-body">Supported operations · build123d</h3>
+              <h3 className="mt-5 mb-2 text-md">Supported operations</h3>
               <div className="flex flex-wrap gap-1.5">
                 {ops.map((op) => (
-                  <span key={op} className="rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-xs text-muted-text">
+                  <Badge key={op} tone="neutral">
                     {op.replace(/_/g, " ")}
-                  </span>
+                  </Badge>
                 ))}
               </div>
             </Panel>

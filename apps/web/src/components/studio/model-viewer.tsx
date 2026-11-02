@@ -2,13 +2,14 @@
 
 import { GizmoHelper, GizmoViewport, Grid, OrbitControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-import { EmptyState, IconButton } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { fetchBlob } from "@/lib/api";
+
+import { ToolbarButton, ViewportCaption, ViewportToolbar } from "./chrome";
 
 // glTF from the CAD worker is in metres with Y up. The scene works in millimetres
 // (scale 1000). CAD axes map to scene axes as X->X, Y->-Z, Z->Y.
@@ -113,7 +114,7 @@ export default function ModelViewer({ glbId, size }: { glbId: string | null; siz
   const label = useMemo(() => (size ? size.map((v) => +v.toFixed(3)).join(" × ") : null), [size]);
 
   if (!hasGL) {
-    return <EmptyState title="3D preview needs WebGL" detail="Download STEP or STL from the Export tab instead." />;
+    return <EmptyState title="3D preview needs WebGL" detail="Download STEP or STL from the Exports tab instead." />;
   }
 
   return (
@@ -143,24 +144,23 @@ export default function ModelViewer({ glbId, size }: { glbId: string | null; siz
         </Canvas>
       )}
 
-      <div className="pointer-events-none absolute top-3 left-3 flex flex-wrap gap-2">
-        <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-muted-text">Units mm</span>
-        {label ? (
-          <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs tabular text-body" title="Exact size from the validated STEP">
-            {label} mm
-          </span>
-        ) : null}
+      <div className="absolute top-3 left-3 max-w-[calc(100%-24px)]">
+        <ViewportToolbar label="View">
+          <ToolbarButton onClick={() => setNonce((n) => n + 1)} disabled={!scene} label="Fit view to part">
+            Fit
+          </ToolbarButton>
+          <ToolbarButton planned>Section</ToolbarButton>
+        </ViewportToolbar>
       </div>
-      {scene ? (
-        <div className="absolute top-3 right-3">
-          <IconButton label="Reset view" onClick={() => setNonce((n) => n + 1)} className="bg-bg">
-            <RotateCcw size={14} strokeWidth={1.75} aria-hidden />
-          </IconButton>
-        </div>
-      ) : null}
+      <ViewportCaption
+        facts={label ? <span title="Exact size from the validated STEP">{label} mm</span> : undefined}
+        hint="Drag to orbit · scroll to zoom"
+        className="pr-24"
+      />
       {!glbId ? (
         <div className="absolute inset-0 flex items-center justify-center">
           <EmptyState
+            image="/imagery/sh-emp-01-empty-tray-128.webp"
             title="No part yet"
             detail="Describe a part, upload a drawing, or start from a reference part."
           />

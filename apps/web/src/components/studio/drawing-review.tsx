@@ -3,7 +3,7 @@
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { Badge, Button, Dialog, NumberInput } from "@/components/ui";
+import { Badge, Button, Dialog, NumberInput, Segmented, Spinner } from "@/components/ui";
 import { api, errText, fetchBlob, type DrawingDim, type Spec } from "@/lib/api";
 
 /**
@@ -77,7 +77,7 @@ export function DrawingReview({
       onClose={onClose}
       actions={
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs text-muted-text">
+          <span className="text-xs text-body">
             {reviewed
               ? spec.status === "ready"
                 ? "Reviewed — ready to generate."
@@ -94,23 +94,24 @@ export function DrawingReview({
         </div>
       }
     >
-      <div className="grid h-[min(78vh,860px)] min-h-0 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_440px]">
-        <div className="min-h-0 overflow-auto bg-surface p-4">
+      <div className="grid h-full min-h-0 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_440px] lg:grid-rows-1 lg:overflow-hidden">
+        <div className="min-h-[280px] overflow-auto bg-surface p-4 lg:min-h-0">
           {pages.length > 1 ? (
-            <div className="mb-3 flex gap-1.5">
-              {pages.map((p) => (
-                <Button key={p} size="sm" variant={p === page ? "primary" : "secondary"} onClick={() => setPage(p)}>
-                  Page {p}
-                </Button>
-              ))}
-            </div>
+            <Segmented<string>
+              variant="filter"
+              label="Drawing page"
+              value={String(page)}
+              onChange={(v) => setPage(Number(v))}
+              className="mb-3"
+              options={pages.map((p) => ({ id: String(p), label: `Page ${p}` }))}
+            />
           ) : null}
           <div className="relative w-full">
             {img ? (
               // eslint-disable-next-line @next/next/no-img-element -- authenticated blob URL, not a static asset
               <img src={img} alt={`Drawing page ${page}`} className="block w-full rounded-md border border-line bg-white" />
             ) : (
-              <div className="flex h-64 items-center justify-center text-xs text-muted-text">Loading page…</div>
+              <div className="flex h-64 items-center justify-center gap-2 text-xs text-body"><Spinner size={14} />Loading page…</div>
             )}
             {drawing.dimensions
               .filter((d) => d.page === page && d.bbox)
@@ -135,7 +136,7 @@ export function DrawingReview({
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-col overflow-y-auto border-t border-line lg:border-t-0 lg:border-l">
+        <div className="flex min-h-0 flex-col border-t border-line lg:overflow-y-auto lg:border-t-0 lg:border-l">
           {drawing.ignored_instructions.length > 0 ? (
             <div role="note" className="m-4 mb-0 flex gap-2.5 rounded-lg border border-consent/40 bg-consent-soft p-3 text-xs text-consent-text">
               <AlertTriangle size={15} strokeWidth={1.75} className="mt-0.5 shrink-0" aria-hidden />
@@ -177,12 +178,12 @@ export function DrawingReview({
                         onChange={(e) => setEdits((x) => ({ ...x, [d.name]: e.target.value }))}
                         className="w-[88px]"
                       />
-                      <span className="text-xs text-muted-text">{d.kind === "count" ? "" : (d.unit ?? r.units)}</span>
+                      <span className="text-xs text-body">{d.kind === "count" ? "" : (d.unit ?? r.units)}</span>
                     </div>
                   </td>
                   <td className="py-2.5 pr-2">
                     <code className="block text-xs text-ink">{d.original_text}</code>
-                    <span className="block text-xs text-muted-text">{d.meaning}</span>
+                    <span className="block text-xs text-body">{d.meaning}</span>
                   </td>
                   <td className="py-2.5 pr-5 pl-4 text-right">
                     {d.verified === true ? <Badge tone="pass">text ✓</Badge> : null}

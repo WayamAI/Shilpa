@@ -1,12 +1,12 @@
 "use client";
 
-import { ArrowRight, Box, Plus, Search } from "lucide-react";
+import { ChevronRight, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { PageBody, PageHeader } from "@/components/layout/page-header";
-import { Button, EmptyState, InfoPopover, Metric, Panel, TextInput } from "@/components/ui";
+import { Badge, Button, EmptyState, InfoPopover, Metric, Skeleton, TextInput } from "@/components/ui";
 import { useSession } from "@/context/session-context";
 import { api, errText, type Project, type Usage } from "@/lib/api";
 
@@ -19,11 +19,15 @@ export default function ProjectsPage() {
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    api.projects().then(setProjects).catch((e) => setError(errText(e)));
+    api
+      .projects()
+      .then((list) => (setProjects(list), setError(null)))
+      .catch((e) => setError(errText(e)));
     api.usage().then(setUsage).catch(() => {});
-  }, [me?.user_id]);
+  }, [me?.user_id, attempt]);
 
   const shown = useMemo(
     () => (projects ?? []).filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase())),
@@ -68,9 +72,9 @@ export default function ProjectsPage() {
                 placeholder="New project name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="h-9 sm:w-64"
+                className="min-w-0 flex-1 sm:w-64 sm:flex-none"
               />
-              <Button type="submit" variant="primary" disabled={creating}>
+              <Button type="submit" variant="primary" loading={creating} disabled={creating}>
                 <Plus size={14} strokeWidth={1.75} aria-hidden />
                 Create
               </Button>
@@ -95,60 +99,77 @@ export default function ProjectsPage() {
             />
           </div>
 
-          <Panel
-            title={projects ? `All projects · ${projects.length}` : "All projects"}
-            padded={false}
-            action={
-              <label className="flex h-8 items-center gap-2 rounded-full border border-line bg-surface-2 px-3 text-xs font-semibold text-muted-text focus-within:shadow-[var(--focus-ring)]">
-                <Search size={13} strokeWidth={1.75} aria-hidden />
+          <section aria-label="All projects" className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-line bg-bg">
+            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-2.5">
+              <h2 className="text-md">
+                All projects
+                {projects ? <span className="ml-1.5 font-normal text-body tabular">{projects.length}</span> : null}
+              </h2>
+              <label className="flex h-8 w-full items-center gap-2 rounded-md border border-line px-2.5 transition-colors duration-fast focus-within:border-action hover:border-line-strong sm:w-64">
+                <Search size={14} strokeWidth={2} className="shrink-0 text-muted" aria-hidden />
                 <input
+                  type="search"
                   aria-label="Search projects"
-                  placeholder="Search"
+                  placeholder="Search projects"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="w-28 bg-transparent text-xs font-semibold text-ink outline-none placeholder:text-muted-text sm:w-44"
+                  className="h-full min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-muted-text focus-visible:shadow-none"
                 />
               </label>
-            }
-          >
-            {error ? <p className="p-4 text-xs text-fail-text">{error}</p> : null}
-            {projects && shown.length === 0 ? (
+            </header>
+            {error ? (
+              <EmptyState
+                image="/imagery/sh-emp-02-import-failed-128.webp"
+                imageSize={48}
+                title="The projects didn't load"
+                detail={error}
+                actions={<Button onClick={() => setAttempt((n) => n + 1)}>Try again</Button>}
+              />
+            ) : !projects ? (
+              <ul aria-label="Loading projects" aria-busy="true">
+                {[0, 1, 2].map((i) => (
+                  <li key={i} className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0">
+                    <Skeleton className="size-10 shrink-0" />
+                    <span className="flex flex-1 flex-col gap-1.5">
+                      <Skeleton className="h-3 w-1/3" />
+                      <Skeleton className="h-2.5 w-1/4" />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : shown.length === 0 ? (
               <EmptyState
                 image="/imagery/sh-card-26-project-128.webp"
-                imageSize={48}
+                imageSize={64}
                 title={projects.length === 0 ? "No projects yet" : "No projects match"}
-                detail={projects.length === 0 ? "Create a project to start your first part." : undefined}
+                detail={projects.length === 0 ? "Create a project to start your first part." : "Try a shorter search."}
               />
-            ) : null}
-            <ul className="min-h-0 overflow-y-auto">
-              {shown.map((p) => (
-                <li key={p.id} className="border-b border-line last:border-b-0">
-                  <Link
-                    href={`/projects/${p.id}`}
-                    className="group flex items-center justify-between gap-4 px-4 py-3 outline-none transition-colors duration-fast hover:bg-surface focus-visible:bg-surface"
-                  >
-                    <span className="flex min-w-0 items-center gap-3">
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted">
-                        <Box size={16} strokeWidth={1.75} aria-hidden />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm text-ink">{p.name}</span>
-                        <span className="block text-xs text-muted-text">
+            ) : (
+              <ul>
+                {shown.map((p) => (
+                  <li key={p.id} className="border-b border-line last:border-b-0">
+                    <Link
+                      href={`/projects/${p.id}`}
+                      className="group flex items-center gap-3 px-4 py-3 outline-none transition-colors duration-fast hover:bg-surface focus-visible:bg-surface"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- static decorative webp */}
+                      <img src="/imagery/sh-card-26-project-128.webp" alt="" width={40} height={40} className="size-10 shrink-0" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-md font-semibold text-ink">{p.name}</span>
+                        <span className="block truncate text-xs text-muted-text">
                           Created {new Date(p.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
                         </span>
                       </span>
-                    </span>
-                    <span className="flex shrink-0 items-center gap-4">
-                      <span className="text-xs tabular text-muted-text">
+                      <Badge tone="neutral">
                         {p.model_count} part{p.model_count === 1 ? "" : "s"}
-                      </span>
-                      <ArrowRight size={14} strokeWidth={1.75} aria-hidden className="text-muted transition-transform group-hover:translate-x-0.5" />
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Panel>
+                      </Badge>
+                      <ChevronRight size={16} strokeWidth={1.8} aria-hidden className="shrink-0 text-muted transition-transform duration-fast group-hover:translate-x-0.5 motion-reduce:transition-none" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
       </PageBody>
     </>

@@ -7,8 +7,9 @@ import { use, useCallback, useEffect, useRef, useState } from "react";
 
 import { Conversation, type ChatItem, type JobState } from "@/components/studio/conversation";
 import { KindWorkspace } from "@/components/studio/kind-workspace";
-import { ExportPanel, ParamsPanel, ValidationPanel, VersionsPanel } from "@/components/studio/part-panels";
-import { Badge, Button, EmptyState, Panel, Select, Tabs } from "@/components/ui";
+import { Facts, Inspector, Viewport, WorkspaceLayout } from "@/components/studio/chrome";
+import { ExportPanel, FeaturesPanel, ParamsPanel, ValidationPanel, VersionsPanel } from "@/components/studio/part-panels";
+import { Badge, Button, buttonClass, EmptyState, Panel, Select } from "@/components/ui";
 import { useSession } from "@/context/session-context";
 import { api, errText, streamJob, type Job, type ModelKind, type ProjectDetail, type Spec, type Version } from "@/lib/api";
 
@@ -18,7 +19,7 @@ const ModelViewer = dynamic(() => import("@/components/studio/model-viewer"), {
   loading: () => <div className="viewer-surface h-full min-h-[320px] w-full" />,
 });
 
-type Tab = "params" | "validation" | "versions" | "export";
+type Tab = "features" | "params" | "validation" | "versions" | "export";
 const TERMINAL = new Set(["succeeded", "failed", "cancelled"]);
 const KIND_LABEL: Record<ModelKind, string> = { part: "part", assembly: "assembly", sheet_metal: "sheet metal", product: "product" };
 
@@ -138,51 +139,76 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
   }
 
   if (error) {
-    return <EmptyState title="This project could not be opened" detail={error} />;
+    return (
+      <EmptyState
+        image="/imagery/sh-emp-02-import-failed-128.webp"
+        title="This project could not be opened"
+        detail={error}
+        actions={
+          <Link href="/projects" className={buttonClass("secondary")}>
+            All projects
+          </Link>
+        }
+      />
+    );
   }
+
+  const thread = (
+    <Panel
+      padded={false}
+      className="min-h-0 flex-1"
+      title={modelId && isHead && isPart ? "Edit with Shilpa" : modelId ? "Shilpa" : "New part"}
+    >
+      <Conversation
+        projectId={projectId}
+        chat={chat}
+        jobs={jobs}
+        editTarget={modelId && version && isHead && isPart ? version : null}
+        busy={!!activeJob}
+        say={say}
+        trackJob={trackJob}
+        onSpecUpdate={onSpecUpdate}
+      />
+    </Panel>
+  );
+  const size = version?.validation?.measurement?.bbox_size ?? null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Workspace header: compact, so the viewer keeps the height. */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
-        <div className="flex min-w-0 items-center gap-3">
-          <Link
-            href="/projects"
-            aria-label="All projects"
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted outline-none transition-colors duration-base hover:bg-surface-2 hover:text-body"
-          >
-            <ArrowLeft size={15} strokeWidth={1.75} aria-hidden />
-          </Link>
-          <div className="min-w-0">
-            <h2 className="truncate text-lg font-semibold text-ink">{project?.name ?? "…"}</h2>
-            <p className="truncate text-xs text-muted-text">
-              {model ? (
-                <>
-                  {model.name}
-                  {!isPart ? ` · ${KIND_LABEL[kind]}` : ""} · v{version?.number ?? model.head_number}
-                  {version && !isHead ? " (older version)" : ""}
-                </>
-              ) : (
-                "New part"
-              )}
-            </p>
-          </div>
-          {version ? (
-            <span className="hidden shrink-0 items-center gap-2 sm:flex">
-              <Badge tone={version.validation_passed ? "pass" : "fail"}>
-                {isPart
-                  ? version.validation_passed
-                    ? "geometry validated"
-                    : "validation failed"
-                  : version.validation_passed
-                    ? "all checks passed"
-                    : "checks failed"}
-              </Badge>
+      {/* Title row (Paper 03): name, status pills, actions. */}
+      <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-3 pb-2 lg:px-8 lg:pt-5 lg:pb-3">
+        <Link
+          href="/projects"
+          aria-label="All projects"
+          className="-ml-1 flex size-8 shrink-0 items-center justify-center rounded-md text-body transition-colors duration-fast hover:bg-surface-2 hover:text-ink"
+        >
+          <ArrowLeft size={16} strokeWidth={1.8} aria-hidden />
+        </Link>
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-semibold text-ink lg:text-page">{model?.name ?? project?.name ?? "…"}</h1>
+          <p className="truncate text-xs text-body">
+            {model ? `${project?.name ?? ""}${!isPart ? ` · ${KIND_LABEL[kind]}` : ""} · v${version?.number ?? model.head_number}${version && !isHead ? " (older version)" : ""}` : "New part"}
+          </p>
+        </div>
+        {version ? (
+          <span className="flex min-w-0 flex-wrap items-center gap-2">
+            <Badge tone={isPart ? "basic" : "complex"}>{isPart ? "Basic" : "Complex"}</Badge>
+            <Badge tone={version.validation_passed ? "pass" : "fail"}>
+              {isPart
+                ? version.validation_passed
+                  ? "geometry validated"
+                  : "validation failed"
+                : version.validation_passed
+                  ? "all checks passed"
+                  : "checks failed"}
+            </Badge>
+            <span className="hidden sm:inline-flex">
               <Badge tone="neutral">not reviewed for release</Badge>
             </span>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+          </span>
+        ) : null}
+        <span className="hidden flex-1 lg:block" />
+        <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto">
           {project && project.models.length > 0 ? (
             <Select
               aria-label="Part"
@@ -193,7 +219,7 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
                 loadModel(e.target.value).catch((err) => setError(errText(err)));
               }}
               size="sm"
-              className="max-w-[260px]"
+              className="min-w-0 flex-1 lg:max-w-[260px] lg:flex-none"
             >
               {!modelId ? <option value="">New part</option> : null}
               {project.models.map((m) => (
@@ -205,8 +231,7 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
             </Select>
           ) : null}
           {canWrite ? (
-            <Button size="sm" onClick={newPart} disabled={!modelId}>
-              <Plus size={13} strokeWidth={1.75} aria-hidden />
+            <Button size="sm" onClick={newPart} disabled={!modelId} icon={<Plus size={13} strokeWidth={1.75} aria-hidden />}>
               New part
             </Button>
           ) : null}
@@ -216,9 +241,9 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
             </Button>
           ) : null}
         </div>
-      </div>
+      </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-3 lg:grid-cols-[320px_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[340px_minmax(0,1fr)_380px]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-line lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)] lg:overflow-hidden">
         {version && !isPart ? (
           <KindWorkspace
             key={version.id}
@@ -230,30 +255,45 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
             onOpenVersion={async (vid) => setVersion(await api.version(vid))}
             onRestore={restore}
             onExportFcstd={exportFcstd}
+            footer={thread}
           />
         ) : (
-          <>
-          <Panel
-            padded={false}
-            className="min-h-[420px] lg:min-h-0"
-            title="Part"
-            action={version ? <span className="text-xs tabular text-muted-text">{version.recipe_hash.slice(0, 8)}</span> : undefined}
-          >
-            {version ? (
-              <div className="flex min-h-0 flex-1 flex-col">
-                  <Tabs<Tab>
-                    label="Part details"
-                    value={tab}
-                    onChange={setTab}
-                    tabs={[
-                      { id: "params", label: "Parameters" },
-                      { id: "validation", label: "Checks" },
-                      { id: "versions", label: "Versions" },
-                      { id: "export", label: "Export" },
-                    ]}
-                  />
-                <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                  {tab === "params" ? (
+          <WorkspaceLayout
+            footer={thread}
+            facts={
+              version ? (
+                <Facts
+                  items={[
+                    { label: "Size mm", value: size ? size.map((v) => +v.toFixed(0)).join("×") : "—" },
+                    { label: "Checks", value: version.validation ? (version.validation.passed ? "Passed" : "Failed") : "—" },
+                    { label: "Version", value: `v${version.number}` },
+                  ]}
+                />
+              ) : undefined
+            }
+            viewport={
+              <Viewport label="3D view" className="min-h-[300px] flex-1">
+                <ModelViewer glbId={glb} size={size} />
+              </Viewport>
+            }
+            inspector={
+              version ? (
+                <Inspector<Tab>
+                  label="Part"
+                  value={tab}
+                  onChange={setTab}
+                  className="flex-1"
+                  tabs={[
+                    { id: "features", label: "Features", count: version.features?.length ?? 0 },
+                    { id: "params", label: "Parameters" },
+                    { id: "validation", label: "Checks" },
+                    { id: "versions", label: "Versions" },
+                    { id: "export", label: "Exports" },
+                  ]}
+                >
+                  {tab === "features" ? (
+                    <FeaturesPanel version={version} />
+                  ) : tab === "params" ? (
                     <ParamsPanel key={version.id} version={version} editable={canWrite && isHead && !activeJob} isHead={isHead} onApply={applyParams} />
                   ) : tab === "validation" ? (
                     <ValidationPanel version={version} />
@@ -268,31 +308,18 @@ export default function WorkspacePage({ params }: PageProps<"/projects/[id]">) {
                   ) : (
                     <ExportPanel version={version} canExport={canWrite && !activeJob} onExportFcstd={exportFcstd} />
                   )}
-                </div>
-              </div>
-            ) : (
-              <EmptyState title="No part selected" detail="The parameters, checks, versions and files of a part appear here." />
-            )}
-          </Panel>
-
-          <Panel padded={false} className="min-h-[420px] lg:min-h-0" title="Model" action={version ? <span className="text-xs text-muted-text">drag to orbit · scroll to zoom</span> : undefined}>
-            <ModelViewer glbId={glb} size={version?.validation?.measurement?.bbox_size ?? null} />
-          </Panel>
-          </>
-        )}
-
-        <Panel padded={false} className="min-h-[480px] lg:col-span-2 lg:min-h-[420px] xl:col-span-1 xl:min-h-0" title={modelId && isHead && isPart ? "Edit with Shilpa" : modelId ? "Shilpa" : "New part"}>
-          <Conversation
-            projectId={projectId}
-            chat={chat}
-            jobs={jobs}
-            editTarget={modelId && version && isHead && isPart ? version : null}
-            busy={!!activeJob}
-            say={say}
-            trackJob={trackJob}
-            onSpecUpdate={onSpecUpdate}
+                </Inspector>
+              ) : (
+                <EmptyState
+                  image="/imagery/sh-card-15-parts-list-128.webp"
+                  imageSize={64}
+                  title="No part selected"
+                  detail="Features, parameters, checks, versions and files of a part appear here once you create one."
+                />
+              )
+            }
           />
-        </Panel>
+        )}
       </div>
     </div>
   );

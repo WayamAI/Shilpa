@@ -6,8 +6,10 @@ import { Badge, EmptyState, KeyValue } from "@/components/ui";
 import type { FlatPattern, Viewer, ViewerCheck } from "@/lib/api";
 import { fmtValue } from "@/lib/assembly";
 
+import { ViewportCaption } from "./chrome";
+
 function Caption({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-5 mb-2 text-xs font-semibold text-body first:mt-0">{children}</h3>;
+  return <h3 className="mt-6 mb-2 text-md first:mt-0">{children}</h3>;
 }
 
 const n = (v: number, d = 2) => +v.toFixed(d);
@@ -92,15 +94,14 @@ export function FlatPatternView({ flat, selectedBend, onSelectBend }: { flat: Fl
           {n(h)} mm
         </text>
       </svg>
-      <div className="pointer-events-none absolute top-3 left-3 flex flex-wrap gap-2">
-        <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-muted-text">Flat · mm</span>
-        <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs tabular text-body" data-testid="flat-size">
-          {n(flat.size[0], 3)} × {n(flat.size[1], 3)} mm
-        </span>
-        <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-muted-text">
-          {flat.bends.length} bend line{flat.bends.length === 1 ? "" : "s"}
-        </span>
-      </div>
+      <ViewportCaption
+        facts={
+          <span data-testid="flat-size">
+            {n(flat.size[0], 3)} × {n(flat.size[1], 3)} mm
+          </span>
+        }
+        hint={`Flat pattern · ${flat.bends.length} bend line${flat.bends.length === 1 ? "" : "s"}`}
+      />
     </div>
   );
 }
@@ -143,7 +144,7 @@ export function BendTable({ viewer, selectedBend, onSelectBend }: { viewer: View
                   className={`cursor-pointer border-b border-line last:border-b-0 ${selectedBend === b.id ? "bg-surface" : "hover:bg-surface"}`}
                 >
                   <td className="py-1.5 pr-2 text-xs text-ink">{b.id}</td>
-                  <td className="py-1.5 pr-2 text-xs text-muted-text">{b.parent}</td>
+                  <td className="py-1.5 pr-2 text-xs text-body">{b.parent}</td>
                   <td className="py-1.5 pr-2 text-right text-xs tabular text-ink">
                     {n(b.angle, 1)}° {b.direction}
                   </td>
@@ -156,9 +157,9 @@ export function BendTable({ viewer, selectedBend, onSelectBend }: { viewer: View
           </table>
         </div>
       ) : (
-        <p className="text-xs text-muted-text">A flat blank: no bends.</p>
+        <p className="text-xs text-body">A flat blank: no bends.</p>
       )}
-      <p className="mt-3 text-xs text-muted-text">Bend allowance BA = angle × (R + K·T); K from DIN 6935 unless the spec fixes it. Lengths in mm.</p>
+      <p className="mt-3 text-xs text-body">Bend allowance BA = angle × (R + K·T); K from DIN 6935 unless the spec fixes it. Lengths in mm.</p>
     </div>
   );
 }
@@ -185,7 +186,7 @@ function ruleTitle(c: ViewerCheck) {
 }
 
 export function SheetChecks({ viewer }: { viewer: Viewer }) {
-  if (!viewer.checks.length) return <EmptyState title="No checks" />;
+  if (!viewer.checks.length) return <EmptyState image="/imagery/sh-card-11-pass-128.webp" imageSize={48} title="No checks" detail="This version has no rule report." />;
   const failed = viewer.checks.filter((c) => !c.passed);
   const geometry = viewer.checks.filter((c) => !["min_flange_length", "hole_to_bend", "cutout_inside_wall"].includes(c.group));
   const rules = viewer.checks.filter((c) => ["min_flange_length", "hole_to_bend", "cutout_inside_wall"].includes(c.group));
@@ -194,20 +195,20 @@ export function SheetChecks({ viewer }: { viewer: Viewer }) {
       {items.map((c) => {
         const t = ruleTitle(c);
         return (
-          <li key={c.name} data-check={c.name} data-passed={c.passed} className="flex items-start justify-between gap-3 border-b border-line py-2 last:border-b-0" title={c.note ?? ""}>
+          <li key={c.name} data-check={c.name} data-passed={c.passed} className={`flex items-start justify-between gap-3 ${c.passed ? "border-b border-line py-2.5" : "rounded-lg border border-fail/40 bg-fail-soft px-3 py-2.5"}`} title={c.note ?? ""}>
             <span className="min-w-0">
-              <span className="block text-xs text-ink">
+              <span className="block text-sm text-ink">
                 {t.rule}
                 {t.where ? <span className="text-muted-text"> · {t.where}</span> : null}
               </span>
-              <span className="block text-xs text-muted-text tabular [overflow-wrap:anywhere]">
+              <span className="block text-xs text-body tabular [overflow-wrap:anywhere]">
                 {c.requested !== null && c.requested !== undefined && (typeof c.actual !== "object" || Array.isArray(c.actual))
                   ? `${fmtValue(c.requested)} → ${fmtValue(c.actual)}`
                   : (c.note ?? fmtValue(c.actual))}
               </span>
             </span>
             <span className="shrink-0">
-              <Badge tone={c.passed ? "pass" : "fail"}>{c.passed ? "pass" : "fail"}</Badge>
+              <Badge tone={c.passed ? "pass" : "fail"}>{c.passed ? "Pass" : "Fail"}</Badge>
             </span>
           </li>
         );
@@ -220,13 +221,13 @@ export function SheetChecks({ viewer }: { viewer: Viewer }) {
         <Badge tone={viewer.passed ? "pass" : "fail"}>
           {viewer.passed ? `all ${viewer.checks.length} checks passed` : `${failed.length} of ${viewer.checks.length} failed`}
         </Badge>
-        <span className="text-xs text-muted-text">folded solid and flat pattern</span>
+        <span className="text-xs text-body">folded solid and flat pattern</span>
       </div>
       <Caption>Shop rules · {rules.filter((c) => c.passed).length}/{rules.length}</Caption>
-      {rules.length ? list(rules) : <p className="text-xs text-muted-text">No flanges or cutouts to check.</p>}
+      {rules.length ? list(rules) : <p className="text-xs text-body">No flanges or cutouts to check.</p>}
       <Caption>Geometry and unfold · {geometry.filter((c) => c.passed).length}/{geometry.length}</Caption>
       {list(geometry)}
-      <p className="mt-3 text-xs text-muted-text">
+      <p className="mt-3 text-xs text-body">
         Rules are conservative shop defaults (flange ≥ 2.5T + R, holes ≥ 2T + R from a bend), not a specific press brake.
       </p>
     </div>

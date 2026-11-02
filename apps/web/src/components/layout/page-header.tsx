@@ -24,17 +24,17 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <div className="shrink-0 border-b border-line px-4 py-3 lg:px-6 lg:py-5">
+    <div className="shrink-0 px-4 pt-3 pb-3 lg:px-8 lg:pt-5 lg:pb-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2.5">
             {mark}
             {/* The phone header already shows the title; keep the h1 for assistive tech. */}
-            <h1 className="sr-only min-w-0 lg:not-sr-only lg:text-2xl">{title}</h1>
+            <h1 className="sr-only min-w-0 lg:not-sr-only lg:text-page">{title}</h1>
             {info}
           </div>
           {description ? (
-            <p className="max-w-[70ch] text-prose text-body lg:mt-1">{description}</p>
+            <p className="max-w-[70ch] text-sm text-body lg:mt-0.5">{description}</p>
           ) : null}
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
@@ -46,5 +46,5 @@ export function PageHeader({
 
 /** Standard scroll container for page bodies. */
 export function PageBody({ children }: { children: ReactNode }) {
-  return <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">{children}</div>;
+  return <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-1 pb-6 lg:px-8 lg:pt-2">{children}</div>;
 }

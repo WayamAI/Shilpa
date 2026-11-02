@@ -2,13 +2,13 @@
 
 import { GizmoHelper, GizmoViewport, Grid, OrbitControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 
-import { EmptyState, IconButton } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import type { CatalogPort, PartMesh } from "@/lib/api";
 
+import { ToolbarButton, ViewportToolbar } from "./chrome";
 import { usePalette, webglAvailable } from "./model-viewer";
 
 // One catalog part in its own millimetre frame, Z up, with its ports drawn as arrows along
@@ -104,12 +104,14 @@ export default function PartViewer({
   showPorts,
   selectedPort,
   busy,
+  onTogglePorts,
 }: {
   mesh: PartMesh | null;
   ports: CatalogPort[];
   showPorts: boolean;
   selectedPort: string | null;
   busy: boolean;
+  onTogglePorts?: () => void;
 }) {
   const palette = usePalette();
   const kinds = useKindColors();
@@ -164,27 +166,28 @@ export default function PartViewer({
         </GizmoHelper>
       </Canvas>
 
-      <div className="pointer-events-none absolute top-3 left-3 flex flex-wrap gap-2">
-        <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-muted-text">Units mm</span>
-        {showPorts ? (
-          <span className="flex items-center gap-2 rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-body">
-            {(["face", "axis", "point"] as const).map((k) => (
-              <span key={k} className="flex items-center gap-1">
-                <span className="inline-block size-2 rounded-full" style={{ background: kinds[k] }} aria-hidden />
-                {k}
-              </span>
-            ))}
-          </span>
-        ) : null}
-        {busy ? <span className="rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-body">Building…</span> : null}
+      <div className="absolute top-3 left-3 max-w-[calc(100%-24px)]">
+        <ViewportToolbar label="View">
+          <ToolbarButton active={showPorts} onClick={onTogglePorts} disabled={!onTogglePorts}>
+            Ports
+          </ToolbarButton>
+          <ToolbarButton onClick={() => setNonce((n) => n + 1)} disabled={!geometry} label="Fit view to part">
+            Fit
+          </ToolbarButton>
+          <ToolbarButton planned>Section</ToolbarButton>
+        </ViewportToolbar>
       </div>
-      {geometry ? (
-        <div className="absolute top-3 right-3">
-          <IconButton label="Reset view" onClick={() => setNonce((n) => n + 1)} className="bg-bg">
-            <RotateCcw size={14} strokeWidth={1.75} aria-hidden />
-          </IconButton>
+      {showPorts ? (
+        <div className="pointer-events-none absolute top-14 left-3 flex items-center gap-3 rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-body">
+          {(["face", "axis", "point"] as const).map((k) => (
+            <span key={k} className="flex items-center gap-1">
+              <span className="inline-block size-2 rounded-full" style={{ background: kinds[k] }} aria-hidden />
+              {k}
+            </span>
+          ))}
         </div>
       ) : null}
+      {busy ? <div className="pointer-events-none absolute top-3 right-3 rounded-full border border-line bg-bg px-2.5 py-1 text-xs text-body">Building…</div> : null}
     </div>
   );
 }
