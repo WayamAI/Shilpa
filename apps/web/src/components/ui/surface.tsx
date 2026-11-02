@@ -79,10 +79,14 @@ export function SplitRow({ children, className = "" }: { children: ReactNode; cl
 }
 
 /** Metric tile: label, value, optional hint. Sentence-case label. */
-export function Metric({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
+export function Metric({ label, value, hint, image }: { label: string; value: ReactNode; hint?: ReactNode; image?: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-lg border border-line bg-bg px-4 py-3.5">
-      <span className="truncate text-xs text-body">{label}</span>
+      <span className="flex min-w-0 items-start justify-between gap-2">
+        <span className="truncate text-xs text-body">{label}</span>
+        {/* eslint-disable-next-line @next/next/no-img-element -- decorative category icon */}
+        {image ? <img src={image} alt="" width={28} height={28} className="-mt-1 -mr-1 size-7 shrink-0" /> : null}
+      </span>
       <span className="text-2xl font-semibold tabular text-ink">{value}</span>
       {hint ? <span className="truncate text-xs text-muted-text">{hint}</span> : null}
     </div>

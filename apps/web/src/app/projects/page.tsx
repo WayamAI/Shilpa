@@ -85,15 +85,17 @@ export default function ProjectsPage() {
       <PageBody>
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-            <Metric label="Projects" value={projects ? String(projects.length) : "…"} hint={me?.tenant_name} />
-            <Metric label="Parts" value={projects ? String(models) : "…"} hint="across all projects" />
+            <Metric label="Projects" image="/imagery/sh-card-26-project-128.webp" value={projects ? String(projects.length) : "…"} hint={me?.tenant_name} />
+            <Metric label="Parts" image="/imagery/sh-card-15-parts-list-128.webp" value={projects ? String(models) : "…"} hint="across all projects" />
             <Metric
               label="Jobs completed"
+              image="/imagery/sh-card-11-pass-128.webp"
               value={jobs === null ? ", " : String(succeeded)}
               hint={jobs ? `${Math.round((succeeded / jobs) * 100)}% of ${jobs} jobs` : undefined}
             />
             <Metric
               label="Planner tokens"
+              image="/imagery/sh-card-22-planner-128.webp"
               value={tokens ? `${Math.round((tokens.input_tokens + tokens.output_tokens) / 1000)}k` : "…"}
               hint={tokens ? `${tokens.events} model calls` : "no model calls yet"}
             />

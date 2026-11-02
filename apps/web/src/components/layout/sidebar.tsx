@@ -13,6 +13,9 @@ import { clearSession, DEV_USERS, writeSession } from "@/lib/session";
 import { Logo } from "./logo";
 import { SearchIcon } from "./nav-icons";
 
+const PLANNER_ICON = "/imagery/sh-card-22-planner-128.webp";
+const FREECAD_ICON = "/imagery/sh-card-23-freecad-adapter-128.webp";
+
 /**
  * Rail (Paper · 00 Shell template): 232px, surface background, logo row,
  * search, nav, engine status, settings, account. The same content fills
@@ -63,15 +66,15 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <EngineStatus
         rows={[
-          { tone: "pass", label: "Kernel · build123d local" },
+          { tone: "pass", label: "Kernel · build123d local", image: "/imagery/sh-card-21-kernel-128.webp" },
           health
             ? health.llm_configured
-              ? { tone: "pass", label: `Planner · ${health.llm_deployment ?? "online"}` }
-              : { tone: health.planner === "disabled" ? "neutral" : "consent", label: health.planner === "disabled" ? "Planner · disabled" : "Planner · not configured" }
-            : { tone: "neutral", label: "Planner · checking…" },
+              ? { tone: "pass", label: `Planner · ${health.llm_deployment ?? "online"}`, image: PLANNER_ICON }
+              : { tone: health.planner === "disabled" ? "neutral" : "consent", label: health.planner === "disabled" ? "Planner · disabled" : "Planner · not configured", image: PLANNER_ICON }
+            : { tone: "neutral", label: "Planner · checking…", image: PLANNER_ICON },
           health?.freecad_available
-            ? { tone: "pass", label: "FreeCAD adapter · ready" }
-            : { tone: "neutral", label: "FreeCAD adapter · not installed" },
+            ? { tone: "pass", label: "FreeCAD adapter · ready", image: FREECAD_ICON }
+            : { tone: "neutral", label: "FreeCAD adapter · not installed", image: FREECAD_ICON },
         ]}
       />
 
@@ -111,7 +114,7 @@ function NavRow({ item, active, onNavigate }: { item: NavItem; active: boolean; 
   );
 }
 
-function EngineStatus({ rows }: { rows: { tone: BadgeTone; label: string }[] }) {
+function EngineStatus({ rows }: { rows: { tone: BadgeTone; label: string; image: string }[] }) {
   return (
     <Link
       href="/system"
@@ -119,9 +122,11 @@ function EngineStatus({ rows }: { rows: { tone: BadgeTone; label: string }[] }) 
       className="mb-2.5 flex flex-col gap-1.5 rounded-panel border border-line bg-bg px-3 py-2.5 transition-colors duration-fast hover:border-line-strong"
     >
       {rows.map((r) => (
-        <span key={r.label} className={`flex min-w-0 items-center gap-1.5 text-xs ${r.tone === "neutral" ? "text-muted-text" : "text-ink"}`}>
+        <span key={r.label} className={`flex min-w-0 items-center gap-2 text-xs ${r.tone === "neutral" ? "text-muted-text" : "text-ink"}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- decorative engine icon */}
+          <img src={r.image} alt="" width={18} height={18} className={`size-[18px] shrink-0 ${r.tone === "neutral" ? "opacity-60" : ""}`} />
+          <span className="min-w-0 flex-1 truncate">{r.label}</span>
           <Dot tone={r.tone} />
-          <span className="truncate">{r.label}</span>
         </span>
       ))}
     </Link>

@@ -31,13 +31,15 @@ export default function SystemPage() {
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
             <Metric
               label="Planner"
+              image="/imagery/sh-card-22-planner-128.webp"
               value={health ? (health.llm_configured ? "Online" : plannerOff ? "Disabled" : "Off") : "…"}
               hint={plannerOff ? "SHILPA_LLM=off · no model calls" : (health?.llm_deployment ?? "Azure OpenAI not configured")}
             />
-            <Metric label="Model calls" value={llm ? String(llm.events) : "0"} hint={llm ? `${(llm.input_tokens / 1000).toFixed(1)}k in · ${(llm.output_tokens / 1000).toFixed(1)}k out` : undefined} />
-            <Metric label="CAD compute" value={cpu ? `${Math.round(cpu.cpu_seconds)}s` : "0s"} hint={cpu ? `${cpu.events} geometry runs` : undefined} />
+            <Metric label="Model calls" image="/imagery/sh-card-08-mention-128.webp" value={llm ? String(llm.events) : "0"} hint={llm ? `${(llm.input_tokens / 1000).toFixed(1)}k in · ${(llm.output_tokens / 1000).toFixed(1)}k out` : undefined} />
+            <Metric label="CAD compute" image="/imagery/sh-card-21-kernel-128.webp" value={cpu ? `${Math.round(cpu.cpu_seconds)}s` : "0s"} hint={cpu ? `${cpu.events} geometry runs` : undefined} />
             <Metric
               label="Job success"
+              image="/imagery/sh-card-11-pass-128.webp"
               value={total ? `${Math.round(((jobs.succeeded ?? 0) / total) * 100)}%` : "…"}
               hint={total ? `${jobs.succeeded ?? 0} of ${total} jobs` : "no jobs yet"}
             />
@@ -47,28 +49,24 @@ export default function SystemPage() {
             <Panel title="Services">
               <ul className="flex flex-col">
                 {[
-                  { name: "API and job queue", detail: "FastAPI · SQLite · DB-backed queue", ok: !!health },
+                  { name: "API and job queue", image: "/imagery/sh-card-09-steps-128.webp", detail: "FastAPI · SQLite · DB-backed queue", ok: !!health },
                   {
                     name: "Planner",
                     image: "/imagery/sh-card-22-planner-128.webp",
                     detail: plannerOff ? "Disabled by SHILPA_LLM=off" : health?.llm_deployment ? `Azure OpenAI · ${health.llm_deployment}` : "Azure OpenAI",
                     ok: !!health?.llm_configured,
                   },
-                  { name: "Assemblies and sheet metal", detail: "Placement, interference, sweep, flat pattern · no AI needed", ok: !!health },
-                  { name: "Product templates", detail: health?.products_available ? "shilpa.product installed" : "Not installed yet", ok: !!health?.products_available },
+                  { name: "Assemblies and sheet metal", image: "/imagery/sh-card-18-mate-128.webp", detail: "Placement, interference, sweep, flat pattern · no AI needed", ok: !!health },
+                  { name: "Product templates", image: "/imagery/sh-card-02-complex-part-128.webp", detail: health?.products_available ? "shilpa.product installed" : "Not installed yet", ok: !!health?.products_available },
                   { name: "build123d engine", image: "/imagery/sh-card-21-kernel-128.webp", detail: `Open CASCADE · ${ops.length} operations`, ok: ops.length > 0 },
                   { name: "FreeCAD engine", image: "/imagery/sh-card-23-freecad-adapter-128.webp", detail: "Native FCStd export", ok: !!health?.freecad_available },
-                  { name: "Identity", detail: health?.auth_mode === "dev" ? "Local dev identities (Entra ID in Azure)" : "Entra ID", ok: !!me },
+                  { name: "Identity", image: "/imagery/sh-card-24-padlock-128.webp", detail: health?.auth_mode === "dev" ? "Local dev identities (Entra ID in Azure)" : "Entra ID", ok: !!me },
                 ].map((s) => (
                   <li key={s.name} className="flex items-center justify-between gap-3 border-b border-line py-2 last:border-b-0">
                     <span className="flex min-w-0 items-center gap-3">
                       <span className="flex size-8 shrink-0 items-center justify-center">
-                        {"image" in s && s.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element -- static decorative webp
-                          <img src={s.image} alt="" width={32} height={32} className="size-8" />
-                        ) : (
-                          <Dot tone={s.ok ? "pass" : "consent"} />
-                        )}
+                        {/* eslint-disable-next-line @next/next/no-img-element -- static decorative webp */}
+                        <img src={s.image} alt="" width={32} height={32} className="size-8" />
                       </span>
                       <span className="min-w-0">
                         <span className="block text-sm text-ink">{s.name}</span>
@@ -76,7 +74,7 @@ export default function SystemPage() {
                       </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-2">
-                      {"image" in s && s.image ? <Dot tone={s.ok ? "pass" : "consent"} /> : null}
+                      <Dot tone={s.ok ? "pass" : "consent"} />
                       <Badge tone={s.ok ? "pass" : "consent"}>{s.ok ? "available" : "unavailable"}</Badge>
                     </span>
                   </li>
