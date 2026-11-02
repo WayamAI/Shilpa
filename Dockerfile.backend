@@ -1,0 +1,58 @@
+# syntax=docker/dockerfile:1
+# One image for the API, the coordinator and the CAD worker (different CMD). Build context: repo root.
+#   docker build -f Dockerfile.backend -t shilpa-backend .
+#   docker build -f Dockerfile.backend --build-arg WITH_FREECAD=true -t shilpa-backend:freecad .   (optional, see docs)
+#
+# Roles (override CMD):
+#   api          python -m uvicorn shilpa.api.app:app --host 0.0.0.0 --port 8000     (default)
+#   coordinator  python -m shilpa.coordinator
+#   worker       python -m shilpa.workers.cad
+#
+# No secrets or .env are baked in: configuration is injected as environment at run time. The CAD worker
+# starts its geometry subprocess with an allow-listed environment (shilpa/workers/cad.py SAFE_ENV_KEYS), so
+# DATABASE_URL and cloud credentials are never visible to recipe code.
+
+ARG PYTHON_VERSION=3.12.16
+ARG UV_VERSION=0.13.6
+
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
+
+FROM python:${PYTHON_VERSION}-slim-trixie AS build
+COPY --from=uv /uv /usr/local/bin/uv
+ENV UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1 UV_PYTHON_DOWNLOADS=never UV_PROJECT_ENVIRONMENT=/opt/venv
+WORKDIR /app
+# Dependencies first (cached until pyproject.toml / uv.lock change). The project itself is not a package.
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+
+FROM python:${PYTHON_VERSION}-slim-trixie AS runtime
+ARG WITH_FREECAD=false
+# Shared library the OCP (OpenCascade) wheel needs: libGL (pulls libX11). Checked with ldd on OCP.so.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libgl1 \
+ && if [ "$WITH_FREECAD" = "true" ]; then apt-get install -y --no-install-recommends freecad-common freecad; fi \
+ && rm -rf /var/lib/apt/lists/*
+RUN groupadd --system --gid 10001 shilpa \
+ && useradd --system --uid 10001 --gid shilpa --create-home --home-dir /home/shilpa shilpa \
+ && mkdir -p /data && chown shilpa:shilpa /data
+COPY --from=build /opt/venv /opt/venv
+WORKDIR /app
+# Only what the runtime reads: the package, the planner example corpus and the starter assemblies.
+COPY shilpa ./shilpa
+COPY evals/corpus ./evals/corpus
+COPY evals/golden_assemblies.py ./evals/golden_assemblies.py
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    SHILPA_VAR_DIR=/data \
+    DATABASE_URL=sqlite:////data/shilpa.db \
+    SHILPA_AUTH_MODE=dev
+# Debian's freecad package ships freecadcmd; empty (and ignored) when WITH_FREECAD=false.
+ENV SHILPA_FREECAD_CMD=${WITH_FREECAD:+/usr/bin/freecadcmd}
+VOLUME ["/data"]
+USER 10001:10001
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD python -c "import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/v1/health',timeout=4).status==200 else 1)"
+CMD ["python", "-m", "uvicorn", "shilpa.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

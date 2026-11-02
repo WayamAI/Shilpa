@@ -32,7 +32,7 @@ There is no formatter configured.
 
 - **8000 may belong to another project** (Parikshan). Don't kill it. Run Shilpa's backend on another port: `uv run python -m shilpa.dev --no-studio --port 8010`.
 - Only one `next dev` can run per folder. For a second server, build with `SHILPA_API_ORIGIN=http://127.0.0.1:8010 npm run build`, then `node node_modules/next/dist/bin/next start --port 3101`. Use node directly: stopping an `npx` wrapper leaves the child holding the port.
-- Rewrites read `SHILPA_API_ORIGIN` at build time.
+- Rewrites read `SHILPA_API_ORIGIN` at build time for `next build`/`next start`. The Docker image substitutes it at container start instead (`apps/web/docker-entrypoint.sh`).
 - Dev identities: `dev@wayam.local` (admin), `viewer@wayam.local` (read-only), `other@example.com` (second tenant). The session is the `shilpa-session` cookie, shared across localhost ports.
 
 ## Cost discipline for agents

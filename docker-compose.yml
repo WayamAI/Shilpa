@@ -1,0 +1,123 @@
+# Local parity stack.   docker compose up --build
+#   studio  http://localhost:13000 (sign in as dev@wayam.local)      api  http://localhost:18000/v1/health
+# Today's code runs on SQLite in the `shilpa-data` volume shared by api, coordinator and worker.
+# The Postgres, Azurite (Blob) and Service Bus services are for the cloud adapters being added in build step 2:
+#   docker compose --profile cloud up        starts postgres + azurite
+# To point the backend at Postgres once the driver ships (psycopg in uv.lock), set before `up`:
+#   SHILPA_DATABASE_URL=postgresql+psycopg://shilpa:shilpa@postgres:5432/shilpa
+# Secrets: put them in an untracked .env next to this file (AZURE_OPENAI_*, OLLAMA_API_KEY); never in images.
+
+name: shilpa
+
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: Dockerfile.backend
+    args:
+      WITH_FREECAD: ${WITH_FREECAD:-false}
+  image: shilpa-backend:local
+  environment: &backend-env
+    DATABASE_URL: ${SHILPA_DATABASE_URL:-sqlite:////data/shilpa.db}
+    SHILPA_VAR_DIR: /data
+    SHILPA_AUTH_MODE: ${SHILPA_AUTH_MODE:-dev}
+    SHILPA_LLM: ${SHILPA_LLM:-off}   # off by default: no model call can leave the stack unless you opt in
+    SHILPA_LLM_PROVIDER: ${SHILPA_LLM_PROVIDER:-azure}
+    AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+    AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
+    AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+    AZURE_OPENAI_AUTH: ${AZURE_OPENAI_AUTH:-key}
+    OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+    # Cloud adapters (step 2) will read these; harmless today.
+    AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
+    SERVICEBUS_CONNECTION_STRING: ${SERVICEBUS_CONNECTION_STRING:-}
+  volumes:
+    - shilpa-data:/data
+  restart: unless-stopped
+
+services:
+  api:
+    <<: *backend
+    ports:
+      - "18000:8000"
+
+  coordinator:
+    <<: *backend
+    command: ["python", "-m", "shilpa.coordinator"]
+    healthcheck:
+      disable: true
+    depends_on:
+      api:
+        condition: service_healthy   # the API creates the schema on first start
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "shilpa.workers.cad"]
+    healthcheck:
+      disable: true
+    depends_on:
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: apps/web
+    image: shilpa-web:local
+    environment:
+      SHILPA_API_ORIGIN: http://api:8000   # runtime; rewritten by docker-entrypoint.sh
+    ports:
+      - "13000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---- cloud-parity services (profile "cloud") -------------------------------------------------
+  postgres:
+    profiles: ["cloud"]
+    image: postgres:18.6-trixie
+    environment:
+      POSTGRES_USER: shilpa
+      POSTGRES_PASSWORD: shilpa   # local only
+      POSTGRES_DB: shilpa
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql   # PG 18 images keep data under a versioned subfolder here
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shilpa -d shilpa"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  azurite:
+    profiles: ["cloud"]
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    command: ["azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--location", "/data", "--skipApiVersionCheck", "--loose"]
+    ports:
+      - "11000:10000"   # blob
+      - "11001:10001"   # queue
+      - "11002:10002"   # table
+    volumes:
+      - azurite-data:/data
+
+  # Azure Service Bus emulator: NOT enabled. It needs `ACCEPT_EULA=Y` (Microsoft's emulator EULA), a SQL Server
+  # / Azure SQL Edge container (its own EULA) and a Config.json declaring queues. Enable it deliberately:
+  #   servicebus-sql:
+  #     profiles: ["servicebus"]
+  #     image: mcr.microsoft.com/mssql/server:2022-latest
+  #     environment: { ACCEPT_EULA: "Y", MSSQL_SA_PASSWORD: "<strong password>" }
+  #   servicebus:
+  #     profiles: ["servicebus"]
+  #     image: mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.1
+  #     environment:
+  #       ACCEPT_EULA: "Y"
+  #       SQL_SERVER: servicebus-sql
+  #       MSSQL_SA_PASSWORD: "<same password>"
+  #     volumes: ["./docker/servicebus-config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro"]
+  #     ports: ["5672:5672"]
+  #     depends_on: [servicebus-sql]
+
+volumes:
+  shilpa-data:
+  postgres-data:
+  azurite-data:
