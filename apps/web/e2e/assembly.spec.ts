@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { signIn } from "./helpers";
+import { signIn, pickOption } from "./helpers";
 
 /**
  * Assemblies and sheet metal from the reference starters. None of this needs the AI
@@ -23,7 +23,7 @@ async function lastJobSucceeds(page: Page, timeout = 120_000) {
 }
 
 async function startFrom(page: Page, value: string) {
-  await page.getByLabel("Start from a reference assembly, sheet-metal part or product").selectOption(value);
+  await pickOption(page.getByLabel("Start from a reference assembly, sheet-metal part or product"), value);
   await lastJobSucceeds(page);
 }
 

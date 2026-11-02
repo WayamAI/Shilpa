@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { pickOption } from "./helpers";
+
 /**
  * Parts catalogue: browse, edit a parameter, see the part rebuild, inspect ports and data.
  * Previews build synchronously on the API (about a second each), no AI involved.
@@ -37,7 +39,7 @@ test("an invalid size explains itself, and the V-slot rail builds", async ({ pag
   await page.goto("/catalog");
   await page.getByLabel("Search parts").fill("v-slot");
   await page.getByTestId("catalog-list").getByRole("button", { name: /aluminium extrusion/ }).click();
-  await page.getByRole("combobox", { name: "Profile" }).selectOption("4040");
+  await pickOption(page.getByRole("combobox", { name: "Profile" }), "4040");
   await expect(page.getByText(/40 × 40 × 250 mm/)).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: info.outputPath("catalog-vslot.png") });
 
@@ -55,7 +57,7 @@ test("screws come from the standards' tables, lengths included", async ({ page }
   await page.getByRole("spinbutton", { name: "Length" }).fill("21");
   await expect(page.getByTestId("build-error")).toContainText("not a nominal iso4762 length", { timeout: 30_000 });
   await page.getByRole("spinbutton", { name: "Length" }).fill("25");
-  await page.getByRole("combobox", { name: "Size" }).selectOption("M8-1.25");
+  await pickOption(page.getByRole("combobox", { name: "Size" }), "M8-1.25");
   await expect(page.getByText(/ISO 4762 M8-1.25 x 25/).first()).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: info.outputPath("catalog-screw.png") });
 });

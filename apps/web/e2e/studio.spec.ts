@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { signIn } from "./helpers";
+import { signIn, pickOption } from "./helpers";
 
 const DRAWINGS = path.resolve(__dirname, "../../../evals/drawings");
 
@@ -56,7 +56,7 @@ test("reference part, parameter edit, restore and FreeCAD export", async ({ page
   await expect(page.getByText("No part yet")).toBeVisible();
 
   // Reference part P01: the analytic plate.
-  await page.getByLabel("Start from a reference part").selectOption("P01");
+  await pickOption(page.getByLabel("Start from a reference part"), "P01");
   await lastJobSucceeds(page);
   await expect(sizeChip(page)).toHaveText("80 × 40 × 8 mm");
   await page.getByRole("tab", { name: "Checks" }).click();

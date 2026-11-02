@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown } from "lucide-react";
+import { Check } from "lucide-react";
 import {
   cloneElement,
   forwardRef,
@@ -96,29 +96,6 @@ export const Textarea = forwardRef<HTMLTextAreaElement, ComponentPropsWithoutRef
 ) {
   return <textarea ref={ref} {...props} className={`min-h-[84px] w-full resize-none px-2.5 py-2 text-prose ${FIELD_BASE} ${className}`} />;
 });
-
-/** Native select: keeps platform keyboard and mobile pickers. */
-export const Select = forwardRef<HTMLSelectElement, Omit<ComponentPropsWithoutRef<"select">, "size"> & { size?: "md" | "sm" }>(
-  function Select({ className = "", size = "md", children, ...props }, ref) {
-    return (
-      <span className={`relative inline-flex min-w-0 ${className.includes("w-") ? "" : "w-full"} ${className}`}>
-        <select
-          ref={ref}
-          {...props}
-          className={`${size === "md" ? "h-8.5" : "h-7 text-xs"} w-full cursor-pointer appearance-none pr-8 pl-2.5 ${FIELD_BASE}`}
-        >
-          {children}
-        </select>
-        <ChevronDown
-          size={14}
-          strokeWidth={1.8}
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-muted"
-        />
-      </span>
-    );
-  },
-);
 
 /* ---------------------------------------------------------------------------
    Checkbox and radio. A real input under a drawn box, so keyboard, forms and

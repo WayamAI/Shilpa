@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { signIn } from "./helpers";
+import { signIn, pickOption } from "./helpers";
 
 /**
  * Template products (bicycle) through the job queue. The request parser is rule-based, so
@@ -31,7 +31,7 @@ test("reference road bike: parts, checks, router log, renders and STEP", async (
   test.setTimeout(300_000);
   await signIn(page);
   await newProject(page, `E2E bike ${Date.now()}`);
-  await page.getByLabel(STARTERS).selectOption("product:road_m");
+  await pickOption(page.getByLabel(STARTERS), "product:road_m");
   const card = page.getByTestId("job-card").last();
   await expect(card.getByText(/offline template parser/)).toBeVisible({ timeout: 60_000 }); // progress events stream in
   await lastJobSucceeds(page);
@@ -83,7 +83,7 @@ test("wide tyres: the router repairs the design", async ({ page }) => {
   test.setTimeout(360_000);
   await signIn(page);
   await newProject(page, `E2E bike repair ${Date.now()}`);
-  await page.getByLabel(STARTERS).selectOption("product:wide_tyres");
+  await pickOption(page.getByLabel(STARTERS), "product:wide_tyres");
   await lastJobSucceeds(page, 300_000);
   await page.getByRole("tab", { name: "Router" }).click();
   const router = page.getByTestId("router-panel");

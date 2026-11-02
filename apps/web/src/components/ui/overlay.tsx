@@ -100,12 +100,12 @@ function useDismiss(open: boolean, onClose: () => void, refs: RefObject<HTMLElem
 const noop = () => () => {};
 
 /** Renders into body in the same pass on the client, nothing on the server. */
-function Portal({ children }: { children: ReactNode }) {
+export function Portal({ children }: { children: ReactNode }) {
   const client = useSyncExternalStore(noop, () => true, () => false);
   return client ? createPortal(children, document.body) : null;
 }
 
-const PANEL = "z-50 overflow-auto rounded-lg border border-line-strong bg-bg shadow-popover motion-safe:animate-[overlay-in_var(--duration-fast)_var(--ease-out)]";
+export const PANEL = "z-50 overflow-auto rounded-lg border border-line-strong bg-bg shadow-popover motion-safe:animate-[overlay-in_var(--duration-fast)_var(--ease-out)]";
 
 /* ---------------------------------------------------------------------------
    Popover: a trigger plus a non-modal panel. Focus moves in on open and
