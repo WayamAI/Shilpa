@@ -357,6 +357,11 @@ export default function ComposePage() {
         </div>
 
         <div className="relative flex min-h-[260px] flex-1 flex-col px-4 pt-3 lg:min-h-0">
+          {version && version.validation_state !== "pending" && !version.validation_passed ? (
+            <p role="status" className="mb-2 rounded-panel border border-consent bg-consent-soft px-3 py-2 text-sm text-consent-text">
+              This version was built, but some checks failed (for example, a part that is not placed or mated). Open Checks on the project to see which.
+            </p>
+          ) : null}
           {version ? (
             <CompositionStage key={version.id} version={version} />
           ) : (

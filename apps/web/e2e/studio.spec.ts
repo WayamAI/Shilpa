@@ -153,5 +153,5 @@ test("the account menu switches between dev users", async ({ page }) => {
   await page.getByRole("button", { name: /^Account/ }).click();
   await expect(page.getByRole("menuitem", { name: /^Switch to / }).first()).toBeVisible();
   await page.getByRole("menuitem", { name: /^Switch to / }).first().click();
-  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page).toHaveURL(/\/home$/);
 });

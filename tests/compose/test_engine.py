@@ -266,3 +266,11 @@ def test_add_then_place_replays_to_the_same_instances():
     prog, reports = Expander(s.lib).run(s.applied, set())
     assert sorted(prog.instances) == sorted(card["spec"]["instances"][i]["id"] for i in range(len(card["spec"]["instances"])))
     assert not [b for r in reports for b in r.blockers]
+
+
+def test_spec_hash_treats_200_and_200_0_alike():
+    # The studio sends steps back via JSON.stringify, which writes 200.0 as 200; apply must not call that a change.
+    from shilpa.compose.lower import spec_hash
+
+    assert spec_hash({"p": {"length": 200.0, "d": [1.5, 2.0]}}) == spec_hash({"p": {"length": 200, "d": [1.5, 2]}})
+    assert spec_hash({"p": 1.5}) != spec_hash({"p": 1})

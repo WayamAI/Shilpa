@@ -79,6 +79,7 @@ class Library:
 
     natives: list[NativeItem] = field(default_factory=list)  # head versions, the ones mentions resolve to
     pinned: dict[str, NativeItem] = field(default_factory=dict)  # older versions pinned by applied steps
+    other_kinds: dict[str, str] = field(default_factory=dict)  # model id -> kind, for models Compose P0 cannot use
 
     def native(self, model_id: str) -> NativeItem | None:
         return next((n for n in self.natives if n.model_id == model_id), None)
@@ -253,6 +254,9 @@ def resolve_mention(mid: str, m: mp.Mention, library: Library, instances: dict[s
     return Resolution(mid, text, "unknown", message=f"{text} is not in this composition, your library or the catalog.")
 
 
+_KIND_TEXT = {"sheet_metal": "sheet metal", "assembly": "an assembly", "product": "a product"}
+
+
 def _resolve_pinned(mid, m, pinned: mp.PinnedRef, library: Library, instances, sel) -> Resolution:
     text = m.text
     if pinned.path and sel is None:
@@ -277,6 +281,10 @@ def _resolve_pinned(mid, m, pinned: mp.PinnedRef, library: Library, instances, s
                                               selector=sel), label=_catalog_label(gen, pinned.params))
     n = library.native(item)
     if n is None:
+        kind = library.other_kinds.get(item)
+        if kind:
+            return Resolution(mid, text, "invalid", message=f"{text}: Compose can only use plain parts and catalog parts for now, "
+                              f"and this one is {_KIND_TEXT.get(kind, kind)}")
         return Resolution(mid, text, "unknown", message=f"{text}: that part is not in your library")
     if pinned.version and pinned.version != n.version_id:
         return Resolution(mid, text, "invalid", message=f"{text}: version {pinned.version[:8]} is not the pinned head of {n.name} "

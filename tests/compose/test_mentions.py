@@ -116,3 +116,13 @@ def test_pinning():
         mp.pin_map([{"text": "@bracket", "ref": {}}])  # names nothing
     with pytest.raises(ValueError):
         mp.pin_map([{"text": "@bracket", "ref": {"item": "M1", "evil": 1}}])  # unknown fields refused
+
+
+def test_pinned_sheet_metal_says_why_it_cannot_be_composed():
+    from shilpa.compose.resolve import Library, resolve_prompt
+
+    pins = mp.pin_map([{"text": "@cover", "ref": {"item": "SM1"}}])
+    res, _ = resolve_prompt("ground @cover", Library(other_kinds={"SM1": "sheet_metal"}), {}, pins)
+    assert res[0].status == "invalid" and "sheet metal" in res[0].message
+    res, _ = resolve_prompt("ground @cover", Library(), {}, pins)
+    assert res[0].status == "unknown"

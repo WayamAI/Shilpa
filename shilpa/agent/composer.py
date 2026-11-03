@@ -43,7 +43,7 @@ Rules:
 - Map phrases to selectors and say so: "wherever there are holes" / "every hole" -> selector.path "holes[*]";
   "the 6 mm holes" -> filter diameter ≈ 6 mm; "holes on top" -> filter on .face.top. Record each mapping in assumptions.
 - Never compute coordinates, transforms or converted units. Copy numbers and units as typed; a number without a unit
-  keeps unit "mm" with provenance "assumed".
+  keeps unit "mm" with provenance "assumed". Never ask which unit a bare number is in; Shilpa shows the assumption.
 - If a mention's status is not "ok", or the request is unclear, emit one step with op "clarify" and a question.
   Never choose between candidates yourself.
 - Do not ask about details Shilpa defaults: leave them out and Shilpa records the default as an assumption.

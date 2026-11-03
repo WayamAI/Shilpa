@@ -95,7 +95,19 @@ def lower(prog: Program, name: str | None = None) -> dict[str, Any]:
 
 
 def spec_json(spec: dict) -> str:
-    return json.dumps(spec, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return json.dumps(_canon(spec), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def _canon(v):
+    """200.0 and 200 are the same number. JSON clients (the studio's JSON.stringify) send 200, so a card
+    read with 200.0 must hash the same when its steps come back, or apply refuses it as changed."""
+    if isinstance(v, float) and v.is_integer():
+        return int(v)
+    if isinstance(v, dict):
+        return {k: _canon(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_canon(x) for x in v]
+    return v
 
 
 def spec_hash(spec: dict) -> str:

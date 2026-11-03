@@ -109,6 +109,8 @@ def _library(s, p: Principal, applied: list[Step], extra_steps: list[dict] | Non
                      .order_by(Model.created_at, Model.id)).all()
     natives = [NativeItem(m.id, m.name, v.id, v.recipe) for m, v in rows]
     lib = Library(natives)
+    lib.other_kinds = dict(s.execute(select(Model.id, Model.kind).where(
+        Model.tenant_id == p.tenant_id, Model.kind.is_not(None), Model.kind != "part")).all())
     have = {n.version_id for n in natives}
     wanted = set()
     for st in applied:
